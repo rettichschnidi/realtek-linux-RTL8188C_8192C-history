@@ -502,6 +502,81 @@ void p2p_status(struct p2p *p, int flag)
 	}
 }
 
+void change_hostapd_op_ch(struct p2p *p, int op_ch)
+{
+	FILE *pfin = NULL;
+	FILE *pfout = NULL;
+	char parse[CMD_SZ] = { 0x00 };
+	char cmd[CMD_SZ] = { 0x00 };
+		
+	pfin = fopen( p->ap_conf, "r" );
+	pfout = fopen( "./p2p_hostapd_temp.conf", "w" );
+	
+	if( pfin && pfout )
+	{
+		while( !feof( pfin ) ){
+			memset( parse, 0x00, CMD_SZ );
+			fgets( parse, CMD_SZ, pfin );
+
+			if(strncmp(parse, "channel=", 8) == 0)
+			{
+				memset(parse, 0x00, CMD_SZ);
+				sprintf( parse, "channel=%d\n", op_ch );
+				fputs( parse, pfout );
+			}
+			else
+				fputs(parse, pfout);
+		}
+	}
+	else 
+	{
+		return;
+	}
+
+	if( pfin != NULL )
+		fclose( pfin );
+	if( pfout != NULL )
+		fclose( pfout );
+
+	memset( cmd, 0x00, CMD_SZ);
+	sprintf( cmd, "rm -rf %s", p->ap_conf );
+	system( cmd );
+	memset( cmd, 0x00, CMD_SZ);
+	sprintf( cmd, "mv ./p2p_hostapd_temp.conf %s", p->ap_conf );
+	system( cmd );
+
+	return;
+}
+
+void p2p_get_opch(struct p2p *p)
+{
+	FILE *pf=NULL;
+	int peer_op_ch = 0;
+	
+	memset( p->cmd, 0x00, CMD_SZ );
+	sprintf( p->cmd, "iwpriv %s p2p_get op_ch > cm.txt", p->ifname);
+	system( p->cmd );
+
+	pf = fopen( "./cm.txt", "r" );
+	if ( pf )
+	{
+		while( !feof( pf ) ){
+			memset( p->parse, 0x00, CMD_SZ );
+			fgets( p->parse, CMD_SZ, pf );
+			if( strncmp( p->parse, "Op_ch", 5) == 0 )
+			{
+				peer_op_ch = atoi( &p->parse[ 6 ] );
+				if( peer_op_ch != p->op_ch )
+				{
+					change_hostapd_op_ch( p, peer_op_ch );
+				}
+				break;
+			}	
+		}
+		fclose( pf );
+	}
+}
+
 void p2p_prov_disc_no_addr(struct p2p *p, char *msg)
 {
 	p->p2p_get=1;
@@ -686,6 +761,7 @@ void p2p_set_nego(struct p2p *p)
 		}
 		else if( p->role == P2P_ROLE_GO )
 		{
+			p2p_get_opch(p);
 			p2p_go_mode(p);
 		}
 	}
