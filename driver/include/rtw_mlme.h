@@ -242,7 +242,6 @@ struct mlme_priv {
 	_timer assoc_timer;
 
 	uint assoc_by_bssid;
-	uint assoc_by_rssi;
 
 	_timer scan_to_timer; // driver itself handles scan_timeout status.
 	u32 scan_start_time; // used to evaluate the time spent in scanning

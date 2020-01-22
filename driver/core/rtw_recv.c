@@ -41,6 +41,10 @@
 #include <wifi.h>
 #include <circ_buf.h>
 
+#ifdef CONFIG_NEW_SIGNAL_STAT_PROCESS
+static RTW_DECLARE_TIMER_HDL(signal_stat);
+#endif //CONFIG_NEW_SIGNAL_STAT_PROCESS
+
 
 void _rtw_init_sta_recv_priv(struct sta_recv_priv *psta_recvpriv)
 {
@@ -121,6 +125,19 @@ _func_enter_;
 #endif
 
 	res = padapter->HalFunc.init_recv_priv(padapter);
+
+#ifdef CONFIG_NEW_SIGNAL_STAT_PROCESS
+	#ifdef PLATFORM_LINUX
+	_init_timer(&precvpriv->signal_stat_timer, padapter->pnetdev, RTW_TIMER_HDL_NAME(signal_stat), padapter);
+	#elif defined(PLATFORM_OS_CE) || defined(PLATFORM_WINDOWS)
+	_init_timer(&precvpriv->signal_stat_timer, padapter->hndis_adapter, RTW_TIMER_HDL_NAME(signal_stat), padapter);
+	#endif
+
+	precvpriv->signal_stat_sampling_interval = 1000; //ms
+	//precvpriv->signal_stat_converging_constant = 5000; //ms
+
+	rtw_set_signal_stat_timer(precvpriv);
+#endif //CONFIG_NEW_SIGNAL_STAT_PROCESS
 
 exit:
 
@@ -2633,7 +2650,7 @@ else if(pHalData->bDumpRxPkt ==3){
 			retval = _FAIL; // only data frame return _SUCCESS
 			break;
 		case WIFI_DATA_TYPE: //data
-			adapter->ledpriv.LedControlHandler(adapter, LED_CTL_RX);
+			rtw_led_control(adapter, LED_CTL_RX);
 			pattrib->qos = (subtype & BIT(7))? 1:0;
 			retval = validate_recv_data_frame(adapter, precv_frame);
 			if (retval == _FAIL)
@@ -3139,7 +3156,8 @@ static int amsdu_to_msdu(_adapter *padapter, union recv_frame *prframe)
 		//nSubframe_Length = *((u16*)(pdata + 12));
 		//==m==>change the length order
 		//nSubframe_Length = (nSubframe_Length>>8) + (nSubframe_Length<<8);
-		nSubframe_Length = ntohs(*((u16*)(pdata + 12)));
+		//nSubframe_Length = ntohs(*((u16*)(pdata + 12)));
+		nSubframe_Length = RTW_GET_BE16(pdata + 12);
 
 		//ntohs(nSubframe_Length);
 
@@ -3205,7 +3223,8 @@ static int amsdu_to_msdu(_adapter *padapter, union recv_frame *prframe)
 		sub_skb = subframes[i];
 		/* convert hdr + possible LLC headers into Ethernet header */
 		//eth_type = (sub_skb->data[6] << 8) | sub_skb->data[7];
-		eth_type = ntohs(*(u16*)&sub_skb->data[6]);
+		//eth_type = ntohs(*(u16*)&sub_skb->data[6]);
+		eth_type = RTW_GET_BE16(&sub_skb->data[6]);
 		if (sub_skb->len >= 8 &&
 			((_rtw_memcmp(sub_skb->data, rfc1042_header, SNAP_SIZE) &&
 			  eth_type != ETH_P_AARP && eth_type != ETH_P_IPX) ||
@@ -3679,7 +3698,7 @@ static int enqueue_reorder_recvframe(struct recv_reorder_ctrl *preorder_ctrl, un
 
 static int recv_indicatepkts_in_order(_adapter *padapter, struct recv_reorder_ctrl *preorder_ctrl, int bforced)
 {
-//	_irqL irql;
+	_irqL irql;
 	//u8 bcancelled;
 	_list	*phead, *plist;
 	union recv_frame *prframe;
@@ -3726,6 +3745,9 @@ static int recv_indicatepkts_in_order(_adapter *padapter, struct recv_reorder_ct
 	// Check if there is any packet need indicate.
 	while(!rtw_is_list_empty(phead))
 	{
+		if(plist == phead)
+			break;											
+	
 		prframe = LIST_CONTAINOR(plist, union recv_frame, u);
 		pattrib = &prframe->u.hdr.attrib;
 
@@ -3787,7 +3809,12 @@ static int recv_indicatepkts_in_order(_adapter *padapter, struct recv_reorder_ct
 				if ((padapter->bDriverStopped == _FALSE) &&
 				    (padapter->bSurpriseRemoved == _FALSE))
 				{
+					_exit_critical_bh(&ppending_recvframe_queue->lock, &irql);//unlock before indicate packet
+					
 					rtw_recv_indicatepkt(padapter, prframe);		//indicate this recv_frame
+					
+					_enter_critical_bh(&ppending_recvframe_queue->lock, &irql);
+					
 				}
 			}
 			else if(pattrib->amsdu==1)
@@ -4140,7 +4167,7 @@ static int recv_func(_adapter *padapter, void *pcontext)
 		goto _exit_recv_func;
 	}
 	// DATA FRAME
-	padapter->ledpriv.LedControlHandler(padapter, LED_CTL_RX);
+	rtw_led_control(padapter, LED_CTL_RX);
 
 	prframe = decryptor(padapter, prframe);
 	if (prframe == NULL) {
@@ -4298,7 +4325,7 @@ _func_enter_;
 	//ptail = precvframe->u.hdr.rx_tail;
 	//pend = precvframe->u.hdr.rx_end;
 
-	//padapter->ledpriv.LedControlHandler(padapter, LED_CTL_RX);
+	//rtw_led_control(padapter, LED_CTL_RX);
 
 #ifdef CONFIG_SDIO_HCI
 	if (precvpriv->free_recvframe_cnt <= 1)
@@ -4346,4 +4373,73 @@ _func_exit_;
 
 	return ret;
 }
+
+#ifdef CONFIG_NEW_SIGNAL_STAT_PROCESS
+RTW_DECLARE_TIMER_HDL(signal_stat){
+//void rtw_signal_stat_timer_hdl(RTW_TIMER_HDL_ARGS){
+	_adapter *adapter = (_adapter *)FunctionContext;
+	struct recv_priv *recvpriv = &adapter->recvpriv;
+	
+	u32 tmp_s, tmp_q;
+	u8 avg_signal_strength = 0;
+	u8 avg_signal_qual = 0;
+	u32 num_signal_strength = 0;
+	u32 num_signal_qual = 0;
+	u8 _alpha = 3; // this value is based on converging_constant = 5000 and sampling_interval = 1000
+
+	if(recvpriv->signal_strength_data.update_req == 0) {// update_req is clear, means we got rx
+		avg_signal_strength = recvpriv->signal_strength_data.avg_val;
+		avg_signal_qual = recvpriv->signal_qual_data.avg_val;
+	}
+	
+	if(recvpriv->signal_qual_data.update_req == 0) {// update_req is clear, means we got rx
+		num_signal_strength = recvpriv->signal_strength_data.total_num;
+		num_signal_qual = recvpriv->signal_qual_data.total_num;
+	}
+	
+	// after avg_vals are accquired, we can re-stat the signal values
+	recvpriv->signal_strength_data.update_req = 1;
+	recvpriv->signal_qual_data.update_req = 1;
+
+	//update value of signal_strength, rssi, signal_qual
+	if(check_fwstate(&adapter->mlmepriv, _FW_UNDER_SURVEY) == _FALSE) {
+		tmp_s = (avg_signal_strength+(_alpha-1)*recvpriv->signal_strength);
+		if(tmp_s %_alpha)
+			tmp_s = tmp_s/_alpha + 1;
+		else
+			tmp_s = tmp_s/_alpha;
+		if(tmp_s>100)
+			tmp_s = 100;
+
+		tmp_q = (avg_signal_qual+(_alpha-1)*recvpriv->signal_qual);
+		if(tmp_q %_alpha)
+			tmp_q = tmp_q/_alpha + 1;
+		else
+			tmp_q = tmp_q/_alpha;
+		if(tmp_q>100)
+			tmp_q = 100;
+
+		recvpriv->signal_strength = tmp_s;
+		recvpriv->rssi = (s8)translate_percentage_to_dbm(tmp_s);
+		recvpriv->signal_qual = tmp_q;
+
+		#if 0
+		DBG_871X("%s signal_strength:%3u, rssi:%3d, signal_qual:%3u"
+			", num_signal_strength:%u, num_signal_qual:%u"
+			"\n"
+			, __FUNCTION__
+			, recvpriv->signal_strength
+			, recvpriv->rssi
+			, recvpriv->signal_qual
+			, num_signal_strength, num_signal_qual
+		);
+		#endif
+	}
+
+	rtw_set_signal_stat_timer(recvpriv);
+	
+}
+#endif //CONFIG_NEW_SIGNAL_STAT_PROCESS
+
+
 

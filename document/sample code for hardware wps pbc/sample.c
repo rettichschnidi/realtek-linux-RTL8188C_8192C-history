@@ -72,7 +72,8 @@ int main(int argc, char** argv)
 	int devsock;	
 	char ifrn_name[IFNAMSIZ];	/* if name, e.g. "wlan0" */
 	int cmd =  SIOCIWFIRSTPRIV + 0x05;
-
+	int req[2];
+	
 	printf("for example\n");
 
 /*
@@ -101,9 +102,9 @@ int main(int argc, char** argv)
 	
 	printf("my pid is %d\n", pid);
 
+	req[0]=0; req[1]=pid;
 
-  	wrq.u.data.pointer = (caddr_t)&pid;
-  	wrq.u.data.length = sizeof(int); 
+	memcpy(wrq.u.name, req, sizeof(int)*2);
 
  	if(iw_set_ext(devsock, ifrn_name, cmd, &wrq) < 0)
  	 {

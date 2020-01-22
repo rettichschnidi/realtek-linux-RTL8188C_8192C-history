@@ -5,8 +5,16 @@ EXTRA_CFLAGS += -O1
 #EXTRA_CFLAGS += -Werror
 #EXTRA_CFLAGS += -pedantic
 #EXTRA_CFLAGS += -Wshadow -Wpointer-arith -Wcast-qual -Wstrict-prototypes -Wmissing-prototypes 
-EXTRA_CFLAGS += -Wno-unused-variable -Wno-unused-value -Wno-unused-label -Wno-unused-parameter -Wno-uninitialized
-EXTRA_CFLAGS += -Wno-unused -Wno-unused-function
+
+EXTRA_CFLAGS += -Wno-unused-variable 
+EXTRA_CFLAGS += -Wno-unused-value 
+EXTRA_CFLAGS += -Wno-unused-label 
+EXTRA_CFLAGS += -Wno-unused-parameter
+EXTRA_CFLAGS += -Wno-unused-function
+EXTRA_CFLAGS += -Wno-unused
+
+EXTRA_CFLAGS += -Wno-uninitialized
+
 EXTRA_CFLAGS += -I$(src)/include
 
 CONFIG_AUTOCFG_CP = n
@@ -393,7 +401,7 @@ rtk_core :=	core/rtw_cmd.o \
 		core/rtw_io.o \
 		core/rtw_ioctl_query.o \
 		core/rtw_ioctl_set.o \
-		core/ieee80211.o \
+		core/rtw_ieee80211.o \
 		core/rtw_mlme.o \
 		core/rtw_mlme_ext.o \
 		core/rtw_wlan_util.o \

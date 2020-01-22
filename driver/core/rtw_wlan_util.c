@@ -1367,8 +1367,10 @@ void update_IOT_info(_adapter *padapter)
 			Switch_DM_Func(padapter, (~DYNAMIC_FUNC_HP), _FALSE);
 			break;
 		case realtekAP:
-			rtw_write16(padapter, 0x4cc, 0xffff);
-			rtw_write16(padapter, 0x546, 0x01c0);			
+			//rtw_write16(padapter, 0x4cc, 0xffff);
+			//rtw_write16(padapter, 0x546, 0x01c0);
+			//disable high power			
+			Switch_DM_Func(padapter, (~DYNAMIC_FUNC_HP), _FALSE);
 			break;
 		default:
 			pmlmeinfo->turboMode_cts2self = 0;

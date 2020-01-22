@@ -25,6 +25,10 @@
 #include <osdep_service.h>		
 #include <drv_types.h>
 
+#ifdef CONFIG_HAS_EARLYSUSPEND
+#include <linux/earlysuspend.h>
+#endif //CONFIG_HAS_EARLYSUSPEND
+
 
 #define FW_PWR0	0	
 #define FW_PWR1 	1
@@ -244,6 +248,21 @@ struct	pwrctrl_priv {
 	u8		brfoffbyhw;
 	unsigned long PS_BBRegBackup[PSBBREG_TOTALCNT];
 	
+	#ifdef CONFIG_RESUME_IN_WORKQUEUE
+	struct workqueue_struct *rtw_workqueue;
+	_workitem resume_work;
+	#endif
+
+	#ifdef CONFIG_HAS_EARLYSUSPEND
+	struct early_suspend early_suspend;
+	u8 do_late_resume;
+	#endif //CONFIG_HAS_EARLYSUSPEND
+
+	#ifdef CONFIG_ANDROID_POWER
+	android_early_suspend_t early_suspend;
+	u8 do_late_resume;
+	#endif
+	
 };
 
 #define rtw_get_ips_mode_req(pwrctrlpriv) \
@@ -291,5 +310,16 @@ rt_rf_power_state RfOnOffDetect(IN	PADAPTER pAdapter );
 void LPS_Enter(PADAPTER padapter);
 void LPS_Leave(PADAPTER padapter);
 #endif
+
+#ifdef CONFIG_RESUME_IN_WORKQUEUE
+void rtw_resume_in_workqueue(struct pwrctrl_priv *pwrpriv);
+#endif //CONFIG_RESUME_IN_WORKQUEUE
+
+#if defined(CONFIG_HAS_EARLYSUSPEND ) || defined(CONFIG_ANDROID_POWER)
+#define rtw_is_earlysuspend_registered(pwrpriv) (pwrpriv)->early_suspend.suspend
+void rtw_register_early_suspend(struct pwrctrl_priv *pwrpriv);
+void rtw_unregister_early_suspend(struct pwrctrl_priv *pwrpriv);
+#endif //CONFIG_HAS_EARLYSUSPEND || CONFIG_ANDROID_POWER
+
 
 #endif  //__RTL871X_PWRCTRL_H_

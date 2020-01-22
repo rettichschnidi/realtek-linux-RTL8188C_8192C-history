@@ -102,6 +102,8 @@ _func_enter_;
 	_rtw_init_sema(&pxmitpriv->xmit_sema, 0);
 	_rtw_init_sema(&pxmitpriv->terminate_xmitthread_sema, 0);
 
+	ATOMIC_SET(&pxmitpriv->HwRdyXmitData, 1);
+
 	/* 
 	Please insert all the queue initializaiton using _rtw_init_queue below
 	*/
@@ -635,9 +637,9 @@ static s32 update_attrib(_adapter *padapter, _pkt *pkt, struct pkt_attrib *pattr
 	} else {
 		psta = rtw_get_stainfo(pstapriv, pattrib->ra);
 		if (psta == NULL)	{ // if we cannot get psta => drrp the pkt
-			RT_TRACE(_module_rtl871x_xmit_c_, _drv_alert_, ("\nupdate_attrib => get sta_info fail, ra:" MACSTR"\n", MAC2STR(pattrib->ra)));
+			RT_TRACE(_module_rtl871x_xmit_c_, _drv_alert_, ("\nupdate_attrib => get sta_info fail, ra:" MAC_FMT"\n", MAC_ARG(pattrib->ra)));
 			#ifdef DBG_TX_DROP_FRAME
-			DBG_871X("DBG_TX_DROP_FRAME %s get sta_info fail, ra:" MACSTR"\n", __FUNCTION__, MAC2STR(pattrib->ra));
+			DBG_871X("DBG_TX_DROP_FRAME %s get sta_info fail, ra:" MAC_FMT"\n", __FUNCTION__, MAC_ARG(pattrib->ra));
 			#endif
 			res =_FAIL;
 			goto exit;
@@ -652,9 +654,9 @@ static s32 update_attrib(_adapter *padapter, _pkt *pkt, struct pkt_attrib *pattr
 	else
 	{
 		// if we cannot get psta => drop the pkt
-		RT_TRACE(_module_rtl871x_xmit_c_, _drv_alert_, ("\nupdate_attrib => get sta_info fail, ra:" MACSTR "\n", MAC2STR(pattrib->ra)));
+		RT_TRACE(_module_rtl871x_xmit_c_, _drv_alert_, ("\nupdate_attrib => get sta_info fail, ra:" MAC_FMT "\n", MAC_ARG(pattrib->ra)));
 		#ifdef DBG_TX_DROP_FRAME
-		DBG_871X("DBG_TX_DROP_FRAME %s get sta_info fail, ra:" MACSTR"\n", __FUNCTION__, MAC2STR(pattrib->ra));
+		DBG_871X("DBG_TX_DROP_FRAME %s get sta_info fail, ra:" MAC_FMT"\n", __FUNCTION__, MAC_ARG(pattrib->ra));
 		#endif
 		res = _FAIL;
 		goto exit;
@@ -3300,7 +3302,7 @@ s32 rtw_xmit(_adapter *padapter, _pkt *pkt)
 	}
 	pxmitframe->pkt = pkt;
 
-	padapter->ledpriv.LedControlHandler(padapter, LED_CTL_TX);
+	rtw_led_control(padapter, LED_CTL_TX);
 
 	if (padapter->HalFunc.hal_xmit(padapter, pxmitframe) == _FALSE)
 		return 1;

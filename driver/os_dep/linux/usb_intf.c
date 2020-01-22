@@ -34,12 +34,6 @@
 
 #endif
 
-#ifdef CONFIG_RESUME_IN_WORKQUEUE
-#include <linux/workqueue.h>
-static struct workqueue_struct *rtw_workqueue;
-static struct work_struct rtw_resume_work;
-#endif
-
 #include <usb_vendor_req.h>
 #include <usb_ops.h>
 #include <usb_osintf.h>
@@ -61,7 +55,6 @@ extern int rtw_ampdu_enable;//for enable tx_ampdu
 #endif
 
 static struct usb_interface *pintf;
-static struct usb_interface  *net_pusb = NULL; // keep usb_interface for resume in workqueue
 
 #ifdef CONFIG_GLOBAL_UI_PID
 int ui_pid[3] = {0, 0, 0};
@@ -71,7 +64,7 @@ int ui_pid[3] = {0, 0, 0};
 extern int pm_netdev_open(struct net_device *pnetdev,u8 bnormal);
 static int rtw_suspend(struct usb_interface *intf, pm_message_t message);
 static int rtw_resume(struct usb_interface *intf);
-static int rtw_resume_process(struct usb_interface *pusb_intf);
+int rtw_resume_process(struct usb_interface *pusb_intf);
 
 
 static int rtw_drv_init(struct usb_interface *pusb_intf,const struct usb_device_id *pdid);
@@ -291,7 +284,6 @@ u8 rtw_deinit_intf_priv(_adapter * padapter)
 		rtw_mfree(padapter->dvobjpriv.usb_alloc_vendor_req_buf,MAX_USB_IO_CTL_SIZE);
 	}
 	
-exit:
 	return rst;
 	
 }
@@ -677,7 +669,7 @@ int rtw_hw_suspend(_adapter *padapter )
 			{
 				_clr_fwstate_(pmlmepriv, _FW_LINKED);
 
-				padapter->ledpriv.LedControlHandler(padapter, LED_CTL_NO_LINK);
+				rtw_led_control(padapter, LED_CTL_NO_LINK);
 
 				rtw_os_indicate_disconnect(padapter);
 				
@@ -810,11 +802,9 @@ static int rtw_suspend(struct usb_interface *pusb_intf, pm_message_t message)
 		if(check_fwstate(pmlmepriv, WIFI_STATION_STATE) && check_fwstate(pmlmepriv, _FW_LINKED) )
 		{
 			//printk("%s:%d assoc_ssid:%s\n", __FUNCTION__, __LINE__, pmlmepriv->assoc_ssid.Ssid);
-			DBG_871X("%s:%d %s(%02x:%02x:%02x:%02x:%02x:%02x), length:%d assoc_ssid.length:%d\n",__FUNCTION__, __LINE__,
+			DBG_871X("%s:%d %s(" MAC_FMT "), length:%d assoc_ssid.length:%d\n",__FUNCTION__, __LINE__,
 					pmlmepriv->cur_network.network.Ssid.Ssid,
-					pmlmepriv->cur_network.network.MacAddress[0],pmlmepriv->cur_network.network.MacAddress[1],
-					pmlmepriv->cur_network.network.MacAddress[2],pmlmepriv->cur_network.network.MacAddress[3],
-					pmlmepriv->cur_network.network.MacAddress[4],pmlmepriv->cur_network.network.MacAddress[5],
+					MAC_ARG(pmlmepriv->cur_network.network.MacAddress),
 					pmlmepriv->cur_network.network.Ssid.SsidLength,
 					pmlmepriv->assoc_ssid.SsidLength);
 			
@@ -858,24 +848,22 @@ static int rtw_resume(struct usb_interface *pusb_intf)
 	_adapter *padapter = (_adapter*)rtw_netdev_priv(pnetdev);
 	struct pwrctrl_priv *pwrpriv = &padapter->pwrctrlpriv;
 	 int ret = 0;
-	 int ret_queue;
-	 net_pusb = NULL;
  
 	if(pwrpriv->bInternalAutoSuspend ){
  		ret = rtw_resume_process(pusb_intf);
 	} else {
-
 #ifdef CONFIG_RESUME_IN_WORKQUEUE
-		// accquire system's suspend lock preventing from falliing asleep while resume in workqueue
-		rtw_lock_suspend();
-
-		net_pusb  = pusb_intf;
-		ret_queue=queue_work(rtw_workqueue, &rtw_resume_work);
-		DBG_871X("%s:%d queue_work(rtw_workqueue, &rtw_resume_work) return %d\n",__FUNCTION__, __LINE__,ret_queue);
-#else
+		rtw_resume_in_workqueue(pwrpriv);
+#elif defined(CONFIG_HAS_EARLYSUSPEND) || defined(CONFIG_ANDROID_POWER)
+		if(rtw_is_earlysuspend_registered(pwrpriv)) {
+			//jeff: bypass resume here, do in late_resume
+			pwrpriv->do_late_resume = _TRUE;
+		} else {
+			ret = rtw_resume_process(pusb_intf);
+		}
+#else // Normal resume process
 		ret = rtw_resume_process(pusb_intf);
-#endif
-
+#endif //CONFIG_RESUME_IN_WORKQUEUE
 	}
 	
 	return ret;
@@ -883,7 +871,7 @@ static int rtw_resume(struct usb_interface *pusb_intf)
 }
 
 
-static int rtw_resume_process(struct usb_interface *pusb_intf)
+int rtw_resume_process(struct usb_interface *pusb_intf)
 {
 	struct net_device *pnetdev;
 	struct usb_device *usb_dev;
@@ -894,13 +882,7 @@ static int rtw_resume_process(struct usb_interface *pusb_intf)
 
 	DBG_8192C("###########  rtw_resume  #################\n");
 
-	DBG_871X("%s:%d net_pusb:%p, pusb_intf:%p\n"
-		, __FUNCTION__, __LINE__, net_pusb, pusb_intf);
-
-	if(net_pusb) {
-		pnetdev=usb_get_intfdata(pintf);
-		usb_dev = interface_to_usbdev(pintf);
-	} else if(pusb_intf) {
+	if(pusb_intf) {
 		pnetdev=usb_get_intfdata(pusb_intf);
 		usb_dev = interface_to_usbdev(pusb_intf);
 	} else {
@@ -964,8 +946,13 @@ static int rtw_resume_process(struct usb_interface *pusb_intf)
 #ifdef CONFIG_LAYER2_ROAMING_RESUME
 	rtw_roaming(padapter, NULL);
 #endif	
-	printk("###########  rtw_resume  done#################\n");
+	
+	DBG_871X("###########  rtw_resume  done#################\n");
+	
+	#ifdef CONFIG_RESUME_IN_WORKQUEUE
 	rtw_unlock_suspend();
+	#endif //CONFIG_RESUME_IN_WORKQUEUE
+	
 	_func_exit_;
 	
 	return 0;
@@ -973,8 +960,13 @@ error_exit:
 	DBG_8192C("%s, Open net dev failed \n",__FUNCTION__);
 
 	DBG_871X("###########  rtw_resume  done with error#################\n");
+	
+	#ifdef CONFIG_RESUME_IN_WORKQUEUE
 	rtw_unlock_suspend();
+	#endif //CONFIG_RESUME_IN_WORKQUEUE
+	
 	_func_exit_;
+	
 	return (-1);
 }
 
@@ -1198,7 +1190,7 @@ static int rtw_drv_init(struct usb_interface *pusb_intf, const struct usb_device
 	rtw_macaddr_cfg(padapter->eeprompriv.mac_addr);
 
 	_rtw_memcpy(pnetdev->dev_addr, padapter->eeprompriv.mac_addr, ETH_ALEN);
-	DBG_8192C("MAC Address from pnetdev->dev_addr= " MACSTR "\n", MAC2STR(pnetdev->dev_addr));	
+	DBG_8192C("MAC Address from pnetdev->dev_addr= " MAC_FMT "\n", MAC_ARG(pnetdev->dev_addr));	
 
 
 	//step 6.
@@ -1391,16 +1383,6 @@ static int __init rtw_drv_entry(void)
 	//console_suspend_enabled=0;
 #endif	
 
-#ifdef CONFIG_RESUME_IN_WORKQUEUE
-	INIT_WORK(&rtw_resume_work, (work_func_t)rtw_resume_process);
-	rtw_workqueue = create_singlethread_workqueue("rtw_workqueue");
-	
-	if (rtw_workqueue == NULL) {
-		printk("%s, %d, create_workqueuen fail\n", __FILE__, __LINE__);
-		return -ENOMEM;
-	}
-#endif
-
 	rtw_suspend_lock_init();
 
 	drvpriv.drv_registered = _TRUE;
@@ -1412,15 +1394,8 @@ static void __exit rtw_drv_halt(void)
 	RT_TRACE(_module_hci_intfs_c_,_drv_err_,("+rtw_drv_halt\n"));
 	DBG_8192C("+rtw_drv_halt\n");
 
-#ifdef CONFIG_RESUME_IN_WORKQUEUE
-	if (rtw_workqueue) { 
-		flush_workqueue(rtw_workqueue);
-		destroy_workqueue(rtw_workqueue);
-	}
-#endif
-
 	rtw_suspend_lock_uninit();
-	
+
 	drvpriv.drv_registered = _FALSE;
 	usb_deregister(&drvpriv.rtw_usb_drv);
 	DBG_8192C("-rtw_drv_halt\n");

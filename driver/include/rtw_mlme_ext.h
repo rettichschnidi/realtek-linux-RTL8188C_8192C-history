@@ -313,7 +313,7 @@ struct mlme_ext_priv
 	unsigned char	cur_wireless_mode;
 	//unsigned char	channel_set[NUM_CHANNELS];
 	unsigned char	max_chan_nums;
-	RT_CHANNEL_INFO		channel_set[NUM_CHANNELS];
+	RT_CHANNEL_INFO		channel_set[MAX_CHANNEL_NUM];
 	unsigned char	basicrate[NumRates];
 	unsigned char	datarate[NumRates];
 	
@@ -518,6 +518,12 @@ void link_timer_hdl (_adapter *padapter);
 void addba_timer_hdl(struct sta_info *psta);
 //void reauth_timer_hdl(_adapter *padapter);
 //void reassoc_timer_hdl(_adapter *padapter);
+
+#define set_survey_timer(mlmeext, ms) \
+	do { \
+		/*DBG_871X("%s set_survey_timer(%p, %d)\n", __FUNCTION__, (mlmeext), (ms));*/ \
+		_set_timer(&(mlmeext)->survey_timer, (ms)); \
+	} while(0)
 
 #define set_link_timer(mlmeext, ms) \
 	do { \

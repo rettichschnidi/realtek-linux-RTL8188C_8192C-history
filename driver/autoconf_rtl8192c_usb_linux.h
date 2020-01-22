@@ -53,7 +53,7 @@
 #ifndef CONFIG_MP_INCLUDED
 #define CONFIG_IPS	1
 #ifdef CONFIG_IPS
-//#define CONFIG_IPS_LEVEL_2	1
+	//#define CONFIG_IPS_LEVEL_2	1 //enable this to set default IPS mode to IPS_LEVEL_2
 #endif
 #define SUPPORT_HW_RFOFF_DETECTED	1
 
@@ -89,15 +89,22 @@
 
 #define CONFIG_SKB_COPY	1//for amsdu
 
+#define CONFIG_LED
+#ifdef CONFIG_LED
+	//#define CONFIG_FORCE_HW_LED
+#endif // CONFIG_LED
+#define CONFIG_HANDLE_JOINBSS_ON_ASSOC_RSP
+
 #define USB_INTERFERENCE_ISSUE // this should be checked in all usb interface
 #define CONFIG_GLOBAL_UI_PID
 
 #define CONFIG_LAYER2_ROAMING
 #define CONFIG_LAYER2_ROAMING_RESUME
 //#define CONFIG_ADAPTOR_INFO_CACHING_FILE // now just applied on 8192cu only, should make it general...
-
 //#define CONFIG_RESUME_IN_WORKQUEUE
 //#define CONFIG_SET_SCAN_DENY_TIMER
+#define CONFIG_LONG_DELAY_ISSUE
+#define CONFIG_NEW_SIGNAL_STAT_PROCESS
 
 /*
  * Interface  Related Config
@@ -186,11 +193,17 @@
 
 #define CONFIG_PROC_DEBUG	1
 
+//#define DBG_IO
+//#define DBG_DELAY_OS
+//#define DBG_MEM_ALLOC
+//#define DBG_IOCTL
+
 //#define DBG_TX
 //#define DBG_XMIT_BUF
 //#define DBG_TX_DROP_FRAME
 
-//#define DBG_MEM_ALLOC
 //#define DBG_RX_DROP_FRAME
 //#define DBG_RX_SEQ
+
+//#define DBG_SHOW_MCUFWDL_BEFORE_51_ENABLE
 

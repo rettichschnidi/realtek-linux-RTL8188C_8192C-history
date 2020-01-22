@@ -56,8 +56,16 @@
 			 Configure file sample for wpa_supplicant-0.8		 
 		
 		4.3 wpa_supplicant-0.6.9_wps_patch_20100201_1.zip	 
-			 
-	5. install.sh
+			
+	5. android_reference_codes/
+	
+		5.1 realtek_wifi_SDK_for_android_20110715.tar.gz
+			This tar ball includes our android wifi reference codes
+			
+		5.2 realtek_wifi_SDK_for_android_20110715.txt
+			A guide for porting Realtek wifi onto your Android system
+			
+	6. install.sh
 	   Script to easy make 8192cu driver.
 	
 ==================================================================================================================	

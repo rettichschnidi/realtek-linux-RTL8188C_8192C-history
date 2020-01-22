@@ -33,10 +33,15 @@
 #define CONFIG_ANDROID
 #endif
 
-#ifdef RESUME_IN_WORKQUEUE
+#if defined(CONFIG_HAS_EARLYSUSPEND) && defined (CONFIG_RESUME_IN_WORKQUEUE)
+	#warning "You have CONFIG_HAS_EARLYSUSPEND enabled in your system, we disable CONFIG_RESUME_IN_WORKQUEUE automatically.\n"
+	#undef CONFIG_RESUME_IN_WORKQUEUE
+#endif
+
+#ifdef CONFIG_RESUME_IN_WORKQUEUE
 	#if !defined( CONFIG_WAKELOCK) && !defined(CONFIG_ANDROID_POWER)
-	#error "enable RESUME_IN_WORKQUEUE without CONFIG_WAKELOCK or CONFIG_ANDROID_POWER will suffer from the danger of wifi's unfunctionality...\n"
-	#error "If you still want to enable RESUME_IN_WORKQUEUE in this case, mask this preprossor checking and GOOD LUCK...\n"
+	#error "enable CONFIG_RESUME_IN_WORKQUEUE without CONFIG_WAKELOCK or CONFIG_ANDROID_POWER will suffer from the danger of wifi's unfunctionality...\n"
+	#error "If you still want to enable CONFIG_RESUME_IN_WORKQUEUE in this case, mask this preprossor checking and GOOD LUCK...\n"
 	#endif
 #endif
 

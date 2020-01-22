@@ -189,7 +189,7 @@ void rtl8192c_silentreset_for_specific_platform(_adapter *padapter)
 	_set_timer(&padapter->mlmepriv.dynamic_chk_timer, 2000);	
 				
 	if (netif_queue_stopped(padapter->pnetdev))
-		netif_wake_queue(padapter->pnetdev);	
+		netif_wake_queue(padapter->pnetdev);
 }
 
 void rtl8192c_sreset_xmit_status_check(_adapter *padapter)

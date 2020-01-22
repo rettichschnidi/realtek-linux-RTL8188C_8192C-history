@@ -76,6 +76,14 @@ int rtw_power_mgnt = 1;
 #else
 int rtw_power_mgnt = PS_MODE_ACTIVE;
 #endif	
+
+#ifdef CONFIG_IPS_LEVEL_2
+int rtw_ips_mode = IPS_LEVEL_2;
+#else
+int rtw_ips_mode = IPS_NORMAL;
+#endif
+module_param(rtw_ips_mode, int, 0644);
+
 int rtw_radio_enable = 1;
 int rtw_long_retry_lmt = 7;
 int rtw_short_retry_lmt = 7;
@@ -177,13 +185,13 @@ module_param(rtw_hwpdn_mode, int, 0644);
 module_param(rtw_hwpwrp_detect, int, 0644);
 
 #ifdef CONFIG_ADAPTOR_INFO_CACHING_FILE
-char *adaptor_info_caching_file_path= "/data/misc/wifi/rtw_cache";
-module_param(adaptor_info_caching_file_path, charp, 0644);
+char *rtw_adaptor_info_caching_file_path= "/data/misc/wifi/rtw_cache";
+module_param(rtw_adaptor_info_caching_file_path, charp, 0644);
 #endif
 
 #ifdef CONFIG_LAYER2_ROAMING
-uint max_roaming_times=2;
-module_param(max_roaming_times, uint, 0644);
+uint rtw_max_roaming_times=2;
+module_param(rtw_max_roaming_times, uint, 0644);
 #endif
 
 static uint loadparam( _adapter *padapter,  _nic_hdl	pnetdev);
@@ -224,7 +232,15 @@ void rtw_proc_init_one(struct net_device *dev)
 			DBG_8192C(KERN_ERR "Unable to create rtw_proc directory\n");
 			return;
 		}
+
+		entry = create_proc_read_entry("ver_info", S_IFREG | S_IRUGO, rtw_proc, proc_get_drv_version, dev);				   
+		if (!entry) {
+			DBG_871X("Unable to create_proc_read_entry!\n"); 
+			return;
+		}
 	}
+
+	
 
 	if(padapter->dir_dev == NULL)
 	{
@@ -370,6 +386,13 @@ void rtw_proc_init_one(struct net_device *dev)
 	}
 #endif
 
+	entry = create_proc_read_entry("rx_signal", S_IFREG | S_IRUGO,
+				   dir_dev, proc_get_rx_signal, dev);				   
+	if (!entry) {
+		DBG_871X("Unable to create_proc_read_entry!\n"); 
+		return;
+	}
+	entry->write_proc = proc_set_rx_signal;
 
 }
 
@@ -407,6 +430,8 @@ void rtw_proc_remove_one(struct net_device *dev)
 #ifdef CONFIG_FIND_BEST_CHANNEL
 		remove_proc_entry("best_channel", dir_dev);
 #endif 
+		remove_proc_entry("rx_signal", dir_dev);
+
 		remove_proc_entry(dev->name, rtw_proc);
 		dir_dev = NULL;
 		
@@ -421,6 +446,8 @@ void rtw_proc_remove_one(struct net_device *dev)
 	if(rtw_proc_cnt == 0)
 	{
 		if(rtw_proc){
+			remove_proc_entry("ver_info", rtw_proc);
+			
 #if(LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24))
 			remove_proc_entry(rtw_proc_name, proc_net);
 #else
@@ -461,6 +488,7 @@ _func_enter_;
 	registry_par->soft_ap=  (u8)rtw_soft_ap;
 	//registry_par->smart_ps =  (u8)rtw_smart_ps;  
 	registry_par->power_mgnt = (u8)rtw_power_mgnt;
+	registry_par->ips_mode = (u8)rtw_ips_mode;
 	registry_par->radio_enable = (u8)rtw_radio_enable;
 	registry_par->long_retry_lmt = (u8)rtw_long_retry_lmt;
 	registry_par->short_retry_lmt = (u8)rtw_short_retry_lmt;
@@ -514,12 +542,12 @@ _func_enter_;
 	registry_par->hw_wps_pbc = (u8)rtw_hw_wps_pbc;
 
 #ifdef CONFIG_ADAPTOR_INFO_CACHING_FILE
-	snprintf(registry_par->adaptor_info_caching_file_path, PATH_LENGTH_MAX, "%s",adaptor_info_caching_file_path);
+	snprintf(registry_par->adaptor_info_caching_file_path, PATH_LENGTH_MAX, "%s",rtw_adaptor_info_caching_file_path);
 	registry_par->adaptor_info_caching_file_path[PATH_LENGTH_MAX-1]=0;
 #endif
 
 #ifdef CONFIG_LAYER2_ROAMING
-	registry_par->max_roaming_times = (u8)max_roaming_times;
+	registry_par->max_roaming_times = (u8)rtw_max_roaming_times;
 #endif
 
 _func_exit_;
@@ -862,6 +890,10 @@ u8 rtw_reset_drv_sw(_adapter *padapter)
 	//mlmeextpriv
 	padapter->mlmeextpriv.sitesurvey_res.state= SCAN_DISABLE;
 
+#ifdef CONFIG_NEW_SIGNAL_STAT_PROCESS
+	rtw_set_signal_stat_timer(&padapter->recvpriv);
+#endif
+
 	return ret8;
 }
 
@@ -921,7 +953,7 @@ _func_enter_;
 	}
 
 	_rtw_memset((unsigned char *)&padapter->securitypriv, 0, sizeof (struct security_priv));	
-	_init_timer(&(padapter->securitypriv.tkip_timer), padapter->pnetdev, rtw_use_tkipkey_handler, padapter);
+	//_init_timer(&(padapter->securitypriv.tkip_timer), padapter->pnetdev, rtw_use_tkipkey_handler, padapter);
 
 	if(_rtw_init_sta_priv(&padapter->stapriv) == _FAIL)
 	{
@@ -971,8 +1003,8 @@ void rtw_cancel_all_timer(_adapter *padapter)
 	_cancel_timer_ex(&padapter->mlmepriv.assoc_timer);
 	RT_TRACE(_module_os_intfs_c_,_drv_info_,("rtw_cancel_all_timer:cancel association timer complete! \n"));
 
-	_cancel_timer_ex(&padapter->securitypriv.tkip_timer);
-	RT_TRACE(_module_os_intfs_c_,_drv_info_,("rtw_cancel_all_timer:cancel tkip_timer! \n"));
+	//_cancel_timer_ex(&padapter->securitypriv.tkip_timer);
+	//RT_TRACE(_module_os_intfs_c_,_drv_info_,("rtw_cancel_all_timer:cancel tkip_timer! \n"));
 
 	_cancel_timer_ex(&padapter->mlmepriv.scan_to_timer);
 	RT_TRACE(_module_os_intfs_c_,_drv_info_,("rtw_cancel_all_timer:cancel scan_to_timer! \n"));	
@@ -981,7 +1013,7 @@ void rtw_cancel_all_timer(_adapter *padapter)
 	RT_TRACE(_module_os_intfs_c_,_drv_info_,("rtw_cancel_all_timer:cancel dynamic_chk_timer! \n"));
 
 	// cancel sw led timer
-	padapter->HalFunc.DeInitSwLeds(padapter);
+	rtw_led_deinit(padapter);
 	RT_TRACE(_module_os_intfs_c_,_drv_info_,("rtw_cancel_all_timer:cancel DeInitSwLeds! \n"));
 
 	_cancel_timer_ex(&padapter->pwrctrlpriv.pwr_state_check_timer);
@@ -990,6 +1022,10 @@ void rtw_cancel_all_timer(_adapter *padapter)
 #ifdef CONFIG_SET_SCAN_DENY_TIMER
 	_cancel_timer_ex(&padapter->mlmepriv.set_scan_deny_timer);
 	RT_TRACE(_module_os_intfs_c_,_drv_info_,("rtw_cancel_all_timer:cancel set_scan_deny_timer! \n"));
+#endif
+
+#ifdef CONFIG_NEW_SIGNAL_STAT_PROCESS
+	_cancel_timer_ex(&padapter->recvpriv.signal_stat_timer);
 #endif
 
 	// cancel dm  timer
@@ -1020,6 +1056,8 @@ u8 rtw_free_drv_sw(_adapter *padapter)
 	_rtw_free_sta_priv(&padapter->stapriv); //will free bcmc_stainfo here
 	
 	_rtw_free_recv_priv(&padapter->recvpriv);	
+
+	rtw_free_pwrctrl_priv(padapter);
 
 	//rtw_mfree((void *)padapter, sizeof (padapter));
 
@@ -1069,8 +1107,7 @@ static int netdev_open(struct net_device *pnetdev)
 			goto netdev_open_error;
 		}
 		
-		DBG_8192C("MAC Address = %x-%x-%x-%x-%x-%x\n", 
-				 pnetdev->dev_addr[0], pnetdev->dev_addr[1], pnetdev->dev_addr[2], pnetdev->dev_addr[3], pnetdev->dev_addr[4], pnetdev->dev_addr[5]);		
+		DBG_8192C("MAC Address = "MAC_FMT"\n", MAC_ARG(pnetdev->dev_addr));
 
 		
 		status=rtw_start_drv_threads(padapter);
@@ -1221,7 +1258,7 @@ void rtw_ips_pwr_down(_adapter *padapter)
 	padapter->bCardDisableWOHSM = _TRUE;
 	padapter->net_closed = _TRUE;
 
-	padapter->ledpriv.LedControlHandler(padapter, LED_CTL_NO_LINK);
+	rtw_led_control(padapter, LED_CTL_NO_LINK);
 	
 	rtw_ips_dev_unload(padapter);
 	padapter->bCardDisableWOHSM = _FALSE;
@@ -1287,7 +1324,7 @@ static int netdev_close(struct net_device *pnetdev)
 		rtw_free_network_queue(padapter,_TRUE);
 #endif
 		// Close LED
-		padapter->ledpriv.LedControlHandler(padapter, LED_CTL_POWER_OFF);
+	rtw_led_control(padapter, LED_CTL_POWER_OFF);
 	}
 
 	RT_TRACE(_module_os_intfs_c_,_drv_info_,("-871x_drv - drv_close\n"));

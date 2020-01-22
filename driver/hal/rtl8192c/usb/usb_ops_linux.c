@@ -1560,7 +1560,7 @@ static void usb_read_port_cancel(struct intf_hdl *pintfhdl)
 
 	for(i=0; i < NR_RECVBUFF ; i++)	
 	{
-		precvbuf->reuse == _TRUE;	
+		precvbuf->reuse = _TRUE;	
 		if(precvbuf->purb)	
 		{
 			//DBG_8192C("usb_read_port_cancel : usb_kill_urb \n");

@@ -121,8 +121,7 @@ do {\
 } while(0)
 
 extern u32 rtw_enqueue_cmd(struct cmd_priv *pcmdpriv, struct cmd_obj *obj);
-extern u32 rtw_enqueue_cmd_ex(struct cmd_priv *pcmdpriv, struct cmd_obj *obj);
-extern struct cmd_obj *rtw_dequeue_cmd(_queue *queue);
+extern struct cmd_obj *rtw_dequeue_cmd(struct cmd_priv *pcmdpriv);
 extern void rtw_free_cmd_obj(struct cmd_obj *pcmd);
 
 #ifdef CONFIG_EVENT_THREAD_MODE
@@ -132,8 +131,6 @@ extern void rtw_free_evt_obj(struct evt_obj *pcmd);
 #endif
 
 thread_return rtw_cmd_thread(thread_context context);
-
-extern u32 rtw_cmd_enqueue(_queue *cmdq,struct cmd_obj	*pcmd);
 
 extern u32 rtw_init_cmd_priv (struct cmd_priv *pcmdpriv);
 extern void rtw_free_cmd_priv (struct cmd_priv *pcmdpriv);

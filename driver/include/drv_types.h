@@ -126,6 +126,7 @@ struct registry_priv
 	u8	adhoc_tx_pwr;
 	u8	soft_ap;
 	u8	power_mgnt;
+	 u8	ips_mode;
 	u8	smart_ps;
 	u8	long_retry_lmt;
 	u8	short_retry_lmt;

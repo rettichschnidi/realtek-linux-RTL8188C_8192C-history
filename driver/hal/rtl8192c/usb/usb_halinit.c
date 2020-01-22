@@ -2160,6 +2160,7 @@ _func_enter_;
 	//HalDetectPwrDownMode(Adapter);
 	// 2010/08/26 MH If Efuse does not support sective suspend then disable the function.
 	//HalDetectSelectiveSuspendMode(Adapter);
+	
 
 	// Set RF type for BB/RF configuration	
 	_InitRFType(Adapter);//->_ReadRFType()
@@ -2190,6 +2191,14 @@ _func_enter_;
 	_InitOperationMode(Adapter);//todo
 	_InitBeaconParameters(Adapter);
 	_InitBeaconMaxError(Adapter, _TRUE);
+
+
+	// led control
+	if(Adapter->ledpriv.LedStrategy == HW_LED)
+		rtw_write16(Adapter, REG_LEDCFG0, 0x0202);
+	else
+		rtw_write16(Adapter, REG_LEDCFG0, 0x8282);
+
 
 	//
 	//d. Initialize BB related configurations.
@@ -2329,7 +2338,7 @@ _func_enter_;
 		pwrctrlpriv->rfoff_reason = 0; 
 		pwrctrlpriv->b_hw_radio_off = _FALSE;
 		pwrctrlpriv->rf_pwrstate = rf_on;
-		Adapter->ledpriv.LedControlHandler(Adapter, LED_CTL_POWER_ON);
+		rtw_led_control(Adapter, LED_CTL_POWER_ON);		
 
 	}
 
@@ -2439,8 +2448,7 @@ _func_enter_;
 			mac_addr[i] = rtw_read8(Adapter, REG_MACID+i);		
 		}
 		
-		DBG_8192C("MAC Address from REG_MACID = %x-%x-%x-%x-%x-%x\n", 
-			mac_addr[0],	mac_addr[1], mac_addr[2], mac_addr[3], mac_addr[4], mac_addr[5]);
+		DBG_8192C("MAC Address from REG_MACID = "MAC_FMT"\n", MAC_ARG(mac_addr));
 	}
 
 exit:
@@ -2954,6 +2962,15 @@ _ResetDigitalProcedure1(
 			valu16 = rtw_read16(Adapter, REG_SYS_FUNC_EN)&0x0FFF;	
 			rtw_write16(Adapter, REG_SYS_FUNC_EN, (valu16 |(FEN_HWPDN|FEN_ELDR)));//reset MAC
 			
+			#ifdef DBG_SHOW_MCUFWDL_BEFORE_51_ENABLE
+			{
+				u8 val;
+				if( (val=rtw_read8(Adapter, REG_MCUFWDL)))
+					DBG_871X("DBG_SHOW_MCUFWDL_BEFORE_51_ENABLE %s:%d REG_MCUFWDL:0x%02x\n", __FUNCTION__, __LINE__, val);
+			}
+			#endif
+
+			
 			valu16 = rtw_read16(Adapter, REG_SYS_FUNC_EN);	
 			rtw_write16(Adapter, REG_SYS_FUNC_EN, (valu16 | FEN_CPUEN));//enable MCU ,8051	
 
@@ -2980,7 +2997,7 @@ _ResetDigitalProcedure1(
 				}
 
 				if(retry_cnts >= 100){
-					DBG_8192C("#####=> 8051 reset failed!.........................\n");
+					DBG_8192C("%s #####=> 8051 reset failed!.........................\n", __FUNCTION__);
 					// if 8051 reset fail we trigger GPIO 0 for LA
 					//PlatformEFIOWrite4Byte(	Adapter, 
 					//						REG_GPIO_PIN_CTRL, 
@@ -2989,13 +3006,25 @@ _ResetDigitalProcedure1(
 					rtw_write8(Adapter, REG_SYS_FUNC_EN+1, 0x50);	//Reset MAC and Enable 8051
 					rtw_mdelay_os(10);
 				}
-				//else
-				//	RT_TRACE(COMP_INIT, DBG_LOUD, ("=====> 8051 reset success (%d) .\n",retry_cnts));
+				else {
+					//DBG_871X("%s =====> 8051 reset success (%d) .\n", __FUNCTION__, retry_cnts);
+				}
+			}
+			else {
+				DBG_871X("%s =====> 8051 in RAM but !Adapter->bFWReady\n", __FUNCTION__);	
 			}
 		}
 		else{
-			//RT_TRACE(COMP_INIT, DBG_LOUD, ("=====> 8051 in ROM.\n"));
+			//DBG_871X("%s =====> 8051 in ROM.\n", __FUNCTION__);
 		}	
+		
+		#ifdef DBG_SHOW_MCUFWDL_BEFORE_51_ENABLE
+		{
+			u8 val;
+			if( (val=rtw_read8(Adapter, REG_MCUFWDL)))
+				DBG_871X("DBG_SHOW_MCUFWDL_BEFORE_51_ENABLE %s:%d REG_MCUFWDL:0x%02x\n", __FUNCTION__, __LINE__, val);
+		}
+		#endif
 		
 		rtw_write8(Adapter, REG_SYS_FUNC_EN+1, 0x54);	//Reset MAC and Enable 8051
 	}
@@ -3651,9 +3680,7 @@ _ReadMACAddress(
 		//sMacAddr[5] = (u8)GetRandomNumber(1, 254);		
 		_rtw_memcpy(pEEPROM->mac_addr, sMacAddr, ETH_ALEN);	
 	}
-	DBG_8192C("%s MAC Address from EFUSE = %x-%x-%x-%x-%x-%x\n",__FUNCTION__, 
-			pEEPROM->mac_addr[0], pEEPROM->mac_addr[1], pEEPROM->mac_addr[2], 
-			pEEPROM->mac_addr[3], pEEPROM->mac_addr[4], pEEPROM->mac_addr[5]);
+	DBG_8192C("%s MAC Address from EFUSE = "MAC_FMT"\n",__FUNCTION__, MAC_ARG(pEEPROM->mac_addr));
 	//NicIFSetMacAddress(Adapter, Adapter->PermanentAddress);
 	//RT_PRINT_ADDR(COMP_INIT|COMP_EFUSE, DBG_LOUD, "MAC Addr: %s", Adapter->PermanentAddress);
 
@@ -3760,6 +3787,11 @@ _ReadLEDSetting(
 		pledpriv->LedStrategy = SW_LED_MODE6;
 	}
 	pHalData->bLedOpenDrain = _TRUE;// Support Open-drain arrangement for controlling the LED. Added by Roger, 2009.10.16.
+
+	#ifdef CONFIG_FORCE_HW_LED
+	pledpriv->LedStrategy = HW_LED;
+	#endif
+	
 }
 
 static VOID
@@ -4851,9 +4883,7 @@ _func_enter_;
 				//keep sn
 				Adapter->xmitpriv.nqos_ssn = rtw_read16(Adapter,REG_NQOS_SEQ);
 
-#ifdef CONFIG_IPS_LEVEL_2	
 				if(pwrpriv->bkeepfwalive != _TRUE)
-#endif
 				{
 					//RX DMA stop
 					rtw_write32(Adapter,REG_RXPKT_NUM,(rtw_read32(Adapter,REG_RXPKT_NUM)|RW_RELEASE_EN));
@@ -5339,8 +5369,13 @@ _func_enter_;
 	pHalFunc->init_recv_priv = &rtl8192cu_init_recv_priv;
 	pHalFunc->free_recv_priv = &rtl8192cu_free_recv_priv;
 
+#ifdef CONFIG_LED
 	pHalFunc->InitSwLeds = &rtl8192cu_InitSwLeds;
 	pHalFunc->DeInitSwLeds = &rtl8192cu_DeInitSwLeds;
+#else // CONFIG_LED
+	pHalFunc->InitSwLeds = NULL;
+	pHalFunc->DeInitSwLeds = NULL;	
+#endif //CONFIG_LED
 
 	//pHalFunc->dm_init = &rtl8192c_init_dm_priv;
 	//pHalFunc->dm_deinit = &rtl8192c_deinit_dm_priv;

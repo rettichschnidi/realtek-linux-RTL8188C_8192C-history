@@ -71,7 +71,8 @@ static u32 go_add_group_info_attr(struct wifidirect_info *pwdinfo, u8 *pbuf)
 			*pcur = psta->dev_cap;
 			pcur++;
 
-			*(u16*)(pcur) = cpu_to_be16(psta->config_methods);
+			//*(u16*)(pcur) = cpu_to_be16(psta->config_methods);
+			RTW_PUT_BE16(pcur, psta->config_methods);
 			pcur += 2;
 
 			_rtw_memcpy(pcur, psta->primary_dev_type, 8);
@@ -85,10 +86,12 @@ static u32 go_add_group_info_attr(struct wifidirect_info *pwdinfo, u8 *pbuf)
 			
 			if(psta->dev_name_len>0)
 			{
-				*(u16*)(pcur) = cpu_to_be16( WPS_ATTR_DEVICE_NAME );
+				//*(u16*)(pcur) = cpu_to_be16( WPS_ATTR_DEVICE_NAME );
+				RTW_PUT_BE16(pcur, WPS_ATTR_DEVICE_NAME);
 				pcur += 2;
 
-				*(u16*)(pcur) = cpu_to_be16( psta->dev_name_len );
+				//*(u16*)(pcur) = cpu_to_be16( psta->dev_name_len );
+				RTW_PUT_BE16(pcur, psta->dev_name_len);
 				pcur += 2;
 
 				_rtw_memcpy(pcur, psta->dev_name, psta->dev_name_len);
@@ -311,7 +314,8 @@ static void issue_p2p_provision_resp(struct wifidirect_info *pwdinfo, u8* raddr,
 
 	wpsielen = 0;
 	//	WPS OUI
-	*(u32*) ( wpsie ) = cpu_to_be32( WPSOUI );
+	//*(u32*) ( wpsie ) = cpu_to_be32( WPSOUI );
+	RTW_PUT_BE32(wpsie, WPSOUI);
 	wpsielen += 4;
 
 #if 0
@@ -330,15 +334,18 @@ static void issue_p2p_provision_resp(struct wifidirect_info *pwdinfo, u8* raddr,
 
 	//	Config Method
 	//	Type:
-	*(u16*) ( wpsie + wpsielen ) = cpu_to_be16( WPS_ATTR_CONF_METHOD );
+	//*(u16*) ( wpsie + wpsielen ) = cpu_to_be16( WPS_ATTR_CONF_METHOD );
+	RTW_PUT_BE16(wpsie + wpsielen, WPS_ATTR_CONF_METHOD);
 	wpsielen += 2;
 
 	//	Length:
-	*(u16*) ( wpsie + wpsielen ) = cpu_to_be16( 0x0002 );
+	//*(u16*) ( wpsie + wpsielen ) = cpu_to_be16( 0x0002 );
+	RTW_PUT_BE16(wpsie + wpsielen, 0x0002);
 	wpsielen += 2;
 
 	//	Value:
-	*(u16*) ( wpsie + wpsielen ) = cpu_to_be16( config_method );
+	//*(u16*) ( wpsie + wpsielen ) = cpu_to_be16( config_method );
+	RTW_PUT_BE16(wpsie + wpsielen, config_method);
 	wpsielen += 2;
 
 	pframe = rtw_set_ie(pframe, _VENDOR_SPECIFIC_IE_, wpsielen, (unsigned char *) wpsie, &pattrib->pktlen );	
@@ -517,7 +524,8 @@ u32 build_probe_resp_p2p_ie(struct wifidirect_info *pwdinfo, u8 *pbuf)
 	p2pie[ p2pielen++ ] = P2P_ATTR_CAPABILITY;
 
 	//	Length:
-	*(u16*) ( p2pie + p2pielen ) = cpu_to_le16( 0x0002 );
+	//*(u16*) ( p2pie + p2pielen ) = cpu_to_le16( 0x0002 );
+	RTW_PUT_LE16(p2pie + p2pielen, 0x0002);
 	p2pielen += 2;
 
 	//	Value:
@@ -547,16 +555,19 @@ u32 build_probe_resp_p2p_ie(struct wifidirect_info *pwdinfo, u8 *pbuf)
 	p2pie[ p2pielen++ ] = P2P_ATTR_EX_LISTEN_TIMING;
 
 	//	Length:
-	*(u16*) ( p2pie + p2pielen ) = cpu_to_le16( 0x0004 );
+	//*(u16*) ( p2pie + p2pielen ) = cpu_to_le16( 0x0004 );
+	RTW_PUT_LE16(p2pie + p2pielen, 0x0004);
 	p2pielen += 2;
 
 	//	Value:
 	//	Availability Period
-	*(u16*) ( p2pie + p2pielen ) = cpu_to_le16( 0xFFFF );
+	//*(u16*) ( p2pie + p2pielen ) = cpu_to_le16( 0xFFFF );
+	RTW_PUT_LE16(p2pie + p2pielen, 0xFFFF);
 	p2pielen += 2;
 
 	//	Availability Interval
-	*(u16*) ( p2pie + p2pielen ) = cpu_to_le16( 0xFFFF );
+	//*(u16*) ( p2pie + p2pielen ) = cpu_to_le16( 0xFFFF );
+	RTW_PUT_LE16(p2pie + p2pielen, 0xFFFF);
 	p2pielen += 2;
 
 
@@ -576,7 +587,8 @@ u32 build_probe_resp_p2p_ie(struct wifidirect_info *pwdinfo, u8 *pbuf)
 	//	Length:
 	//	21 -> P2P Device Address (6bytes) + Config Methods (2bytes) + Primary Device Type (8bytes) 
 	//	+ NumofSecondDevType (1byte) + WPS Device Name ID field (2bytes) + WPS Device Name Len field (2bytes)
-	*(u16*) ( p2pie + p2pielen ) = cpu_to_le16( 21 + pwdinfo->device_name_len );
+	//*(u16*) ( p2pie + p2pielen ) = cpu_to_le16( 21 + pwdinfo->device_name_len );
+	RTW_PUT_LE16(p2pie + p2pielen, 21 + pwdinfo->device_name_len);
 	p2pielen += 2;
 
 	//	Value:
@@ -586,20 +598,24 @@ u32 build_probe_resp_p2p_ie(struct wifidirect_info *pwdinfo, u8 *pbuf)
 
 	//	Config Method
 	//	This field should be big endian. Noted by P2P specification.
-	*(u16*) ( p2pie + p2pielen ) = cpu_to_be16( pwdinfo->supported_wps_cm );
+	//*(u16*) ( p2pie + p2pielen ) = cpu_to_be16( pwdinfo->supported_wps_cm );
+	RTW_PUT_BE16(p2pie + p2pielen, pwdinfo->supported_wps_cm);
 	p2pielen += 2;
 
 	//	Primary Device Type
 	//	Category ID
-	*(u16*) ( p2pie + p2pielen ) = cpu_to_be16( WPS_PDT_CID_RTK_WIDI );
+	//*(u16*) ( p2pie + p2pielen ) = cpu_to_be16( WPS_PDT_CID_RTK_WIDI );
+	RTW_PUT_BE16(p2pie + p2pielen, WPS_PDT_CID_RTK_WIDI);
 	p2pielen += 2;
 
 	//	OUI
-	*(u32*) ( p2pie + p2pielen ) = cpu_to_be32( WPSOUI );
+	//*(u32*) ( p2pie + p2pielen ) = cpu_to_be32( WPSOUI );
+	RTW_PUT_BE32(p2pie + p2pielen, WPSOUI);
 	p2pielen += 4;
 
 	//	Sub Category ID
-	*(u16*) ( p2pie + p2pielen ) = cpu_to_be16( WPS_PDT_SCID_RTK_DMP );
+	//*(u16*) ( p2pie + p2pielen ) = cpu_to_be16( WPS_PDT_SCID_RTK_DMP );
+	RTW_PUT_BE16(p2pie + p2pielen, WPS_PDT_SCID_RTK_DMP);
 	p2pielen += 2;
 
 	//	Number of Secondary Device Types
@@ -607,11 +623,13 @@ u32 build_probe_resp_p2p_ie(struct wifidirect_info *pwdinfo, u8 *pbuf)
 
 	//	Device Name
 	//	Type:
-	*(u16*) ( p2pie + p2pielen ) = cpu_to_be16( WPS_ATTR_DEVICE_NAME );
+	//*(u16*) ( p2pie + p2pielen ) = cpu_to_be16( WPS_ATTR_DEVICE_NAME );
+	RTW_PUT_BE16(p2pie + p2pielen, WPS_ATTR_DEVICE_NAME);
 	p2pielen += 2;
 
 	//	Length:
-	*(u16*) ( p2pie + p2pielen ) = cpu_to_be16( pwdinfo->device_name_len );
+	//*(u16*) ( p2pie + p2pielen ) = cpu_to_be16( pwdinfo->device_name_len );
+	RTW_PUT_BE16(p2pie + p2pielen, pwdinfo->device_name_len);
 	p2pielen += 2;
 
 	//	Value:
@@ -659,7 +677,8 @@ u32 build_prov_disc_request_p2p_ie(struct wifidirect_info *pwdinfo, u8 *pbuf, u8
 	p2pie[ p2pielen++ ] = P2P_ATTR_CAPABILITY;
 
 	//	Length:
-	*(u16*) ( p2pie + p2pielen ) = cpu_to_le16( 0x0002 );
+	//*(u16*) ( p2pie + p2pielen ) = cpu_to_le16( 0x0002 );
+	RTW_PUT_LE16(p2pie + p2pielen, 0x0002);
 	p2pielen += 2;
 
 	//	Value:
@@ -679,7 +698,8 @@ u32 build_prov_disc_request_p2p_ie(struct wifidirect_info *pwdinfo, u8 *pbuf, u8
 	//	Length:
 	//	21 -> P2P Device Address (6bytes) + Config Methods (2bytes) + Primary Device Type (8bytes) 
 	//	+ NumofSecondDevType (1byte) + WPS Device Name ID field (2bytes) + WPS Device Name Len field (2bytes)
-	*(u16*) ( p2pie + p2pielen ) = cpu_to_le16( 21 + pwdinfo->device_name_len );
+	//*(u16*) ( p2pie + p2pielen ) = cpu_to_le16( 21 + pwdinfo->device_name_len );
+	RTW_PUT_LE16(p2pie + p2pielen, 21 + pwdinfo->device_name_len);
 	p2pielen += 2;
 
 	//	Value:
@@ -691,26 +711,31 @@ u32 build_prov_disc_request_p2p_ie(struct wifidirect_info *pwdinfo, u8 *pbuf, u8
 	//	This field should be big endian. Noted by P2P specification.
 	if ( pwdinfo->ui_got_wps_info == P2P_GOT_WPSINFO_PBC )
 	{
-		*(u16*) ( p2pie + p2pielen ) = cpu_to_be16( WPS_CONFIG_METHOD_PBC );
+		//*(u16*) ( p2pie + p2pielen ) = cpu_to_be16( WPS_CONFIG_METHOD_PBC );
+		RTW_PUT_BE16(p2pie + p2pielen, WPS_CONFIG_METHOD_PBC);
 	}
 	else
 	{
-		*(u16*) ( p2pie + p2pielen ) = cpu_to_be16( WPS_CONFIG_METHOD_DISPLAY );
+		//*(u16*) ( p2pie + p2pielen ) = cpu_to_be16( WPS_CONFIG_METHOD_DISPLAY );
+		RTW_PUT_BE16(p2pie + p2pielen, WPS_CONFIG_METHOD_DISPLAY);
 	}
 
 	p2pielen += 2;
 
 	//	Primary Device Type
 	//	Category ID
-	*(u16*) ( p2pie + p2pielen ) = cpu_to_be16( WPS_PDT_CID_RTK_WIDI );
+	//*(u16*) ( p2pie + p2pielen ) = cpu_to_be16( WPS_PDT_CID_RTK_WIDI );
+	RTW_PUT_BE16(p2pie + p2pielen, WPS_PDT_CID_RTK_WIDI);
 	p2pielen += 2;
 
 	//	OUI
-	*(u32*) ( p2pie + p2pielen ) = cpu_to_be32( WPSOUI );
+	//*(u32*) ( p2pie + p2pielen ) = cpu_to_be32( WPSOUI );
+	RTW_PUT_BE32(p2pie + p2pielen, WPSOUI);
 	p2pielen += 4;
 
 	//	Sub Category ID
-	*(u16*) ( p2pie + p2pielen ) = cpu_to_be16( WPS_PDT_SCID_RTK_DMP );
+	//*(u16*) ( p2pie + p2pielen ) = cpu_to_be16( WPS_PDT_SCID_RTK_DMP );
+	RTW_PUT_BE16(p2pie + p2pielen, WPS_PDT_SCID_RTK_DMP);
 	p2pielen += 2;
 
 	//	Number of Secondary Device Types
@@ -718,11 +743,13 @@ u32 build_prov_disc_request_p2p_ie(struct wifidirect_info *pwdinfo, u8 *pbuf, u8
 
 	//	Device Name
 	//	Type:
-	*(u16*) ( p2pie + p2pielen ) = cpu_to_be16( WPS_ATTR_DEVICE_NAME );
+	//*(u16*) ( p2pie + p2pielen ) = cpu_to_be16( WPS_ATTR_DEVICE_NAME );
+	RTW_PUT_BE16(p2pie + p2pielen, WPS_ATTR_DEVICE_NAME);
 	p2pielen += 2;
 
 	//	Length:
-	*(u16*) ( p2pie + p2pielen ) = cpu_to_be16( pwdinfo->device_name_len );
+	//*(u16*) ( p2pie + p2pielen ) = cpu_to_be16( pwdinfo->device_name_len );
+	RTW_PUT_BE16(p2pie + p2pielen, pwdinfo->device_name_len);
 	p2pielen += 2;
 
 	//	Value:
@@ -739,7 +766,8 @@ u32 build_prov_disc_request_p2p_ie(struct wifidirect_info *pwdinfo, u8 *pbuf, u8
 		p2pie[ p2pielen++ ] = P2P_ATTR_GROUP_ID;
 
 		//	Length:
-		*(u16*) ( p2pie + p2pielen ) = cpu_to_le16( ETH_ALEN + ussidlen );
+		//*(u16*) ( p2pie + p2pielen ) = cpu_to_le16( ETH_ALEN + ussidlen );
+		RTW_PUT_LE16(p2pie + p2pielen, ETH_ALEN + ussidlen);
 		p2pielen += 2;
 
 		//	Value:
@@ -1607,7 +1635,7 @@ _func_enter_;
 
 			init_h2fwcmd_w_parm_no_rsp(ph2c, pdrvextra_cmd_parm, GEN_CMD_CODE(_Set_Drv_Extra));
 
-			res = rtw_enqueue_cmd_ex(pcmdpriv, ph2c);
+			res = rtw_enqueue_cmd(pcmdpriv, ph2c);
 		}
 		else
 		{

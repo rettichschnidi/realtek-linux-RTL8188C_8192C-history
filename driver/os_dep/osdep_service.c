@@ -866,6 +866,11 @@ void rtw_usleep_os(int us)
 #ifdef DBG_DELAY_OS
 void _rtw_mdelay_os(int ms, const char *func, const int line)
 {
+	if(ms>10)
+		DBG_871X("%s:%d %s(%d)\n", func, line, __FUNCTION__, ms);
+		rtw_msleep_os(ms);
+	return;
+
 
 	DBG_871X("%s:%d %s(%d)\n", func, line, __FUNCTION__, ms);
 
@@ -884,7 +889,15 @@ void _rtw_mdelay_os(int ms, const char *func, const int line)
 void _rtw_udelay_os(int us, const char *func, const int line)
 {
 
+	if(us > 1000) {
 	DBG_871X("%s:%d %s(%d)\n", func, line, __FUNCTION__, us);
+		rtw_usleep_os(us);
+		return;
+	}
+
+
+	//DBG_871X("%s:%d %s(%d)\n", func, line, __FUNCTION__, us);
+	
 	
 #if defined(PLATFORM_LINUX)
 
