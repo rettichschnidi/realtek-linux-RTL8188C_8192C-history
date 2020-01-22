@@ -175,7 +175,7 @@ void rtw_indicate_wx_assoc_event(_adapter *padapter)
 	
 	_rtw_memcpy(wrqu.ap_addr.sa_data, pmlmepriv->cur_network.network.MacAddress, ETH_ALEN);
 
-	//printk("+rtw_indicate_wx_assoc_event\n");
+	printk("+rtw_indicate_wx_assoc_event\n");
 	wireless_send_event(padapter->pnetdev, SIOCGIWAP, &wrqu, NULL);
 }
 
@@ -798,7 +798,7 @@ static int rtw_set_wpa_ie(_adapter *padapter, char *pie, unsigned short ielen)
 		}
 			
 		switch(group_cipher)
-		{
+		{			
 			case WPA_CIPHER_NONE:
 				padapter->securitypriv.dot118021XGrpPrivacy=_NO_PRIVACY_;
 				padapter->securitypriv.ndisencryptstatus=Ndis802_11EncryptionDisabled;
@@ -822,7 +822,7 @@ static int rtw_set_wpa_ie(_adapter *padapter, char *pie, unsigned short ielen)
 		}
 
 		switch(pairwise_cipher)
-		{
+		{		
 			case WPA_CIPHER_NONE:
 				padapter->securitypriv.dot11PrivacyAlgrthm=_NO_PRIVACY_;
 				padapter->securitypriv.ndisencryptstatus=Ndis802_11EncryptionDisabled;
@@ -1755,14 +1755,14 @@ static int rtw_wx_set_scan(struct net_device *dev, struct iw_request_info *a,
 	if (check_fwstate(pmlmepriv, _FW_UNDER_SURVEY|_FW_UNDER_LINKING) == _TRUE) 
 	{
 		printk("%s exit cause fw state(%x) mismatch\n",__FUNCTION__,pmlmepriv->fw_state);
-		ret = -1;
+		ret = 0;
 		goto exit;
 	}
 
 	if(pmlmepriv->sitesurveyctrl.traffic_busy == _TRUE)
 	{
 		printk("%s exit cause traffic_busy(%x) RCR(0x%04x)\n",__FUNCTION__,pmlmepriv->sitesurveyctrl.traffic_busy,rtw_read16(padapter,REG_RCR));
-		ret = -1;
+		ret = 0;
 		goto exit;
 	} 
 
@@ -1851,6 +1851,9 @@ static int rtw_wx_get_scan(struct net_device *dev, struct iw_request_info *a,
 	}		
   
   	//printk("==> %s \n",__FUNCTION__);
+  	// 20110214 Commented by Jeff: 
+  	// In rockchip 2818 platforms with low-speed IO, the UI will not show scan list bause of this busy waiting
+  	#ifndef CONFIG_PLATFORM_ANDROID
  	while((check_fwstate(pmlmepriv, (_FW_UNDER_SURVEY|_FW_UNDER_LINKING))) == _TRUE)
 	{	
 		rtw_msleep_os(30);
@@ -1858,6 +1861,7 @@ static int rtw_wx_get_scan(struct net_device *dev, struct iw_request_info *a,
 		if(cnt > 100)
 			break;
 	}
+	#endif
 	
 	_enter_critical_bh(&(pmlmepriv->scanned_queue.lock), &irqL);
 
@@ -2731,6 +2735,7 @@ static int rtw_wx_set_auth(struct net_device *dev,
 		*/
 		if(check_fwstate(&padapter->mlmepriv, _FW_LINKED)) {
 			rtw_disassoc_cmd(padapter);
+			printk("%s...call rtw_indicate_disconnect\n ",__FUNCTION__);
 			rtw_indicate_disconnect(padapter);
 			rtw_free_assoc_resources(padapter);
 		}
@@ -5213,7 +5218,7 @@ static void start_bss_network(_adapter *padapter, u8 *pbuf)
 
 	if(retry == 100)
 	{
-		DBG_871X("issue_beacon, fail!\n");
+		DBG_871X("@@@@ %s issue_beacon failed...@@@@\n", __FUNCTION__);	
 	}
 	
 }

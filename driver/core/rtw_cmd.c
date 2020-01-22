@@ -376,6 +376,7 @@ _func_enter_;
 
 	if (obj == NULL)
 		goto exit;
+
 #ifdef SUPPORT_HW_RFOFF_DETECTED
 	if((pcmdpriv->padapter->pwrctrlpriv.bHWPwrPindetect)&&(!pcmdpriv->padapter->registrypriv.usbss_enable))
 	{
@@ -392,7 +393,6 @@ _func_enter_;
 #endif
 	if((pcmdpriv->padapter->hw_init_completed==_FALSE)	&& (bSkip == _FALSE))	
 	{	
-		//printk("hw_init_completed==_FALSE ...  free cmd \n");
 		rtw_free_cmd_obj(obj);
 		return _FAIL;
 	}	
@@ -1133,7 +1133,7 @@ _func_enter_;
 		RT_TRACE(_module_rtl871x_cmd_c_, _drv_err_, ("rtw_joinbss_cmd: memory allocate for cmd_obj fail!!!\n"));
 		goto exit;
 	}
-	/*
+	/* // for IEs is pointer 
 	t_len = sizeof (ULONG) + sizeof (NDIS_802_11_MAC_ADDRESS) + 2 + 
 			sizeof (NDIS_802_11_SSID) + sizeof (ULONG) + 
 			sizeof (NDIS_802_11_RSSI) + sizeof (NDIS_802_11_NETWORK_TYPE) + 
@@ -1141,8 +1141,10 @@ _func_enter_;
 			sizeof (NDIS_802_11_NETWORK_INFRASTRUCTURE) +   
 			sizeof (NDIS_802_11_RATES_EX)+ sizeof(WLAN_PHY_INFO)+ sizeof (ULONG) + MAX_IE_SZ;
 	*/
+	//for IEs is fix buf size
 	t_len = sizeof(WLAN_BSSID_EX);
-	
+			
+		
 	//for hidden ap to set fw_state here
 	if (check_fwstate(pmlmepriv, WIFI_STATION_STATE|WIFI_ADHOC_STATE) != _TRUE)
 	{
@@ -1178,8 +1180,7 @@ _func_enter_;
 	}
 
 	_rtw_memset(psecnetwork, 0, t_len);
-
-	_rtw_memcpy(psecnetwork, &pnetwork->network, t_len);
+	_rtw_memcpy(psecnetwork, &pnetwork->network, get_WLAN_BSSID_EX_sz(&pnetwork->network));
 	
 	auth=&psecuritypriv->authenticator_ie[0];
 	psecuritypriv->authenticator_ie[0]=(unsigned char)psecnetwork->IELength;
@@ -1273,7 +1274,7 @@ _func_enter_;
 	psecnetwork->InfrastructureMode = cpu_to_le32(psecnetwork->InfrastructureMode);
 	psecnetwork->IELength = cpu_to_le32(psecnetwork->IELength);      
 #endif
-	   
+
 	_rtw_init_listhead(&pcmd->list);
 	pcmd->cmdcode = _JoinBss_CMD_;//GEN_CMD_CODE(_JoinBss)
 	pcmd->parmbuf = (unsigned char *)psecnetwork;

@@ -1203,8 +1203,17 @@ Current IOREG MAP
 
 //2 9346CR
 
-#define		BOOT_FROM_EEPROM		BIT(4)
-#define		EEPROM_EN				BIT(5)
+
+#define 	EEDO					BIT(0)
+#define 	EEDI					BIT(1)
+#define 	EESK					BIT(2)
+#define 	EECS					BIT(3)
+//#define 	EERPROMSEL			BIT(4)
+//#define 	EEPROM_EN			BIT(5)
+#define	BOOT_FROM_EEPROM		BIT(4)
+#define	EEPROM_EN				BIT(5)
+#define 	EEM0					BIT(6)
+#define 	EEM1					BIT(7)
 
 
 //2 AFE_MISC

@@ -41,6 +41,11 @@ struct zero_bulkout_context{
 };
 
 #define REALTEK_USB_VENQT_MAX_BUF_SIZE	254
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,12))
+#define USB_CONTROL_MSG_TIMEOUT	500		//ms
+#else
+#define USB_CONTROL_MSG_TIMEOUT	HZ/2	//jiffies
+#endif
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)) || (LINUX_VERSION_CODE > KERNEL_VERSION(2,6,18))
 #define _usbctrl_vendorreq_async_callback(urb, regs)	_usbctrl_vendorreq_async_callback(urb)
@@ -62,7 +67,9 @@ static int usbctrl_vendorreq(struct dvobj_priv  *pdvobjpriv, u8 request, u16 val
 	int status = 0;
 	u32 tmp_buflen=0;
 	u8 reqtype;
-	u8 tmp_buf[MAX_USB_IO_CTL_SIZE];	
+#if (DYNAMIC_ALLOCIATE_VENDOR_CMD==0)
+	u8 tmp_buf[MAX_USB_IO_CTL_SIZE];
+#endif
 	
 	struct usb_device *udev=pdvobjpriv->pusbdev;
 		
@@ -78,7 +85,7 @@ static int usbctrl_vendorreq(struct dvobj_priv  *pdvobjpriv, u8 request, u16 val
 		return(-1);
 	}
 	
-#ifdef DYNAMIC_ALLOCIATE_VENDOR_CMD
+#if (DYNAMIC_ALLOCIATE_VENDOR_CMD==1)
 	palloc_buf = _rtw_malloc( (u32) len + ALIGNMENT_UNIT);
 	tmp_buflen =  (u32)len + ALIGNMENT_UNIT;
 #else
@@ -108,7 +115,7 @@ static int usbctrl_vendorreq(struct dvobj_priv  *pdvobjpriv, u8 request, u16 val
 		_rtw_memcpy( pIo_buf, pdata, len);
 	}		
 	
-	status = usb_control_msg(udev, pipe, request, reqtype, value, index, pIo_buf, len, HZ/2);
+	status = usb_control_msg(udev, pipe, request, reqtype, value, index, pIo_buf, len, USB_CONTROL_MSG_TIMEOUT);
 	
 	if (status < 0)
        {
@@ -128,7 +135,7 @@ static int usbctrl_vendorreq(struct dvobj_priv  *pdvobjpriv, u8 request, u16 val
                        _rtw_memcpy( pdata, pIo_buf,  status );
                }
 	}
-	#ifdef DYNAMIC_ALLOCIATE_VENDOR_CMD
+	#if(DYNAMIC_ALLOCIATE_VENDOR_CMD==1)
 	_rtw_mfree( palloc_buf,tmp_buflen);
 	#endif
 
@@ -1438,6 +1445,26 @@ _func_enter_;
 
 	RT_TRACE(_module_hci_ops_os_c_,_drv_err_,("+usb_write_port_complete\n"));
 	
+
+	switch(pxmitbuf->flags)
+	{
+		case XMIT_VO_QUEUE:
+			pxmitpriv->voq_cnt--;			
+			break;
+		case XMIT_VI_QUEUE:
+			pxmitpriv->viq_cnt--;		
+			break;
+		case XMIT_BE_QUEUE:
+			pxmitpriv->beq_cnt--;			
+			break;
+		case XMIT_BK_QUEUE:
+			pxmitpriv->bkq_cnt--;			
+			break;
+		default:			
+			break;
+	}
+		
+
 /*	
 	_enter_critical(&pxmitpriv->lock, &irqL);
 
@@ -1573,6 +1600,33 @@ _func_enter_;
 		return _FAIL;
 	}
 
+	_enter_critical(&pxmitpriv->lock, &irqL);
+
+	switch(addr)
+	{
+		case VO_QUEUE_INX:
+			pxmitpriv->voq_cnt++;
+			pxmitbuf->flags = XMIT_VO_QUEUE;
+			break;
+		case VI_QUEUE_INX:
+			pxmitpriv->viq_cnt++;
+			pxmitbuf->flags = XMIT_VI_QUEUE;
+			break;
+		case BE_QUEUE_INX:
+			pxmitpriv->beq_cnt++;
+			pxmitbuf->flags = XMIT_BE_QUEUE;
+			break;
+		case BK_QUEUE_INX:
+			pxmitpriv->bkq_cnt++;
+			pxmitbuf->flags = XMIT_BK_QUEUE;
+			break;
+		default:
+			pxmitbuf->flags = XMIT_VO_QUEUE;
+			break;
+	}
+		
+	_exit_critical(&pxmitpriv->lock, &irqL);
+		
 /*
 	_enter_critical(&pxmitpriv->lock, &irqL);
 	

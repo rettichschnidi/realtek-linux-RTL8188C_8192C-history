@@ -154,7 +154,8 @@ u8 rtl8192c_setopmode_hdl(_adapter *padapter, u8 *pbuf)
 	}
 	else if(psetop->mode == Ndis802_11IBSS)
 	{
-		rtw_write8(padapter, REG_BCN_CTRL, 0x1a);//0x550[4:3:1] = 111'b
+		//rtw_write8(padapter, REG_BCN_CTRL, 0x1a);//0x550[4:3:1] = 111'b
+		rtw_write8(padapter, REG_BCN_CTRL, 0x1E);//Test for Adhoc issue 2011-02-18
 		rtw_write8(padapter,REG_RD_CTRL+1,0x6F);		
 		ResumeTxBeacon(padapter);
 		rtw_write8(padapter, REG_BCN_CTRL, rtw_read8(padapter, REG_BCN_CTRL)|BIT(1));	//disable bcn sub function
@@ -370,7 +371,7 @@ u8 rtl8192c_join_cmd_hdl(_adapter *padapter, u8 *pbuf)
 		return H2C_PARAMETERS_ERROR;	
 		
 	_rtw_memcpy(pnetwork->IEs, ((WLAN_BSSID_EX *)pbuf)->IEs, pnetwork->IELength); 
-	
+
 	start_clnt_join(padapter);
 	
 	//only for cisco's AP

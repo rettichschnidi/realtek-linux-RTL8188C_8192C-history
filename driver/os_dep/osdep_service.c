@@ -47,6 +47,7 @@ u8* _rtw_zmalloc(u32 sz)
 	return pbuf;	
 	
 }
+
 u8* _rtw_malloc(u32 sz)
 {
 	u8 	*pbuf;
@@ -302,9 +303,14 @@ void	_rtw_mutex_init(_mutex *pmutex)
 {
 #ifdef PLATFORM_LINUX
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37))
+	mutex_init(pmutex);
+#else
 	init_MUTEX(pmutex);
-
 #endif
+	
+#endif
+
 #ifdef PLATFORM_OS_XP
 
 	KeInitializeMutex(pmutex, 0);

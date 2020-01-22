@@ -112,7 +112,13 @@ int rtw_ampdu_enable = 1;//for enable tx_ampdu,
 //int rtw_rf_config = RF_1T2R;  // 1T2R	
 int rtw_rf_config = RF_819X_MAX_TYPE;  //auto
 int rtw_low_power = 0;
+
+#ifdef CONFIG_WIFI_TEST
+int wifi_spec = 1;//for wifi test
+#else
 int wifi_spec = 0;//for wifi test
+#endif
+
 int channel_plan = RT_CHANNEL_DOMAIN_MAX;
 
 #ifdef CONFIG_BT_COEXIST
@@ -413,6 +419,7 @@ _func_enter_;
 	registry_par->wireless_mode = (u8)rtw_wireless_mode;
 	registry_par->vrtl_carrier_sense = (u8)rtw_vrtl_carrier_sense ;
 	registry_par->vcs_type = (u8)rtw_vcs_type;
+	registry_par->rts_thresh = (u16)rtw_rts_thresh;
 	registry_par->frag_thresh=(u16)rtw_frag_thresh;
 	registry_par->preamble = (u8)rtw_preamble;
 	registry_par->scan_mode = (u8)rtw_scan_mode;
@@ -1144,6 +1151,7 @@ netdev_open_error:
 	return (-1);
 	
 }
+
 #ifdef CONFIG_IPS
 int  ips_netdrv_open(_adapter *padapter)
 {
@@ -1248,6 +1256,7 @@ static int netdev_close(struct net_device *pnetdev)
 		//s2-1.  issue rtw_disassoc_cmd to fw
 		rtw_disassoc_cmd(padapter);	
 		//s2-2.  indicate disconnect to os
+		printk("%s...call rtw_indicate_disconnect\n ",__FUNCTION__);
 		rtw_indicate_disconnect(padapter);
 		//s2-3. 
 	       rtw_free_assoc_resources(padapter);	

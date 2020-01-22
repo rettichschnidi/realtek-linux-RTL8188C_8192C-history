@@ -705,7 +705,7 @@ s32 rtw_xmitframe_complete(_adapter *padapter, struct xmit_priv *pxmitpriv, stru
 	do {
 		rtw_free_xmitframe_ex(pxmitpriv, pxmitframe);
 			
-		pxmitframe = rtw_dequeue_xframe(pxmitpriv, pxmitpriv->hwxmits, pxmitpriv->hwxmit_entry);
+		pxmitframe = rtw_dequeue_xframe(pxmitpriv, pxmitbuf->flags);
 		if (pxmitframe == NULL) {
 			// no more xmit frame, release xmit buffer
 			rtw_free_xmitbuf(pxmitpriv, pxmitbuf);
@@ -927,15 +927,10 @@ s32 rtw_xmitframe_complete(_adapter *padapter, struct xmit_priv *pxmitpriv, stru
 #else
 
 s32 rtw_xmitframe_complete(_adapter *padapter, struct xmit_priv *pxmitpriv, struct xmit_buf *pxmitbuf)
-{		
-
-	struct hw_xmit *phwxmits;
-	sint hwentry;
+{
 	struct xmit_frame *pxmitframe=NULL;	
 	int res=_SUCCESS, xcnt = 0;
 
-	phwxmits = pxmitpriv->hwxmits;
-	hwentry = pxmitpriv->hwxmit_entry;
 
 	RT_TRACE(_module_rtl871x_xmit_c_,_drv_info_,("rtw_xmitframe_complete()\n"));
 
@@ -951,7 +946,7 @@ s32 rtw_xmitframe_complete(_adapter *padapter, struct xmit_priv *pxmitpriv, stru
 
 	do
 	{		
-		pxmitframe =  rtw_dequeue_xframe(pxmitpriv, phwxmits, hwentry);
+		pxmitframe =  rtw_dequeue_xframe(pxmitpriv, pxmitbuf->flags);
 		
 		if(pxmitframe)
 		{

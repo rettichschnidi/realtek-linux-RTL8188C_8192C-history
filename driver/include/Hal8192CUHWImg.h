@@ -22,14 +22,19 @@
 
 /*Created on  2010/ 5/25,  2:21*/
 
-//#define TSMCImgArrayLength 13540 //v49
-#define TSMCImgArrayLength 16076 //v60
-//#define TSMCImgArrayLength 16062 //v64 2011-01-14
+//#define TSMCImgArrayLength 16226 //v66 2011-02-10
+#define TSMCImgArrayLength 16352 //v68.1 2011-02-24
 extern u8 Rtl8192CUFwTSMCImgArray[TSMCImgArrayLength];
 
-#define UMCImgArrayLength 16076 //V60
-//#define UMCImgArrayLength 16062 //V64 2011-01-14
-extern u8 Rtl8192CUFwUMCImgArray[UMCImgArrayLength];
+//#define UMCImgArrayLength 16226 //V66 2011-02-10
+#define UMCACutImgArrayLength 16352 //v68.1 2011-02-24
+extern u8 Rtl8192CUFwUMCACutImgArray[UMCACutImgArrayLength];
+
+#define UMCBCutImgArrayLength 16334 //v68.1 2011-02-24
+extern u8 Rtl8192CUFwUMCBCutImgArray[UMCBCutImgArrayLength] ; 
+	
+//#define UMCBCutImgArrayLength 16206
+//extern u1Byte Rtl8192CUFwUMCBCutImgArray[UMCBCutImgArrayLength];
 
 #define UMC8723ImgArrayLength 16288
 extern u8 Rtl8192CUFwUMC8723ImgArray[UMC8723ImgArrayLength];

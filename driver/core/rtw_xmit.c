@@ -195,6 +195,8 @@ _func_enter_;
 
 		rtw_os_xmit_resource_alloc(padapter, pxmitbuf);
 
+		pxmitbuf->flags = XMIT_VO_QUEUE;
+
 		rtw_list_insert_tail(&pxmitbuf->list, &(pxmitpriv->free_xmitbuf_queue.queue));
 
 		pxmitbuf++;
@@ -1303,7 +1305,8 @@ _func_enter_;
 
 	xmitframe_swencrypt(padapter, pxmitframe);
 	
-	update_attrib_vcs_info(padapter, pxmitframe);
+	if(!bmcst)
+		update_attrib_vcs_info(padapter, pxmitframe);
 	
 exit:	
 	
@@ -1705,7 +1708,7 @@ static struct xmit_frame *dequeue_one_xmitframe(struct xmit_priv *pxmitpriv, str
 	return pxmitframe;
 }
 
-struct xmit_frame* rtw_dequeue_xframe(struct xmit_priv *pxmitpriv, struct hw_xmit *phwxmit_i, sint entry)
+struct xmit_frame* rtw_dequeue_xframe(struct xmit_priv *pxmitpriv, u8 flags)
 {
 	_irqL irqL0;
 	_list *sta_plist, *sta_phead;
@@ -1715,56 +1718,57 @@ struct xmit_frame* rtw_dequeue_xframe(struct xmit_priv *pxmitpriv, struct hw_xmi
 	struct xmit_frame *pxmitframe = NULL;
 	_adapter *padapter = pxmitpriv->adapter;
 	struct registry_priv	 *pregpriv = &padapter->registrypriv;	
-	int i, inx[4];
+	struct hw_xmit *phwxmit_i = pxmitpriv->hwxmits;
+	sint entry = pxmitpriv->hwxmit_entry;
+	u8 inx[XMIT_QUEUE_ENTRY];
+	int i;
+	
 #ifdef CONFIG_USB_HCI
-//	int j, tmp, acirp_cnt[4];
+	int j, tmp, acirp_cnt[4];
 #endif
 
 _func_enter_;
 
-	if(pregpriv->wifi_spec==0)
+	inx[0] = 0; inx[1] = 1; inx[2] = 2; inx[3] = 3;
+
+	if(pregpriv->wifi_spec==1)
 	{
-		inx[0] = 0; inx[1] = 1; inx[2] = 2; inx[3] = 3;
-	}
-	else
-	{
-		if(pxmitpriv->tx_pkts%2==0)
+#if 0
+		if(flags<XMIT_QUEUE_ENTRY)
 		{
-			inx[0] = 0; inx[1] = 1; inx[2] = 2; inx[3] = 3;
+			//priority exchange according to the completed xmitbuf flags.
+			inx[flags] = 0;
+			inx[0] = flags;
 		}
-		else
-		{
-			inx[0] = 2; inx[1] = 3; inx[2] = 0; inx[3] = 1;
-		}
-	}
+#endif	
 	
-
-/*
 #ifdef CONFIG_USB_HCI
-	//entry indx: 0->vo, 1->vi, 2->be, 3->bk.
-	acirp_cnt[0] = pxmitpriv->voq_cnt;
-	acirp_cnt[1] = pxmitpriv->viq_cnt;
-	acirp_cnt[2] = pxmitpriv->beq_cnt;
-	acirp_cnt[3] = pxmitpriv->bkq_cnt;
+		//entry indx: 0->vo, 1->vi, 2->be, 3->bk.
+		acirp_cnt[0] = pxmitpriv->voq_cnt;
+		acirp_cnt[1] = pxmitpriv->viq_cnt;
+		acirp_cnt[2] = pxmitpriv->beq_cnt;
+		acirp_cnt[3] = pxmitpriv->bkq_cnt;
 
-	for(i=0; i<4; i++)
-	{
-		for(j=i+1; j<4; j++)
+		for(i=0; i<4; i++)
 		{
-			if(acirp_cnt[j]<acirp_cnt[i])
+			for(j=i+1; j<4; j++)
 			{
-				tmp = acirp_cnt[i];
-				acirp_cnt[i] = acirp_cnt[j];
-				acirp_cnt[j] = tmp;
+				if(acirp_cnt[j]<acirp_cnt[i])
+				{
+					tmp = acirp_cnt[i];
+					acirp_cnt[i] = acirp_cnt[j];
+					acirp_cnt[j] = tmp;
 
-				tmp = inx[i];
-				inx[i] = inx[j];
-				inx[j] = tmp;
+					tmp = inx[i];
+					inx[i] = inx[j];
+					inx[j] = tmp;
+				}
 			}
 		}
-	}
 #endif
-*/
+
+	}
+
 
 	_enter_critical_bh(&pxmitpriv->lock, &irqL0);
 
@@ -1947,7 +1951,7 @@ void rtw_alloc_hwxmits(_adapter *padapter)
 	struct hw_xmit *hwxmits;
 	struct xmit_priv *pxmitpriv = &padapter->xmitpriv;
 
-	pxmitpriv->hwxmit_entry = HWXMIT_ENTRY;
+	pxmitpriv->hwxmit_entry = XMIT_QUEUE_ENTRY;
 
 	pxmitpriv->hwxmits = (struct hw_xmit *)_rtw_zmalloc(sizeof (struct hw_xmit) * pxmitpriv->hwxmit_entry);	
 	

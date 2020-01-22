@@ -49,20 +49,27 @@
 	#include <net/iw_handler.h>
 	#include <linux/proc_fs.h>	// Necessary because we use the proc fs
 	
+
+
+
+#ifdef CONFIG_USB_HCI
+	typedef struct urb *  PURB;
 #if (LINUX_VERSION_CODE>=KERNEL_VERSION(2,6,22))
 #ifdef CONFIG_USB_SUSPEND
 #define CONFIG_AUTOSUSPEND	1
 #endif
 #endif
-
-
-#ifdef CONFIG_USB_HCI
-	typedef struct urb *  PURB;
 #endif
 
 	typedef struct 	semaphore _sema;
 	typedef	spinlock_t	_lock;
-        typedef struct semaphore	_mutex;
+	
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37))
+	typedef struct mutex 		_mutex;
+#else
+	typedef struct semaphore	_mutex;
+#endif
+
 	typedef struct timer_list _timer;
 
 	struct	__queue	{
@@ -138,13 +145,21 @@ __inline static void _exit_critical_bh(_lock *plock, _irqL *pirqL)
 
 __inline static void _enter_critical_mutex(_mutex *pmutex, _irqL *pirqL)
 {
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37))
+		mutex_lock(pmutex);
+#else
 		down(pmutex);
+#endif
 }
 
 
 __inline static void _exit_critical_mutex(_mutex *pmutex, _irqL *pirqL)
 {
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37))
+		mutex_unlock(pmutex);
+#else
 		up(pmutex);
+#endif
 }
 
 __inline static void list_delete(_list *plist)

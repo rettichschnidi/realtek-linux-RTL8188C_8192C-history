@@ -461,17 +461,14 @@ static u8 _InitPowerOn(_adapter *padapter)
 	value16 &= ~ISO_DIOR;
 	rtw_write16(padapter, REG_SYS_ISO_CTRL, value16);
 
-//=============== Init MAC ======================
-
-
+#if 0
 	// Reconsider when to do this operation after asking HWSD.
 	pollingCount = 0;
 	rtw_write8(padapter, REG_APSD_CTRL, (rtw_read8(padapter, REG_APSD_CTRL) & ~BIT6));
 	do{
 		pollingCount++;	
 	}while((pollingCount<200) && (rtw_read8(padapter, REG_APSD_CTRL)&BIT7)); //polling until BIT7 is 0. by tynli
-
-
+#endif
 
 	// Enable MAC DMA/WMAC/SCHEDULE/SEC block
 	value16 = rtw_read16(padapter, REG_CR);
@@ -2368,11 +2365,11 @@ n. LEDCFG 0x4C[15:0] = 0x8080
 	//2. Disable GPIO[10:8]          
 
 	rtw_write8(Adapter, REG_GPIO_MUXCFG+3, 0x00);
-  value16 = rtw_read16(Adapter, REG_GPIO_MUXCFG+2) & 0xFF0F;  
+  	value16 = rtw_read16(Adapter, REG_GPIO_MUXCFG+2) & 0xFF0F;  
 
 	value8 = (u8) (value16&0x000F);
 	value16 |= ((value8<<4) | 0x0780);
-	rtw_write16(Adapter, REG_GPIO_PIN_CTRL+2, value16);
+	rtw_write16(Adapter, REG_GPIO_MUXCFG+2, value16);
 
 	//3. Disable LED0 & 1
 	rtw_write16(Adapter, REG_LEDCFG0, 0x8080);
@@ -2593,7 +2590,11 @@ _ResetDigitalProcedure1(
 
 			rtw_write8(Adapter, REG_MCUFWDL, 0);//reset MCU ready status
 			if(Adapter->bFWReady){
-				
+
+				// 2010/08/25 MH Accordign to RD alfred's suggestion, we need to disable other
+				// HRCV INT to influence 8051 reset.
+				rtw_write8(Adapter, REG_FWIMR, 0x20);
+
 				rtw_write8(Adapter, REG_HMETFR+3, 0x20);//8051 reset by self
 				while( (retry_cnts++ <100) && (FEN_CPUEN &rtw_read16(Adapter, REG_SYS_FUNC_EN)))
 				{					
@@ -2610,9 +2611,10 @@ _ResetDigitalProcedure1(
 				//RT_TRACE(COMP_INIT, DBG_LOUD, ("=====> 8051 reset success (%d) .\n",retry_cnts));
 			}
 		}
-			
+	
 		rtw_write8(Adapter, REG_SYS_FUNC_EN+1, 0x54);	//Reset MAC and Enable 8051
-		rtw_write8(Adapter, REG_MCUFWDL, 0);//reset MCU ready status
+	//	rtw_write8(Adapter, REG_MCUFWDL, 0);//reset MCU ready status
+
 	}			
 
 	if(bWithoutHWSM){
@@ -2650,7 +2652,9 @@ l.	SYS_CLKR 0x08[15:0] = 0x3083			// disable ELDR clock
 m.	SYS_ISO_CTRL 0x01[7:0] = 0x83			// isolated ELDR to PON
 ******************************/
 	//rtw_write8(Adapter, REG_SYS_FUNC_EN+1, 0x44);//V11 2010-08-13.
-	rtw_write16(Adapter, REG_SYS_CLKR, 0x70A3); //modify to 0x70a3 by Scott.
+
+
+	rtw_write16(Adapter, REG_SYS_CLKR, 0x70a3); //modify to 0x70a3 by Scott.
  	rtw_write8(Adapter, REG_SYS_ISO_CTRL+1, 0x82); //modify to 0x82 by Scott.
 }
 
@@ -2685,10 +2689,11 @@ i.	APS_FSMCO 0x04[15:0] = 0x4802		// set USB suspend
 	rtw_write8(Adapter, REG_SPS0_CTRL, 0x23);
 	
 	value16 |= (APDM_HOST | AFSM_HSUS |PFM_ALDN);
+
 	
 	rtw_write16(Adapter, REG_APS_FSMCO,(u16)value16 );
 
-	rtw_write8(Adapter, REG_RSV_CTRL, 0x0E);
+	rtw_write8(Adapter, REG_RSV_CTRL, 0x0e);
 
 	//RT_TRACE(COMP_INIT, DBG_LOUD, ("======> Disable Analog Reg0x04:0x%04x.\n",value16));
 }
@@ -2826,6 +2831,7 @@ static void rtl8192cu_hw_power_down(_adapter *padapter)
 	rtw_write8(padapter,REG_RSV_CTRL, 0x0);			
 	rtw_write16(padapter, REG_APS_FSMCO, 0x8812);
 }
+
 u32 rtl8192cu_hal_deinit(_adapter *padapter)
  {
         printk("==> %s \n",__FUNCTION__);

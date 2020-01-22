@@ -349,11 +349,16 @@ _func_enter_;
 	 
 	while (plist != phead)
        {
-                pnetwork = LIST_CONTAINOR(plist, struct wlan_network ,list);
-                plist = get_next(plist);
+		pnetwork = LIST_CONTAINOR(plist, struct wlan_network ,list);
+		
 		if (_rtw_memcmp(addr, pnetwork->network.MacAddress, ETH_ALEN) == _TRUE)
                         break;
+
+		plist = get_next(plist);
         }
+
+	if(plist==phead)
+		pnetwork=NULL;
 
 	_exit_critical_bh(&scanned_queue->lock, &irqL);
 	
@@ -785,8 +790,7 @@ _func_enter_;
 		plist = get_next(plist);
 		
 	}
-	
-	
+
 	/* If we didn't find a match, then get a new network slot to initialize
 	 * with this beacon's information */
 	if (rtw_end_of_queue_search(phead,plist)== _TRUE) {
@@ -944,7 +948,7 @@ _func_exit_;
 }
 
 
-void rtw_survey_event_callback(_adapter	*adapter, u8 *pbuf)
+void rtw_survey_event_callback(_adapter *adapter, u8 *pbuf)
 {
 	_irqL  irqL;
 	u32 len;
@@ -1003,7 +1007,7 @@ _func_enter_;
 			_rtw_memcpy(pmlmepriv->cur_network.network.IEs, pnetwork->IEs, 8);
 
 			ibss_wlan = find_network(&pmlmepriv->scanned_queue,  pnetwork->MacAddress);
-			if(!ibss_wlan)
+			if(ibss_wlan)
 			{
 				_rtw_memcpy(ibss_wlan->network.IEs , pnetwork->IEs, 8);			
 				goto exit;
@@ -1265,12 +1269,11 @@ _func_enter_;
 	{
 	        pmlmepriv->fw_state ^= _FW_LINKED;
 
-	padapter->ledpriv.LedControlHandler(padapter, LED_CTL_NO_LINK);
-
-	rtw_os_indicate_disconnect(padapter);
-	
+		padapter->ledpriv.LedControlHandler(padapter, LED_CTL_NO_LINK);		
+		rtw_os_indicate_disconnect(padapter);
+		
 #ifdef CONFIG_LPS
-	lps_ctrl_wk_cmd(padapter, LPS_CTRL_DISCONNECT, 1);
+		lps_ctrl_wk_cmd(padapter, LPS_CTRL_DISCONNECT, 1);
 #endif
  	
 	}
@@ -1526,6 +1529,7 @@ _func_enter_;
 						else
 #endif							
 						{
+							printk("%s...call rtw_indicate_connect...\n ",__FUNCTION__);
 							rtw_indicate_connect(adapter);
 						}
 		
@@ -1561,7 +1565,21 @@ _func_enter_;
 		}
 				
 	}
-	else //if join_res < 0 (join fails), then try again
+	else if(pnetwork->join_res == -4) 
+	{
+		rtw_reset_securitypriv(adapter);
+		_set_timer(&pmlmepriv->assoc_timer, 1);					
+
+		//rtw_free_assoc_resources(adapter);
+
+		if((check_fwstate(pmlmepriv, _FW_UNDER_LINKING)) == _TRUE)
+		{		
+             	RT_TRACE(_module_rtl871x_mlme_c_,_drv_err_,("fail! clear _FW_UNDER_LINKING ^^^fw_state=%x\n", pmlmepriv->fw_state));
+			pmlmepriv->fw_state ^= _FW_UNDER_LINKING;
+		}	
+		
+	}
+	else	//if join_res < 0 (join fails), then try again
 	{
 
 #ifdef CONFIG_DRVEXT_MODULE
@@ -1569,8 +1587,7 @@ _func_enter_;
 select_and_join_new_bss:
 
 		//drvext_assoc_fail_indicate(adapter);
-#endif	
-
+#endif			
 		res = rtw_select_and_join_from_scanned_queue(pmlmepriv);	
 		RT_TRACE(_module_rtl871x_mlme_c_,_drv_err_,("rtw_select_and_join_from_scanned_queue again! res:%d\n",res));
 		if (res != _SUCCESS || retry>2)
@@ -1599,8 +1616,7 @@ select_and_join_new_bss:
 		}
 		
 	}
-
-				
+					
 ignore_joinbss_callback:
 
 	_exit_critical_bh(&pmlmepriv->lock, &irqL);
@@ -1649,7 +1665,7 @@ _func_enter_;
 		//the sta have been in sta_info_queue => do nothing 
 		
 		RT_TRACE(_module_rtl871x_mlme_c_,_drv_err_,("Error: rtw_stassoc_event_callback: sta has been in sta_hash_queue \n"));
-		printk("Error: rtw_stassoc_event_callback: sta has been in sta_hash_queue \n");
+		//printk("Error: rtw_stassoc_event_callback: sta has been in sta_hash_queue \n");
 		goto exit; //(between drv has received this event before and  fw have not yet to set key to CAM_ENTRY)
 	}
 
@@ -1680,6 +1696,7 @@ _func_enter_;
 			if(ptarget_wlan)	ptarget_wlan->fixed = _TRUE;	
 					
 			// a sta + bc/mc_stainfo (not Ibss_stainfo)
+			printk("%s...call rtw_indicate_connect...\n ",__FUNCTION__);
 			rtw_indicate_connect(adapter);
 		}
 	}
@@ -1721,6 +1738,7 @@ _func_enter_;
 	if(pmlmepriv->fw_state & WIFI_STATION_STATE)
 	{
 		rtw_free_assoc_resources(adapter);
+		printk("%s...call rtw_indicate_disconnect\n ",__FUNCTION__);
 		rtw_indicate_disconnect(adapter);
 	}
 
@@ -2048,7 +2066,7 @@ _func_enter_;
 					if(is_same_network(&pmlmepriv->cur_network.network, &pnetwork->network))
 					{
 						//DBG_871X("select_and_join(1): _FW_LINKED and is same network, it needn't join again\n");
-
+						printk("%s...call rtw_indicate_connect...\n ",__FUNCTION__);
 						rtw_indicate_connect(adapter);//rtw_indicate_connect again
 							
 						return 2;
@@ -2056,7 +2074,7 @@ _func_enter_;
 					else
 					{
 						rtw_disassoc_cmd(adapter);
-			
+						printk("%s...call rtw_indicate_disconnect\n ",__FUNCTION__);
 						rtw_indicate_disconnect(adapter);
 
 						rtw_free_assoc_resources(adapter);

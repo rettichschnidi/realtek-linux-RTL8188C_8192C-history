@@ -610,7 +610,7 @@ unsigned int OnBeacon(_adapter *padapter, union recv_frame *precv_frame)
 				psta->sta_stats.rx_pkts++;				
 			}
 			else
-			{
+			{	
 					
 				//allocate a new CAM entry for IBSS station
 				if ((cam_idx = allocate_cam_entry(padapter)) == NUM_STA)
@@ -772,8 +772,8 @@ unsigned int OnAssocRsp(_adapter *padapter, union recv_frame *precv_frame)
 	//status
 	if ((status = le16_to_cpu(*(unsigned short *)(pframe + WLAN_HDR_A3_LEN + 2))) > 0)
 	{
-		DBG_871X("assoc reject, status: %x\n", status);
-		res = -1;
+		DBG_871X("assoc reject, status code: %d\n", status);
+		res = -4;
 		goto report_assoc_result;
 	}
 	
@@ -1251,14 +1251,14 @@ void issue_probersp(_adapter *padapter, unsigned char *da)
 	unsigned char					*pframe;
 	struct ieee80211_hdr	*pwlanhdr;
 	unsigned short				*fctrl;	
+	unsigned int	rate_len;
 	unsigned char					*mac, *bssid;
 	struct xmit_priv	*pxmitpriv = &(padapter->xmitpriv);
 	struct mlme_ext_priv	*pmlmeext = &(padapter->mlmeextpriv);
 	struct mlme_ext_info	*pmlmeinfo = &(pmlmeext->mlmext_info);
 	WLAN_BSSID_EX 		*cur_network = &(pmlmeinfo->network);
-	
-	
-	DBG_871X("%s\n", __FUNCTION__);
+
+	//DBG_871X("%s\n", __FUNCTION__);
 	
 	if ((pmgntframe = alloc_mgtxmitframe(pxmitpriv)) == NULL)
 	{
@@ -1295,14 +1295,77 @@ void issue_probersp(_adapter *padapter, unsigned char *da)
 	if(cur_network->IELength>MAX_IE_SZ)
 		return;
 
-	
+#if 0	
 	_rtw_memcpy(pframe, cur_network->IEs, cur_network->IELength);
 	pframe += cur_network->IELength;
 	pattrib->pktlen += cur_network->IELength;
+#else	
 	
+	//timestamp will be inserted by hardware
+	pframe += 8;
+	pattrib->pktlen += 8;
 
-	pattrib->last_txcmdsz = pattrib->pktlen;
+	// beacon interval: 2 bytes
+	_rtw_memcpy(pframe, (unsigned char *)(rtw_get_beacon_interval_from_ie(cur_network->IEs)), 2); 
+	pframe += 2;
+	pattrib->pktlen += 2;
+
+	// capability info: 2 bytes
+	_rtw_memcpy(pframe, (unsigned char *)(rtw_get_capability_from_ie(cur_network->IEs)), 2);
+	pframe += 2;
+	pattrib->pktlen += 2;
+
+
+	if( (pmlmeinfo->state&0x03) == WIFI_FW_AP_STATE)
+	{
+		DBG_871X("ie len=%d\n", cur_network->IELength);
+		pattrib->pktlen += cur_network->IELength - sizeof(NDIS_802_11_FIXED_IEs);
+		_rtw_memcpy(pframe, cur_network->IEs+sizeof(NDIS_802_11_FIXED_IEs), pattrib->pktlen);
+		
+		goto _issue_probersp;
+	}
+
+	//below for ad-hoc mode
+
+	// SSID
+	pframe = rtw_set_ie(pframe, _SSID_IE_, cur_network->Ssid.SsidLength, cur_network->Ssid.Ssid, &pattrib->pktlen);
+
+	// supported rates...
+	rate_len = rtw_get_rateset_len(cur_network->SupportedRates);
+	pframe = rtw_set_ie(pframe, _SUPPORTEDRATES_IE_, ((rate_len > 8)? 8: rate_len), cur_network->SupportedRates, &pattrib->pktlen);
+
+	// DS parameter set
+	pframe = rtw_set_ie(pframe, _DSSET_IE_, 1, (unsigned char *)&(cur_network->Configuration.DSConfig), &pattrib->pktlen);
+
+	if( (pmlmeinfo->state&0x03) == WIFI_FW_ADHOC_STATE)
+	{
+		u32 ATIMWindow;
+		// IBSS Parameter Set...
+		//ATIMWindow = cur->Configuration.ATIMWindow;
+		ATIMWindow = 0;
+		pframe = rtw_set_ie(pframe, _IBSS_PARA_IE_, 2, (unsigned char *)(&ATIMWindow), &pattrib->pktlen);
+	}	
+
+
+	//todo: ERP IE
 	
+	
+	// EXTERNDED SUPPORTED RATE
+	if (rate_len > 8)
+	{
+		pframe = rtw_set_ie(pframe, _EXT_SUPPORTEDRATES_IE_, (rate_len - 8), (cur_network->SupportedRates + 8), &pattrib->pktlen);
+	}
+
+
+	//todo:HT for adhoc
+
+#endif
+
+_issue_probersp:
+	
+	
+	pattrib->last_txcmdsz = pattrib->pktlen;
+	//DBG_871X("issue probersp_sz=%d\n", pattrib->last_txcmdsz);
 
 	dump_mgntframe(padapter, pmgntframe);
 	
@@ -2320,9 +2383,22 @@ u8 collect_bss_info(_adapter *padapter, union recv_frame *precv_frame, WLAN_BSSI
 	if ((p = rtw_get_ie(bssid->IEs + _FIXED_IE_LENGTH_, _SSID_IE_, &len, bssid->IELength - _FIXED_IE_LENGTH_)) == NULL)
 	{
 		DBG_871X("marc: cannot find SSID for survey event\n");
+	#if 1
+		{//georgia ############3
+			uint i,j=1;			
+			DBG_871X("############################# \n");
+			for(i=0;i<packet_len;i++)
+			{
+				DBG_871X("%02X:", *(pframe+i));
+				if((j++)%8 == 0)	printk("\n");	
+			}
+			DBG_871X("\n############################# \n");	
+		}
+	#endif
 		return _FAIL;
 	}
 
+	
 	if (*(p + 1))
 	{
 		_rtw_memcpy(bssid->Ssid.Ssid, (p + 2), *(p + 1));
@@ -2332,6 +2408,7 @@ u8 collect_bss_info(_adapter *padapter, union recv_frame *precv_frame, WLAN_BSSI
 	{
 		bssid->Ssid.SsidLength = 0;
 	}
+
 
 	_rtw_memset(bssid->SupportedRates, 0, NDIS_802_11_LENGTH_RATES_EX);
 
@@ -2469,7 +2546,7 @@ void start_create_ibss(_adapter* padapter)
 		if(retry == 100)
 		{
 			RT_TRACE(_module_rtl871x_mlme_c_,_drv_err_,("issuing beacon frame fail....\n"));
-			
+			DBG_871X("@@@@ %s issue_beacon failed...@@@@\n", __FUNCTION__);	
 			report_join_res(padapter, -1);			
 			//pmlmeinfo->state ^= WIFI_FW_ADHOC_STATE;
 		}
@@ -2508,6 +2585,8 @@ void start_clnt_join(_adapter* padapter)
 	if (caps&cap_ESS)
 	{
 		pmlmeinfo->state = WIFI_FW_AUTH_NULL | WIFI_FW_STATION_STATE;
+		
+		//printk("%s==> caps&cap_ESS\n",__FUNCTION__);
 
 		//set_opmode_cmd(padapter, infra_client_with_mlme);//removed
 
@@ -2537,7 +2616,8 @@ void start_clnt_join(_adapter* padapter)
 		_set_timer(&(pmlmeext->link_timer), decide_wait_for_beacon_timeout(pmlmeinfo->bcn_interval));
 	}
 	else if (caps&cap_IBSS) //adhoc client
-	{		
+	{			
+		//printk("%s==> caps&cap_IBSS\n",__FUNCTION__);
 		//set_opmode_cmd(padapter, adhoc);//removed
 
 		rtw_write8(padapter, REG_SECCFG, 0xcf);
@@ -3124,7 +3204,8 @@ void mlmeext_sta_add_event_callback(_adapter *padapter, struct sta_info *psta)
 				pmlmeinfo->FW_sta_info[psta->mac_id].status = 0;
 					
 				pmlmeinfo->state ^= WIFI_FW_ADHOC_STATE;
-					
+
+				DBG_871X("@@@@ %s issue_beacon failed...@@@@\n", __FUNCTION__);	
 				return;			
 			}
 
@@ -3153,7 +3234,11 @@ void mlmeext_sta_add_event_callback(_adapter *padapter, struct sta_info *psta)
 
 	//update adhoc sta_info
 	update_sta_info(padapter, psta);
-	
+
+	//fixed beacon issue for 8191su.............
+	{
+		rtw_write8(padapter,0x542 ,0x02);
+	}
 
 	pmlmeext->linked_to = LINKED_TO;
 	
@@ -3393,6 +3478,8 @@ void silentreset_for_specific_platform(_adapter *padapter)
 		netif_wake_queue(padapter->pnetdev);	
 }
 #endif
+
+
 void _linked_rx_signal_strehgth_display(_adapter *padapter)
 {
 	printk("============ linked status check ===================\n");
@@ -3402,6 +3489,7 @@ void _linked_rx_signal_strehgth_display(_adapter *padapter)
 	printk("Rx Signal_qual:%d \n",padapter->recvpriv.signal_qual);
 	printk("============ linked status check ===================\n");
 }
+
 void linked_status_chk(_adapter *padapter)
 {
 	u32	i;
@@ -3455,7 +3543,7 @@ void linked_status_chk(_adapter *padapter)
 						//	to trigger the AP to send the probe response.
 						issue_probereq(padapter, 0);
 						issue_probereq(padapter, 0);
-						issue_probereq(padapter, 0);
+						issue_probereq(padapter, 0);					
 
 					}
 					
@@ -3465,8 +3553,9 @@ void linked_status_chk(_adapter *padapter)
 				}
 				else
 				{				
-                                	retry = 0;
-                                	DBG_871X("no beacon to call receive_disconnect()\n");
+                                retry = 0;
+                                DBG_871X("no beacon to call receive_disconnect()\n");
+							
 					receive_disconnect(padapter, pmlmeinfo->network.MacAddress);
 					pmlmeinfo->link_count = 0;
 					return;

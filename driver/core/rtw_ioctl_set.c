@@ -354,8 +354,10 @@ _func_enter_;
 
 			rtw_disassoc_cmd(padapter);
 
-			if (check_fwstate(pmlmepriv, _FW_LINKED) == _TRUE)
+			if (check_fwstate(pmlmepriv, _FW_LINKED) == _TRUE){
+				printk("%s...call rtw_indicate_disconnect\n ",__FUNCTION__);
 				rtw_indicate_disconnect(padapter);
+			}
 
 			rtw_free_assoc_resources(padapter);
 
@@ -442,8 +444,10 @@ _func_enter_;
 					//if in WIFI_ADHOC_MASTER_STATE | WIFI_ADHOC_STATE, create bss or rejoin again
 					rtw_disassoc_cmd(padapter);
 
-					if (check_fwstate(pmlmepriv, _FW_LINKED) == _TRUE)
+					if (check_fwstate(pmlmepriv, _FW_LINKED) == _TRUE){
+						printk("%s...call rtw_indicate_disconnect\n ",__FUNCTION__);
 						rtw_indicate_disconnect(padapter);
+					}
 						
 					rtw_free_assoc_resources(padapter);
 
@@ -471,8 +475,10 @@ _func_enter_;
 
 			rtw_disassoc_cmd(padapter);
 
-			if (check_fwstate(pmlmepriv, _FW_LINKED) == _TRUE)
+			if (check_fwstate(pmlmepriv, _FW_LINKED) == _TRUE){				
+				printk("%s...call rtw_indicate_disconnect\n ",__FUNCTION__);
 				rtw_indicate_disconnect(padapter);
+			}
 			
 			rtw_free_assoc_resources(padapter);
 
@@ -573,7 +579,8 @@ _func_enter_;
 
 
 		if((check_fwstate(pmlmepriv, _FW_LINKED)== _TRUE) || (*pold_state==Ndis802_11Infrastructure) ||(*pold_state==Ndis802_11IBSS))
-		{		
+		{	
+			printk("%s...call rtw_indicate_disconnect\n ",__FUNCTION__);
 			rtw_indicate_disconnect(padapter); //will clr Linked_state; before this function, we must have chked whether  issue dis-assoc_cmd or not
 		}	
 	
@@ -635,8 +642,9 @@ _func_enter_;
 
 	if (check_fwstate(pmlmepriv, _FW_LINKED) == _TRUE)
 	{
+		
 		RT_TRACE(_module_rtl871x_ioctl_set_c_,_drv_info_,("MgntActSet_802_11_DISASSOCIATE: rtw_indicate_disconnect\n"));
-
+		printk("%s...call rtw_indicate_disconnect\n ",__FUNCTION__);
 		rtw_disassoc_cmd(padapter);		
 		rtw_indicate_disconnect(padapter);
 		rtw_free_assoc_resources(padapter);			
