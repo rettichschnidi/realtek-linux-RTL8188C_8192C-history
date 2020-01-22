@@ -77,7 +77,7 @@ static char g_ifname[PROPERTY_VALUE_MAX];
 #endif
 
 #ifndef WIFI_DRIVER_MODULE_PATH_AP
-#define WIFI_DRIVER_MODULE_PATH_AP	WIFI_DRIVER_MODULE_PATH // "/system/wifi/wlap.ko"
+#define WIFI_DRIVER_MODULE_PATH_AP	WIFI_DRIVER_MODULE_PATH
 #endif
 #ifndef WIFI_DRIVER_MODULE_ARG_AP
 #define WIFI_DRIVER_MODULE_ARG_AP	"ifname=" WIFI_DRIVER_IFNAME_AP
@@ -108,6 +108,12 @@ static const char WPA_SUPP_CTRL_DIR[]				= "/data/misc/wifi/wpa_supplicant";
 static const char WPA_SUPP_CONFIG_TEMPLATE[]	= "/system/etc/wifi/wpa_supplicant.conf";
 static const char WPA_SUPP_CONFIG_FILE[]			= "/data/misc/wifi/wpa_supplicant.conf";
 
+static const char HOSTAPD_NAME[]				= "hostapd";
+static const char HOSTAPD_PROP_NAME[]		= "init.svc.hostapd";
+static const char HOSTAPD_CTRL_DIR[]			= "/data/misc/wifi/hostapd";
+static const char HOSTAPD_CONFIG_TEMPLATE[]	= "/system/etc/wifi/hostapd.conf";
+static const char HOSTAPD_CONFIG_FILE[]    		= "/data/misc/wifi/hostapd.conf";
+
 static const char MODULE_FILE[]	= "/proc/modules";
 
 #if 0
@@ -120,7 +126,8 @@ const char* pSupplicantPropName = WPA_SUPP_PROP_NAME;//WAPI_SUPP_PROP_NAME;
 
 #include <linux/wireless.h>
 
-int get_priv_func_num(int sockfd, const char *ifname, const char *fname) {
+int get_priv_func_num(int sockfd, const char *ifname, const char *fname)
+{
 	struct iwreq wrq;
 	struct iw_priv_args *priv_ptr;
 	int i, ret;
@@ -140,7 +147,7 @@ int get_priv_func_num(int sockfd, const char *ifname, const char *fname) {
 		goto exit;
 	}
 
-	ret =-1;
+	ret = -EOPNOTSUPP;
 	priv_ptr = (struct iw_priv_args *)wrq.u.data.pointer;
 	for(i=0;(i < wrq.u.data.length);i++) {
 		if (strcmp(priv_ptr[i].name, fname) == 0) {
@@ -156,13 +163,24 @@ exit:
 	return ret;
 }
 
-
-int rtl871x_drv_rereg_nd_name_fd(int sockfd, const char *ifname, const int fnum, const char * new_ifname)
+int rtl871x_drv_rereg_nd_name_fd(int sockfd, const char *ifname, const char * new_ifname)
 {
 	struct iwreq wrq;
 	int ret;
+	
+	int fnum;
+	char *fname = "rereg_nd_name";
+	
 	char ifname_buf[IFNAMSIZ];
+
+	ret = fnum = get_priv_func_num(sockfd, ifname, fname);
+	if(ret < 0) {
+		LOGE("get_priv_func_num(%s) return %d", fname, ret);
+		goto exit;
+	}
+	
 	strncpy(wrq.ifr_name, ifname, sizeof(wrq.ifr_name));
+	
 	strncpy(ifname_buf, new_ifname, IFNAMSIZ);
 	ifname_buf[IFNAMSIZ-1] = 0;
 	wrq.u.data.pointer = ifname_buf;
@@ -170,10 +188,10 @@ int rtl871x_drv_rereg_nd_name_fd(int sockfd, const char *ifname, const int fnum,
 	wrq.u.data.flags = 0;
 
 	ret = ioctl(sockfd, fnum, &wrq);
-
 	if (ret) {
 		LOGE("ioctl - failed: %d %s", ret, strerror(errno));
 	}
+exit:
 	return ret;
 }
 
@@ -201,7 +219,6 @@ int rtl871x_drv_rereg_nd_name(const char *ifname, const char *new_ifname)
 	ret = rtl871x_drv_rereg_nd_name_fd(
 		sockfd
 		, ifname
-		, get_priv_func_num(sockfd, ifname, "rereg_nd_name")
 		, new_ifname
 	);
 	
@@ -210,23 +227,32 @@ bad:
 	return ret;
 }
 
-int rtl871x_drv_set_pid_fd(int sockfd, const char *ifname, const int fnum, const int index, const int pid) {
+int rtl871x_drv_set_pid_fd(int sockfd, const char *ifname, const int index, const int pid)
+{
 	struct iwreq wrq;
 	int ret;
+	int fnum;
+	char *fname = "setpid";
 
 	int req[2];
 
-	req[0]=index;
-	req[1]=pid;
+	ret = fnum = get_priv_func_num(sockfd, ifname, fname);
+	if(ret < 0) {
+		LOGE("get_priv_func_num(%s) return %d", fname, ret);
+		goto exit;
+	}
 
 	strncpy(wrq.ifr_name, ifname, sizeof(wrq.ifr_name));
+	
+	req[0]=index;
+	req[1]=pid;
 	memcpy(wrq.u.name,req,sizeof(int)*2);
 
 	ret = ioctl(sockfd, fnum, &wrq);
-
 	if (ret) {
 		LOGE("ioctl - failed: %d %s", ret, strerror(errno));
 	}
+exit:
 	return ret;
 }
 
@@ -254,7 +280,6 @@ int rtl871x_drv_set_pid(const char *ifname, const int index, const int pid)
 	ret = rtl871x_drv_set_pid_fd(
 		sockfd
 		, ifname
-		, get_priv_func_num(sockfd, ifname, "setpid")
 		, index
 		, pid
 	);
@@ -994,4 +1019,417 @@ void wifi_close_supplicant_connection()
 int wifi_command(const char *command, char *reply, size_t *reply_len)
 {
     return wifi_send_command(ctrl_conn, command, reply, reply_len);
+}
+
+#define WIFI_DEFAULT_BI         100         /* in TU */
+#define WIFI_DEFAULT_DTIM       1           /* in beacon */
+#define WIFI_DEFAULT_CHANNEL    6
+#define WIFI_DEFAULT_MAX_STA    8
+#define WIFI_DEFAULT_PREAMBLE   0
+
+static struct wpa_ctrl *hostapd_ctrl_conn = NULL;
+static int hostapd_conif_valid = 0;
+
+int set_hostapd_config_file(int argc, char *argv[])
+{
+	int fd;
+	char buf[80];
+	int len;
+	hostapd_conif_valid = 0;
+
+	fd = open(HOSTAPD_CONFIG_FILE, O_CREAT|O_WRONLY|O_TRUNC, 0660);
+	if (fd < 0) {
+		LOGE("Cannot create \"%s\": %s", HOSTAPD_CONFIG_FILE, strerror(errno));
+		return -1;
+	}
+
+	#if 0
+	#ifdef USE_DRIVER_PROP_IF_NAME
+	getWifiIfname(defIfname);
+	property_get(DRIVER_PROP_IF_NAME, ifname, defIfname);
+	#else
+	getWifiIfname(ifname);
+	#endif
+	#endif
+
+
+	if(*getWifiIfname() == '\0') {
+		LOGD("set_hostapd_config_file: getWifiIfname fail");
+		return -1;
+	}
+	
+	//len = snprintf(buf, sizeof(buf), "interface=%s\n",argv[3]);
+	len = snprintf(buf, sizeof(buf), "interface=%s\n", getWifiIfname());
+	write(fd, buf, len);
+	len = snprintf(buf, sizeof(buf), "ctrl_interface=%s\n", HOSTAPD_CTRL_DIR);
+	write(fd, buf, len);
+
+	/* for CU-series flag */
+	len = snprintf(buf, sizeof(buf), "driver=rtl871xdrv\n");
+	write(fd, buf, len);
+	len = snprintf(buf, sizeof(buf), "wme_enabled=1\n");
+	write(fd, buf, len);
+	len = snprintf(buf, sizeof(buf), "hw_mode=g\n");
+	write(fd, buf, len);
+	len = snprintf(buf, sizeof(buf), "ieee80211n=1\n");
+	write(fd, buf, len);
+	len = snprintf(buf, sizeof(buf), "ht_capab=[SHORT-GI-20][SHORT-GI-40]\n");
+	write(fd, buf, len);
+    
+	if (argc > 4) {
+		len = snprintf(buf, sizeof(buf), "ssid=%s\n",argv[4]);
+	} else {
+		len = snprintf(buf, sizeof(buf), "ssid=AndroidAP\n");
+	}
+	write(fd, buf, len);
+	
+	/* set open auth */
+	len = snprintf(buf, sizeof(buf), "auth_algs=1\n");
+	write(fd, buf, len);
+	len = snprintf(buf, sizeof(buf), "max_num_sta=%d\n", WIFI_DEFAULT_MAX_STA);
+	write(fd, buf, len);
+	len = snprintf(buf, sizeof(buf), "beacon_int=%d\n", WIFI_DEFAULT_BI);
+	write(fd, buf, len);
+	len = snprintf(buf, sizeof(buf), "dtim_period=%d\n", WIFI_DEFAULT_DTIM);
+	write(fd, buf, len);
+	
+	if (argc > 5) {
+		if (strncmp(argv[5], "wpa2-psk", 8) == 0) {
+			len = snprintf(buf, sizeof(buf), "wpa=2\n");
+			write(fd, buf, len);
+			len = snprintf(buf, sizeof(buf), "wpa_key_mgmt=WPA-PSK\n");
+			write(fd, buf, len);
+			len = snprintf(buf, sizeof(buf), "wpa_pairwise=CCMP\n");
+			write(fd, buf, len);
+			
+			if (argc > 6) {
+				len = snprintf(buf, sizeof(buf), "wpa_passphrase=%s\n",argv[6]);
+				write(fd, buf, len);
+			} else {
+				len = snprintf(buf, sizeof(buf), "wpa_passphrase=12345678\n");
+				write(fd, buf, len);
+			}
+		}
+	}
+	
+	if (argc > 7) {
+		len = snprintf(buf, sizeof(buf), "channel=%s\n",argv[7]);
+		write(fd, buf, len);
+	} else {
+		len = snprintf(buf, sizeof(buf), "channel=%d\n",WIFI_DEFAULT_CHANNEL);
+		write(fd, buf, len);
+	}
+	
+	if (argc > 8) {
+		len = snprintf(buf, sizeof(buf), "preamble=%s\n",argv[8]);
+		write(fd, buf, len);
+	} else {
+		len = snprintf(buf, sizeof(buf), "preamble=%d\n",WIFI_DEFAULT_PREAMBLE);
+		write(fd, buf, len);
+	}
+
+	len = snprintf(buf, sizeof(buf), "eap_server=1\n");
+	write(fd, buf, len);
+
+	len = snprintf(buf, sizeof(buf), "wps_state=2\n");
+	write(fd, buf, len);
+	
+	hostapd_conif_valid = 1;
+	close(fd);
+
+	return 0;
+}
+
+#ifdef START_HOSTAPD_INSIDE
+int wifi_start_hostapd()
+{
+	static int hostapdPid=0;
+	
+	LOGD("SoftapController::wifi_start_hostapd");
+
+
+	/* Check whether already running */
+	if (hostapdPid != 0) {
+		LOGE("%s already started", HOSTAPD_NAME);
+		return 0;
+	}
+
+	/* Clear out any stale socket files that might be left over. */
+	wpa_ctrl_cleanup();
+	
+	LOGD("Starting %s services", HOSTAPD_NAME);
+
+
+	if ((pid = fork()) < 0) {
+		LOGE("fork failed (%s)", strerror(errno));
+		return -1;
+	}
+
+	if (!pid) {
+		
+		char *args[] = {
+			(char *)"/system/bin/hostapd"
+			(char *)HOSTAPD_CONFIG_FILE	
+			,(char *) 0 
+		};
+
+		if (execv(args[0], args)) {
+			LOGE("execl failed (%s)", strerror(errno));
+		}
+
+		LOGE("Should never get here!");
+		return 0;
+	} else {
+		hostapdPid = pid;
+		LOGD("%s services running", HOSTAPD_NAME);
+	}
+
+    return 0;
+
+}
+
+int wifi_stop_hostapd()
+{
+	int count = 50; /* wait at most 5 seconds for completion */
+	int wait_ret;
+
+	/* Check whether hostapd already stopped */
+	if (hostapdPid == 0) {
+		LOGE("%s already stopped", HOSTAPD_NAME);
+		return 0;
+	}
+	
+
+	LOGD("Stopping %s services", HOSTAPD_NAME);
+	kill(hostapdPid, SIGTERM);
+
+	while (count-- > 0) {	
+		if(hostapdPid == (wait_ret=waitpid(hostapdPid, NULL, WNOHANG)) ) {
+			LOGD("%s services stopped", HOSTAPD_NAME);
+			hostapdPid = 0;
+			return 0
+		} else if(wait_ret == 0) {
+			usleep(100000);
+		} else {
+			LOGD("Stopping %s services failed(%s)", HOSTAPD_NAME, strerror(errno));
+			return -1;
+		}
+	}
+	return -1;
+		
+}
+#else
+int wifi_start_hostapd()
+{
+    char daemon_cmd[PROPERTY_VALUE_MAX];
+    char supp_status[PROPERTY_VALUE_MAX] = {'\0'};
+    int count = 200; /* wait at most 20 seconds for completion */
+    char mac_buff[15] = {'\0'};
+#ifdef HAVE_LIBC_SYSTEM_PROPERTIES
+    const prop_info *pi;
+    unsigned serial = 0;
+#endif
+
+	LOGD("SoftapController::wifi_start_hostapd");
+
+	/* Check whether already running */
+	if (property_get(HOSTAPD_PROP_NAME, supp_status, NULL)
+		&& strcmp(supp_status, "running") == 0) {
+		return 0;
+	}
+
+	/* Before starting the daemon, make sure its config file exists */
+	if(ensure_config_file_exists(HOSTAPD_CONFIG_FILE, HOSTAPD_CONFIG_TEMPLATE) < 0) {
+		LOGE("configuration file missing");
+		return -1;
+	}
+
+	/* Clear out any stale socket files that might be left over. */
+	wpa_ctrl_cleanup();
+
+#ifdef HAVE_LIBC_SYSTEM_PROPERTIES
+	/*
+	 * Get a reference to the status property, so we can distinguish
+	 * the case where it goes stopped => running => stopped (i.e.,
+	 * it start up, but fails right away) from the case in which
+	 * it starts in the stopped state and never manages to start
+	 * running at all.
+	 */
+	pi = __system_property_find(HOSTAPD_PROP_NAME);
+	if (pi != NULL) {
+		serial = pi->serial;
+	}
+#endif
+
+	#ifdef CONFIG_DAEMON_CMD_WITH_PARA
+	snprintf(daemon_cmd, PROPERTY_VALUE_MAX, "%s:%s", HOSTAPD_NAME, HOSTAPD_CONFIG_FILE);
+	#else
+	snprintf(daemon_cmd, PROPERTY_VALUE_MAX, "%s", HOSTAPD_NAME);
+	#endif
+	
+	property_set("ctl.start", daemon_cmd);
+	LOGD("hostapd daemon_cmd = %s\n", daemon_cmd);   
+	sched_yield();
+
+	while (count-- > 0) {
+#ifdef HAVE_LIBC_SYSTEM_PROPERTIES
+		if (pi == NULL) {
+			pi = __system_property_find(HOSTAPD_PROP_NAME);
+		}
+		if (pi != NULL) {
+			__system_property_read(pi, NULL, supp_status);
+			if (strcmp(supp_status, "running") == 0) {
+				LOGD("hostapd running 1");
+				return 0;
+			} else if (pi->serial != serial && strcmp(supp_status, "stopped") == 0) {
+				LOGI("wifi_start_supplicant stopped pi->serial %u serial %u leave", pi->serial, serial);
+				if (serial==0) { /* no initialized, skip it */
+					serial = pi->serial;
+				} else {
+					LOGE("HAVE_LIBC_SYSTEM_PROPERTIES: return -1");
+					return -1;
+				}
+			}
+		}
+#else
+		if (property_get(HOSTAPD_PROP_NAME, supp_status, NULL)) {
+			if (strcmp(supp_status, "running") == 0) {
+				LOGD("hostapd running 2");
+				return 0;
+			}
+		}
+#endif
+		usleep(100000);
+	}
+	LOGI("wifi_start_hostapd is NOT running. timeout. leave" );
+	return -1;
+}
+
+int wifi_stop_hostapd()
+{
+	char supp_status[PROPERTY_VALUE_MAX] = {'\0'};
+	int count = 50; /* wait at most 5 seconds for completion */
+
+	/* Check whether hostapd already stopped */
+	if (property_get(HOSTAPD_PROP_NAME, supp_status, NULL)
+		&& strcmp(supp_status, "stopped") == 0) {
+		return 0;
+	}
+
+	property_set("ctl.stop", HOSTAPD_NAME);
+	sched_yield();
+
+	while (count-- > 0) {
+		if (property_get(HOSTAPD_PROP_NAME, supp_status, NULL)) {
+			if (strcmp(supp_status, "stopped") == 0)
+				return 0;
+		}
+		usleep(100000);
+	}
+	return -1;
+}
+#endif
+
+int wifi_connect_to_hostapd()
+{
+	char defIfname[256];
+	char ctrl_conn_path[256];
+	char supp_status[PROPERTY_VALUE_MAX] = {'\0'};
+	int retry_times = 20;
+
+	/* Make sure hostapd is running */
+	if (!property_get(HOSTAPD_PROP_NAME, supp_status, NULL)
+		|| strcmp(supp_status, "running") != 0) {
+		LOGE("hostapd not running, cannot connect");
+		return -1;
+	}
+
+	#if 0
+	#ifdef USE_DRIVER_PROP_IF_NAME
+	getWifiIfname(defIfname);
+	property_get(DRIVER_PROP_IF_NAME, ifname, defIfname);
+	#else
+	getWifiIfname(ifname);
+	#endif
+	#endif
+
+	if(*getWifiIfname() == '\0') {
+		LOGD("wifi_connect_to_hostapd: getWifiIfname fail");
+		return -1;
+	}
+	
+	snprintf(ctrl_conn_path, sizeof(ctrl_conn_path), "%s/%s", HOSTAPD_CTRL_DIR, getWifiIfname());
+	LOGD("ctrl_conn_path = %s\n", ctrl_conn_path);
+
+
+	{ /* check iface file is ready */
+		int cnt = 160; /* 8 seconds (160*50)*/
+		sched_yield();
+		while ( access(ctrl_conn_path, F_OK|W_OK)!=0 && cnt-- > 0) {
+			usleep(50000);
+		}
+		if (access(ctrl_conn_path, F_OK|W_OK)==0) {
+			LOGD("ctrl_conn_path %s is ready to read/write cnt=%d\n", ctrl_conn_path, cnt);
+		} else {
+			LOGD("ctrl_conn_path %s is not ready, cnt=%d\n", ctrl_conn_path, cnt);
+		}
+	}
+
+	if(hostapd_ctrl_conn)
+		LOGE("before wpa_ctrl_open, hostapd_ctrl_conn is not NULL\n");
+
+	while (retry_times--){
+		hostapd_ctrl_conn = wpa_ctrl_open(ctrl_conn_path);
+		if (NULL == hostapd_ctrl_conn) {
+			usleep(1000 * 500);
+			LOGD("Retry to wpa_ctrl_open \n");
+		} else {
+			break;
+		}
+	}
+	
+	if (NULL == hostapd_ctrl_conn) {
+		LOGE("Unable to open connection to supplicant on \"%s\": %s",
+		ctrl_conn_path, strerror(errno));
+		return -1;
+	}
+
+	if (wpa_ctrl_attach(hostapd_ctrl_conn) != 0) {
+		wpa_ctrl_close(hostapd_ctrl_conn);
+		hostapd_ctrl_conn = NULL;
+		return -1;
+	}
+	return 0;
+}
+
+void wifi_close_hostapd_connection()
+{
+	if (hostapd_ctrl_conn != NULL) {
+		wpa_ctrl_close(hostapd_ctrl_conn);
+		hostapd_ctrl_conn = NULL;
+	}
+}
+
+int wifi_load_profile(int started)
+{
+	int ret;
+	int retry=0;
+	if ((started) && (hostapd_conif_valid)) {
+retry:
+		if (hostapd_ctrl_conn == NULL) {
+			LOGE("wifi_load_profile(): hostapd_ctrl_conn == NULL");
+			return -1;
+		} else {
+			if( (ret=wpa_ctrl_reload(hostapd_ctrl_conn))<0){
+				if(retry++==0) {
+					LOGE("wpa_ctrl_reload(hostapd_ctrl_conn) fail, retry...");
+					wifi_close_hostapd_connection();
+					wifi_connect_to_hostapd();
+					goto retry;
+				}
+			}
+			return ret;
+		}
+	}
+	return 0;
 }

@@ -26,7 +26,9 @@ LOCAL_SRC_FILES:=                                      \
 ifeq ($(BOARD_USES_ATH_WIFI), true)
     LOCAL_SRC_FILES += AthSoftapController.cpp
 else ifeq ($(BOARD_USES_REALTEK_WIFI), true)
-    LOCAL_SRC_FILES += SoftapController_realtek.cpp 
+    LOCAL_SRC_FILES += SoftapController_realtek.cpp
+else
+    LOCAL_SRC_FILES += SoftapController.cpp 
 endif
 
 LOCAL_MODULE:= netd
@@ -50,7 +52,6 @@ ifeq ($(BOARD_USES_ATH_WIFI), true)
     LOCAL_SHARED_LIBRARIES += libhostapd_client
 else ifeq ($(BOARD_USES_REALTEK_WIFI), true)
     LOCAL_SHARED_LIBRARIES += libhardware_legacy
-    LOCAL_SHARED_LIBRARIES += libhostapd_client
 endif
 
 ifeq ($(BOARD_HAVE_BLUETOOTH),true)

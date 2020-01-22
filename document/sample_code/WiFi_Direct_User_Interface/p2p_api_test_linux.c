@@ -612,7 +612,7 @@ void p2p_ifaddr(struct p2p *p)
 	memset( p->cmd, 0x00, CMD_SZ );
 	sprintf( p->cmd, "iwpriv %s p2p_get peer_ifa > status.txt", p->ifname);
 	system( p->cmd );
-
+/*
 	pf = fopen( "./status.txt", "r" );
 	if ( pf )
 	{
@@ -633,7 +633,7 @@ void p2p_ifaddr(struct p2p *p)
 
 		fclose( pf );
 	}
-	
+*/	
 	pf = fopen( "./status.txt", "r" );
 	if ( pf )
 	{
@@ -1295,7 +1295,7 @@ void *polling_client(void *arg)
 	while( p->res_go == 0 ){
 
 		p2p_status(p, 0);
-		if( p->status == P2P_STATE_RX_PROVISION_DIS_REQ )
+		if( p->status == P2P_STATE_RX_PROVISION_DIS_REQ || p->status == P2P_STATE_GONEGO_FAIL || p->status == P2P_STATE_GONEGO_ING )
 		{
 			p->thread_trigger = THREAD_GO ;
 			

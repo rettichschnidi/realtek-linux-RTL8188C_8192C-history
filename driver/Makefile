@@ -17,7 +17,7 @@ EXTRA_CFLAGS += -Wno-uninitialized
 
 EXTRA_CFLAGS += -I$(src)/include
 
-CONFIG_AUTOCFG_CP = n
+CONFIG_AUTOCFG_CP = y
 
 CONFIG_RTL8192C = y
 CONFIG_RTL8192D = n
@@ -27,7 +27,7 @@ CONFIG_PCI_HCI = n
 CONFIG_SDIO_HCI = n
 
 CONFIG_MP_INCLUDED = n
-CONFIG_POWER_SAVING			=	y
+CONFIG_POWER_SAVING			=	n
 CONFIG_USB_AUTOSUSPEND			=	n
 CONFIG_HW_PWRP_DETECTION		=	n
 CONFIG_WIFI_TEST						=	n
@@ -35,6 +35,7 @@ CONFIG_BT_COEXISTENCE				= n
 CONFIG_RTL8192CU_REDEFINE_1X1 =n
 
 CONFIG_PLATFORM_I386_PC = y
+CONFIG_PLATFORM_TI_AM3517 = n
 CONFIG_PLATFORM_ANDROID_X86 = n
 CONFIG_PLATFORM_ARM_S3C2K4 = n
 CONFIG_PLATFORM_ARM_PXA2XX = n
@@ -48,9 +49,10 @@ CONFIG_PLATFORM_MSTAR389 = n
 CONFIG_PLATFORM_MT53XX = n
 CONFIG_PLATFORM_ARM_MX51_241H = n
 CONFIG_PLATFORM_ACTIONS_ATJ227X = n
-CONFIG_PLATFORM_ARM_TCC8900	=	n
-CONFIG_PLATFORM_ARM_RK2818	=	n
-CONFIG_PLATFORM_MIPS_JZ4760	=	n
+CONFIG_PLATFORM_ARM_TEGRA3 = n
+CONFIG_PLATFORM_ARM_TCC8900 = n
+CONFIG_PLATFORM_ARM_RK2818 = n
+CONFIG_PLATFORM_MIPS_JZ4760 = n
 CONFIG_PLATFORM_DMP_PHILIPS = n
 CONFIG_PLATFORM_TI_DM365	=	n
 CONFIG_PLATFORM_MN10300 = n
@@ -154,6 +156,7 @@ _HAL_INTFS_FILES :=	hal/hal_init.o \
 			hal/$(RTL871X)/$(RTL871X)_dm.o \
 			hal/$(RTL871X)/$(RTL871X)_rxdesc.o \
 			hal/$(RTL871X)/$(RTL871X)_cmd.o \
+			hal/$(RTL871X)/$(RTL871X)_mp.o \
 			hal/$(RTL871X)/usb/usb_ops_linux.o \
 			hal/$(RTL871X)/usb/usb_halinit.o \
 			hal/$(RTL871X)/usb/rtl$(MODULE_NAME)_led.o \
@@ -184,6 +187,7 @@ _HAL_INTFS_FILES :=	hal/hal_init.o \
 			hal/$(RTL871X)/$(RTL871X)_dm.o \
 			hal/$(RTL871X)/$(RTL871X)_rxdesc.o \
 			hal/$(RTL871X)/$(RTL871X)_cmd.o \
+			hal/$(RTL871X)/$(RTL871X)_mp.o \
 			hal/$(RTL871X)/pci/pci_ops_linux.o \
 			hal/$(RTL871X)/pci/pci_halinit.o \
 			hal/$(RTL871X)/pci/rtl$(MODULE_NAME)_led.o \
@@ -234,6 +238,13 @@ KVER  := $(shell uname -r)
 KSRC := /lib/modules/$(KVER)/build
 MODDESTDIR := /lib/modules/$(KVER)/kernel/drivers/net/wireless/
 INSTALL_PREFIX :=
+endif
+
+ifeq ($(CONFIG_PLATFORM_TI_AM3517), y)
+EXTRA_CFLAGS += -DCONFIG_LITTLE_ENDIAN -DCONFIG_PLATFORM_ANDROID -DCONFIG_PLATFORM_SHUTTLE
+CROSS_COMPILE := arm-eabi-
+KSRC := $(shell pwd)/../../../Android/kernel
+ARCH := arm
 endif
 
 ifeq ($(CONFIG_PLATFORM_MSTAR_TITANIA12), y)
@@ -364,8 +375,16 @@ KVER  := 2.6.18
 KSRC := /home/cnsd4/Appro/mv_pro_5.0/montavista/pro/devkit/lsp/ti-davinci/linux-dm365
 endif
 
+ifeq ($(CONFIG_PLATFORM_ARM_TEGRA3), y)
+EXTRA_CFLAGS += -DCONFIG_LITTLE_ENDIAN #-DCONFIG_MINIMAL_MEMORY_USAGE
+ARCH ?= arm
+CROSS_COMPILE ?= /media/DATA-1/nvidia/gingerbread/prebuilt/linux-x86/toolchain/arm-eabi-4.4.3/bin/arm-eabi-
+KSRC ?= /media/DATA-1/nvidia/gingerbread/out/debug/target/product/cardhu/obj/KERNEL
+MODULE_NAME := wlan
+endif
+
 ifeq ($(CONFIG_PLATFORM_ARM_TCC8900), y)
-EXTRA_CFLAGS += -DCONFIG_LITTLE_ENDIAN
+EXTRA_CFLAGS += -DCONFIG_LITTLE_ENDIAN -DCONFIG_MINIMAL_MEMORY_USAGE
 ARCH ?= arm
 CROSS_COMPILE ?= /media/DATA-1/telechips/SDK_2302_20110425/prebuilt/linux-x86/toolchain/arm-eabi-4.4.3/bin/arm-eabi-
 KSRC ?=/media/DATA-1/telechips/SDK_2302_20110425/kernel
@@ -373,7 +392,7 @@ MODULE_NAME := wlan
 endif
 
 ifeq ($(CONFIG_PLATFORM_ARM_RK2818), y)
-EXTRA_CFLAGS += -DCONFIG_LITTLE_ENDIAN -DCONFIG_PLATFORM_ANDROID -DCONFIG_PLATFORM_ROCKCHIPS
+EXTRA_CFLAGS += -DCONFIG_LITTLE_ENDIAN -DCONFIG_PLATFORM_ANDROID -DCONFIG_PLATFORM_ROCKCHIPS -DCONFIG_MINIMAL_MEMORY_USAGE
 ARCH := arm
 CROSS_COMPILE := /usr/src/release_fae_version/toolchain/arm-eabi-4.4.0/bin/arm-eabi-
 KSRC := /usr/src/release_fae_version/kernel25_A7_281x
@@ -381,7 +400,7 @@ MODULE_NAME := wlan
 endif
 
 ifeq ($(CONFIG_PLATFORM_MIPS_JZ4760), y)
-EXTRA_CFLAGS += -DCONFIG_LITTLE_ENDIAN #-DCONFIG_MINIMAL_MEMORY_USAGE
+EXTRA_CFLAGS += -DCONFIG_LITTLE_ENDIAN -DCONFIG_MINIMAL_MEMORY_USAGE
 ARCH ?= mips
 CROSS_COMPILE ?= /mnt/sdb5/Ingenic/Umido/mips-4.3/bin/mips-linux-gnu-
 KSRC ?= /mnt/sdb5/Ingenic/Umido/kernel
@@ -420,7 +439,9 @@ rtk_core :=	core/rtw_cmd.o \
 		core/rtw_recv.o \
 		core/rtw_sta_mgt.o \
 		core/rtw_xmit.o	\
-		core/rtw_p2p.o
+		core/rtw_p2p.o \
+		core/rtw_br_ext.o \
+		core/rtw_iol.o
 
 $(MODULE_NAME)-y += $(rtk_core)
 									

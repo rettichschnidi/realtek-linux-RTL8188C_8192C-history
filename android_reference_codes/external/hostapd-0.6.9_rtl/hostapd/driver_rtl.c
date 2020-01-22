@@ -64,7 +64,6 @@
 static int rtl871x_sta_remove_ops(void *priv, const u8 *addr);
 static char gbuf[4096];
 
-
 struct rtl871x_driver_data {
 	struct hostapd_data *hapd;
 	
@@ -99,12 +98,16 @@ static const char *ether_sprintf(const u8 *addr)
 	return buf;
 }
 
-int get_priv_func_num(int sockfd, char *iface, const char *fname) {
+#ifdef LINK_WITH_WIFI_REALTEK_C
+extern int get_priv_func_num(int sockfd, const char *ifname, const char *fname);
+extern int rtl871x_drv_set_pid_fd(int sockfd, const char *ifname, const int index, const int pid); 
+#else
+int get_priv_func_num(int sockfd, const char *ifname, const char *fname) {
     struct iwreq wrq;
     struct iw_priv_args *priv_ptr;
     int i, ret;
 
-    strncpy(wrq.ifr_name, iface, sizeof(wrq.ifr_name));
+    strncpy(wrq.ifr_name, ifname, sizeof(wrq.ifr_name));
     wrq.u.data.pointer = gbuf;
     wrq.u.data.length = sizeof(gbuf) / sizeof(struct iw_priv_args);
     wrq.u.data.flags = 0;
@@ -117,8 +120,39 @@ int get_priv_func_num(int sockfd, char *iface, const char *fname) {
         if (strcmp(priv_ptr[i].name, fname) == 0)
             return priv_ptr[i].cmd;
     }
-    return -1;
+    return -EOPNOTSUPP;
 }
+
+int rtl871x_drv_set_pid_fd(int sockfd, const char *ifname, const int index, const int pid) {
+	struct iwreq wrq;
+	int ret;
+
+	int fnum;
+	char *fname = "setpid";
+
+	int req[2];
+
+	ret = fnum = get_priv_func_num(sockfd, ifname, fname);
+	if(ret < 0) {
+		//LOGE("get_priv_func_num(%s) return %d", fname, ret);
+		goto exit;
+	}
+
+	req[0]=index;
+	req[1]=pid;
+
+	strncpy(wrq.ifr_name, ifname, sizeof(wrq.ifr_name));
+	memcpy(wrq.u.name,req,sizeof(int)*2);
+
+	ret = ioctl(sockfd, fnum, &wrq);
+	if (ret) {
+		//wpa_printf(MSG_WARNING, "ioctl - failed: %d", ret);
+	}
+exit:
+	return ret;
+} 
+#endif
+
 
 static int rtl871x_set_iface_flags(void *priv, int dev_up, int is_mgnt)
 {
@@ -174,26 +208,6 @@ static int rtl871x_set_iface_flags(void *priv, int dev_up, int is_mgnt)
 #endif
 
 	return 0;
-}
-
-int rtl871x_drv_set_pid_fd(int sockfd, const char *ifname, const int fnum, const int index, const int pid) {
-	struct iwreq wrq;
-	int ret;
-
-	int req[2];
-
-	req[0]=index;
-	req[1]=pid;
-
-	strncpy(wrq.ifr_name, ifname, sizeof(wrq.ifr_name));
-	memcpy(wrq.u.name,req,sizeof(int)*2);
-
-	ret = ioctl(sockfd, fnum, &wrq);
-
-	if (ret) {
-		//wpa_printf(MSG_WARNING, "ioctl - failed: %d", ret);
-	}
-	return ret;
 }
 
 static int rtl871x_hostapd_ioctl(struct rtl871x_driver_data *drv, ieee_param *param, int len)
@@ -1589,7 +1603,6 @@ static void *rtl871x_driver_init_ops(struct hostapd_data *hapd)
 	rtl871x_drv_set_pid_fd(
 		drv->ioctl_sock
 		, drv->iface
-		, get_priv_func_num(drv->ioctl_sock, drv->iface, "setpid")
 		, 1
 		, getppid()
 	);
@@ -1718,7 +1731,14 @@ static void rtl871x_driver_deinit_ops(void *priv)
 	if (ioctl(drv->ioctl_sock, SIOCSIWMODE, &iwr) < 0) {
 		perror("ioctl[SIOCSIWMODE]");
 	}
-	
+ 
+	rtl871x_drv_set_pid_fd(
+		drv->ioctl_sock
+		, drv->iface
+		, 1
+		, 0
+	);
+
 
 	if (drv->ioctl_sock >= 0)
 		close(drv->ioctl_sock);

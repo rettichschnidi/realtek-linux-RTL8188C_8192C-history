@@ -16,7 +16,9 @@ endif
 ifeq ($(BOARD_USES_ATH_WIFI),true)
 	LOCAL_SRC_FILES += wifi/wifi_atheros.c
 else ifeq ($(BOARD_USES_REALTEK_WIFI),true)
-LOCAL_SRC_FILES += wifi/wifi_realtek.c
+	LOCAL_SRC_FILES += wifi/wifi_realtek.c
+else
+	LOCAL_SRC_FILES += wifi/wifi.c
 endif
 
 LOCAL_SHARED_LIBRARIES += libnetutils

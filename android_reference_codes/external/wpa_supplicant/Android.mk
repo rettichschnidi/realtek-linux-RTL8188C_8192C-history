@@ -724,6 +724,7 @@ include $(BUILD_EXECUTABLE)
 
 endif # ifeq ($(WPA_BUILD_SUPPLICANT),true)
 
+ifneq ($(BOARD_USES_REALTEK_WIFI),true)
 include $(CLEAR_VARS)
 LOCAL_MODULE = libwpa_client
 LOCAL_CFLAGS = $(L_CFLAGS)
@@ -733,5 +734,6 @@ LOCAL_SHARED_LIBRARIES := libcutils
 LOCAL_COPY_HEADERS_TO := libwpa_client
 LOCAL_COPY_HEADERS := wpa_ctrl.h
 include $(BUILD_SHARED_LIBRARY)
+endif #ifneq ($(BOARD_USES_REALTEK_WIFI),true)
 
 endif # VER_0_5_X

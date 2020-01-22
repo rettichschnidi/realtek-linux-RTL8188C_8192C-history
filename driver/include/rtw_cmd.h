@@ -24,6 +24,7 @@
 #include <drv_conf.h>
 #include <wlan_bssdef.h>
 #include <rtw_rf.h>
+#include <rtw_led.h>
 
 #define C2H_MEM_SZ (16*1024)
 
@@ -859,6 +860,18 @@ struct SetChannelPlan_param
 	u8 channel_plan;
 };
 
+/*H2C Handler index: 60 */ 
+struct LedBlink_param
+{
+	PLED_871x	 pLed;
+};
+
+/*H2C Handler index: 61 */ 
+struct SetChannelSwitch_param
+{
+	u8 new_ch_no;
+};
+
 #define GEN_CMD_CODE(cmd)	cmd ## _CMD_
 
 
@@ -925,7 +938,9 @@ extern u8 rtw_ps_cmd(_adapter*padapter);
 u8 rtw_chk_hi_queue_cmd(_adapter*padapter);
 #endif
 
-extern u8 rtw_set_chplan_cmd(_adapter*padapter, u8 chplan);
+extern u8 rtw_set_chplan_cmd(_adapter*padapter, u8 chplan, u8 enaueue);
+extern u8 rtw_led_blink_cmd(_adapter*padapter, PLED_871x pLed);
+extern u8 rtw_set_csa_cmd(_adapter*padapter, u8 new_ch_no);
 
 u8 rtw_drvextra_cmd_hdl(_adapter *padapter, unsigned char *pbuf);
 
@@ -1015,6 +1030,9 @@ enum rtw_h2c_cmd
 	GEN_CMD_CODE(_Set_H2C_MSG), /*58*/
 	
 	GEN_CMD_CODE(_SetChannelPlan), /*59*/
+	GEN_CMD_CODE(_LedBlink), /*60*/
+	
+	GEN_CMD_CODE(_SetChannelSwitch), /*61*/
 	
 	MAX_H2CCMD
 };
@@ -1093,6 +1111,8 @@ struct _cmd_callback 	rtw_cmd_callback[] =
 	{GEN_CMD_CODE(_Set_Drv_Extra), NULL},/*57*/
 	{GEN_CMD_CODE(_Set_H2C_MSG), NULL},/*58*/
 	{GEN_CMD_CODE(_SetChannelPlan), NULL},/*59*/
+	{GEN_CMD_CODE(_LedBlink), NULL},/*60*/
+	{GEN_CMD_CODE(_SetChannelSwitch), NULL},/*61*/
 };
 #endif
 

@@ -2,7 +2,10 @@ include $(call my-dir)/clear.mk
 HOSTAPD_VER := -0.6.9_rtl
 LOCAL_PATH := $(call my-dir)
 include $(CLEAR_VARS)
+
+#choose one configuration file
 include $(LOCAL_PATH)/.config.android
+#include $(LOCAL_PATH)/.config.android.compact
 
 LOCAL_PATH := $(call my-dir)/../..
 
@@ -550,6 +553,8 @@ LOCAL_MODULE_TAGS := optional
 LOCAL_SHARED_LIBRARIES := libc libcutils
 LOCAL_SHARED_LIBRARIES += $(LIBS) 
 LOCAL_CFLAGS := $(L_CFLAGS)
+#LOCAL_CFLAGS += -DLINK_WITH_WIFI_REALTEK_C
+#LOCAL_SHARED_LIBRARIES += libhardware_legacy
 LOCAL_SRC_FILES := $(addprefix hostapd$(HOSTAPD_VER)/,$(OBJS))
 LOCAL_C_INCLUDES := $(INCLUDES)
 include $(BUILD_EXECUTABLE)
@@ -565,13 +570,13 @@ include $(BUILD_PREBUILT)
 
 OBJS_c = src/common/wpa_ctrl.c src/utils/os_$(CONFIG_OS).c
 include $(CLEAR_VARS)
-LOCAL_MODULE = libhostapd_client
+LOCAL_MODULE = libwpa_client
 LOCAL_MODULE_TAGS := optional
 LOCAL_CFLAGS = $(L_CFLAGS)
 LOCAL_SRC_FILES := $(addprefix hostapd$(HOSTAPD_VER)/,$(OBJS_c))
 LOCAL_C_INCLUDES = $(INCLUDES)
 LOCAL_SHARED_LIBRARIES := libc libcutils
-LOCAL_COPY_HEADERS_TO := libhostapd_client
+LOCAL_COPY_HEADERS_TO := libwpa_client
 LOCAL_COPY_HEADERS := hostapd$(HOSTAPD_VER)/src/common/wpa_ctrl.h
 include $(BUILD_SHARED_LIBRARY)
 

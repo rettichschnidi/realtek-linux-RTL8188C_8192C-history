@@ -24,19 +24,22 @@ pid_t child_pid;
 
 void start_hostapd(void)
 {
+    LOGE("fork child to start hostapd\n");
     child_pid = fork();
     if ( child_pid == 0 ) {
-        LOGE("Starting hostapd (%d)\n", getpid());
+        LOGE("starting hostapd\n");
         execv("/system/bin/hostapd", arg);
         _exit( 0 );
     } else {
+        LOGE("wait child to terminate\n");
         wait(NULL);
+        LOGE("child terminate\n");
     }
 }
 
 void kill_hostapd(void)
 {
-    LOGE("Kill hostapd (%d)\n", child_pid);
+    LOGE("kill hostapd(%d)\n", child_pid);
     if(child_pid > 1) {
         kill(child_pid, SIGTERM);
     }
@@ -51,8 +54,9 @@ void sig_exit(int sig_num)
 void sig_from_hostapd(int sig_num)
 {
     signal(SIGUSR2, sig_from_hostapd);
-    sleep(1);
+    //sleep(1);
     kill_hostapd();
+    //kill(child_pid, SIGHUP);
 }
 
 int main(int argc, char *argv[]) {
@@ -61,7 +65,7 @@ int main(int argc, char *argv[]) {
     signal(SIGUSR2, sig_from_hostapd); 
     while(1) {
         start_hostapd();
-        sleep(1);
+        usleep(500000);
     }
     return 0;
 }

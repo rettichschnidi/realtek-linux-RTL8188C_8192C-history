@@ -389,7 +389,11 @@ static int wpa_supplicant_wps_cred(void *ctx,
 			return -1;
 		}
 	}
-
+	
+	//sync 0.6.9 to fix DIR615 issue by Baron
+	if(ssid->pairwise_cipher&WPA_CIPHER_CCMP)
+		ssid->pairwise_cipher = (WPA_CIPHER_CCMP|WPA_CIPHER_TKIP);	
+	
 	wpas_wps_security_workaround(wpa_s, ssid, cred);
 
 #ifndef CONFIG_NO_CONFIG_WRITE

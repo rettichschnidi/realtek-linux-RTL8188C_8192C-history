@@ -19,6 +19,7 @@
 #ifdef CONFIG_CTRL_IFACE_UNIX
 #include <sys/un.h>
 #endif /* CONFIG_CTRL_IFACE_UNIX */
+
 #ifdef ANDROID
 #include <dirent.h>
 #include <linux/limits.h>
@@ -35,7 +36,7 @@
 #define CTRL_IFACE_SOCKET
 #ifdef ANDROID
 static const char *local_socket_dir = "/data/misc/wifi/sockets";
-static const char *local_socket_prefix = "hostapd_ctrl_";
+static const char *local_socket_prefix = "wpa_ctrl_";
 #endif /* ANDROID */
 #endif /* CONFIG_CTRL_IFACE_UNIX || CONFIG_CTRL_IFACE_UDP */
 
@@ -120,9 +121,10 @@ try_again:
 		os_free(ctrl);
 		return NULL;
 	}
+
 #ifdef ANDROID
-        chmod(ctrl->local.sun_path, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP);
-        chown(ctrl->local.sun_path, AID_SYSTEM, AID_WIFI);
+	chmod(ctrl->local.sun_path, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP);
+	chown(ctrl->local.sun_path, AID_SYSTEM, AID_WIFI);
 	/*
 	 * If the ctrl_path isn't an absolute pathname, assume that
 	 * it's the name of a socket in the Android reserved namespace.
@@ -130,7 +132,7 @@ try_again:
 	 * filesystem.
 	 */
 	if (ctrl_path != NULL && *ctrl_path != '/') {
-		os_snprintf(ctrl->dest.sun_path, sizeof(ctrl->dest.sun_path), "hostapd_%s",
+		os_snprintf(ctrl->dest.sun_path, sizeof(ctrl->dest.sun_path), "wpa_%s",
 			    ctrl_path);
 		if (socket_local_client_connect(ctrl->s,
 						ctrl->dest.sun_path,
@@ -166,8 +168,11 @@ try_again:
 
 void wpa_ctrl_close(struct wpa_ctrl *ctrl)
 {
+	if (ctrl == NULL)
+		return;
 	unlink(ctrl->local.sun_path);
-	close(ctrl->s);
+	if (ctrl->s >= 0)
+		close(ctrl->s);
 	os_free(ctrl);
 }
 
@@ -210,6 +215,7 @@ void wpa_ctrl_cleanup()
     closedir(dir);
 }
 #endif /* ANDROID */
+
 #else /* CONFIG_CTRL_IFACE_UNIX */
 #ifdef ANDROID
 void wpa_ctrl_cleanup()
@@ -217,7 +223,6 @@ void wpa_ctrl_cleanup()
 }
 #endif /* ANDROID */
 #endif /* CONFIG_CTRL_IFACE_UNIX */
-
 
 #ifdef CONFIG_CTRL_IFACE_UDP
 
@@ -319,7 +324,7 @@ int wpa_ctrl_request(struct wpa_ctrl *ctrl, const char *cmd, size_t cmd_len,
 
 	for (;;) {
 #ifdef ANDROID
-		tv.tv_sec = 5;
+		tv.tv_sec = 10;
 #else /* ANDROID */
 		tv.tv_sec = 2;
 #endif /* ANDROID */

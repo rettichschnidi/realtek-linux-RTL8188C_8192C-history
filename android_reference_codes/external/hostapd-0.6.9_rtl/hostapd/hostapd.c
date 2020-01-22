@@ -333,6 +333,119 @@ static void hostapd_wpa_auth_conf(struct hostapd_bss_config *conf,
 #endif /* CONFIG_IEEE80211R */
 }
 
+#if 0
+#include "wireless_copy.h"
+int rtl871x_drv_set_mode_fd(int sockfd, const char *ifname, const int mode)
+{
+	struct iwreq wrq;
+	int ret;
+	char ifname_buf[IFNAMSIZ];
+
+	printf("%s ifname:%s, mode:%d", __FUNCTION__, ifname, mode);
+		
+	strncpy(wrq.ifr_name, ifname, sizeof(wrq.ifr_name));
+
+	wrq.u.mode = mode;
+
+	ret = ioctl(sockfd, SIOCSIWMODE, &wrq);
+	if (ret) {
+		printf("ioctl - failed: %d %s", ret, strerror(errno));
+	}
+	return ret;
+}
+
+int rtl871x_drv_set_mode(const char *ifname, const int mode)
+{
+	int sockfd;
+	int ret;
+
+#if 0
+	if (ifc_init() < 0)
+		return -1;	
+	if (ifc_up(ifname)) {
+		LOGD("failed to bring up interface %s: %s\n", ifname, strerror(errno));
+		return -1;
+	}
+#endif
+	
+	sockfd = socket(PF_INET, SOCK_DGRAM, 0);
+	if (sockfd< 0) {
+		perror("socket[PF_INET,SOCK_DGRAM]");
+		ret = -1;
+		goto bad;
+	}
+
+	ret = rtl871x_drv_set_mode_fd(
+		sockfd
+		, ifname
+		, mode
+	);
+	
+	close(sockfd);
+bad:
+	return ret;
+}
+
+int rtl871x_drv_set_iface_flags_fd(int sockfd, const char *ifname, const int dev_up)
+{
+	struct ifreq ifr;
+	int ret;
+
+	printf("%s ifname:%s, dev_up:%d", __FUNCTION__, ifname, dev_up);
+
+	memset(&ifr, 0, sizeof(ifr));
+	os_strlcpy(ifr.ifr_name, ifname, IFNAMSIZ);
+		
+
+	if ( (ret=ioctl(sockfd, SIOCGIFFLAGS, &ifr)) != 0) {
+		perror("ioctl[SIOCGIFFLAGS]");
+		goto exit;
+	}
+
+	if (dev_up)
+		ifr.ifr_flags |= IFF_UP;
+	else
+		ifr.ifr_flags &= ~IFF_UP;
+
+	if ( (ret =ioctl(sockfd, SIOCSIFFLAGS, &ifr)) != 0) {
+		perror("ioctl[SIOCSIFFLAGS]");
+	}
+exit:
+	return ret;
+}
+
+int rtl871x_drv_set_iface_flags(const char *ifname, const int dev_up)
+{
+	int sockfd;
+	int ret;
+
+#if 0
+	if (ifc_init() < 0)
+		return -1;	
+	if (ifc_up(ifname)) {
+		LOGD("failed to bring up interface %s: %s\n", ifname, strerror(errno));
+		return -1;
+	}
+#endif
+	
+	sockfd = socket(PF_INET, SOCK_DGRAM, 0);
+	if (sockfd< 0) {
+		perror("socket[PF_INET,SOCK_DGRAM]");
+		ret = -1;
+		goto bad;
+	}
+
+	ret = rtl871x_drv_set_iface_flags_fd(
+		sockfd
+		, ifname
+		, dev_up
+	);
+	
+	close(sockfd);
+bad:
+	return ret;
+}
+#endif
 
 int hostapd_reload_config(struct hostapd_iface *iface)
 {
@@ -343,6 +456,11 @@ int hostapd_reload_config(struct hostapd_iface *iface)
 	newconf = hostapd_config_read(iface->config_fname);
 	if (newconf == NULL)
 		return -1;
+
+#if 0
+	rtl871x_drv_set_iface_flags(hapd->conf->iface, 1);
+	rtl871x_drv_set_mode(hapd->conf->iface, IW_MODE_MASTER);
+#endif
 
 	/*
 	 * Deauthenticate all stations since the new configuration may not

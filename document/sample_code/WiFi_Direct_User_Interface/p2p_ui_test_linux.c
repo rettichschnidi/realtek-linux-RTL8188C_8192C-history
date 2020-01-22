@@ -148,10 +148,10 @@ void init_p2p(struct p2p *p)
 	strcpy(p->redo_msg, "Re-do GO handshake" );
 	strcpy(p->fail_msg, "GO handshake unsuccessful" );
 	strcpy(p->nego_msg, "Start P2P negotiation" );
-	strcpy(p->wpa_conf, "/etc/wpa_supplicant/wpa_supplicant.conf" );
+	strcpy(p->wpa_conf, "../../../wpa_supplicant_hostapd/wpa_0_8.conf" );
 	strcpy(p->wpa_path, "../wpa_supplicant_hostapd-0.8/wpa_supplicant/wpa_supplicant" );
 	strcpy(p->wpacli_path, "../wpa_supplicant_hostapd-0.8/wpa_supplicant/wpa_cli" );
-	strcpy(p->ap_conf, "/etc/hostapd.conf" );
+	strcpy(p->ap_conf, "../../../wpa_supplicant_hostapd/p2p_hostapd.conf" );
 	strcpy(p->ap_path, "../wpa_supplicant_hostapd-0.8/hostapd/hostapd" );
 	strcpy(p->apcli_path, "../wpa_supplicant_hostapd-0.8/hostapd/hostapd_cli" );
 	strcpy(p->scan_msg, "Device haven't enable p2p functionalities" );

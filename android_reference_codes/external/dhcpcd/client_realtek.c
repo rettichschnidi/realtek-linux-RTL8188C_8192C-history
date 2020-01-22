@@ -1790,7 +1790,8 @@ dhcp_run(const struct options *options, int *pid_fd)
 	struct if_state *state = NULL;
 	int fd = -1, r = 0, sig;
 
-	rtl871x_drv_set_pid(options->interface, 2, getpid());
+	if( 0 == strncmp(options->interface, "wlan", 4) )
+		rtl871x_drv_set_pid(options->interface, 2, getpid());
 
 	iface = read_interface(options->interface, options->metric);
 	if (!iface) {
@@ -1872,6 +1873,9 @@ eexit:
 		free(state->old);
 		free(state);
 	}
+
+	if( 0 == strncmp(options->interface, "wlan", 4) )
+		rtl871x_drv_set_pid(options->interface, 2, 0);
 
 	return r;
 }
