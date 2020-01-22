@@ -1,20 +1,22 @@
 /******************************************************************************
-* rtw_xmit.c									*
-*                                                                                                                                          *
-* Description :                                                                                                                       *
-*                                                                                                                                           *
-* Author :                                                                                                                       *
-*                                                                                                                                         *
-* History :									*
-*										*
-*										*
-*                                                                                                                                       *
-* Copyright 2010, Realtek Corp.							*
-*                                                                                                                                        *
-* The contents of this file is the sole property of Realtek Corp.  It can not be                                     *
-* be used, copied or modified without written permission from Realtek Corp.                                         *
-*                                                                                                                                          *
-*******************************************************************************/
+ *
+ * Copyright(c) 2007 - 2010 Realtek Corporation. All rights reserved.
+ *                                        
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
+ *
+ *
+ ******************************************************************************/
 #define _RTL871X_XMIT_C_
 
 #include <drv_conf.h>
@@ -301,7 +303,109 @@ _func_exit_;
 
 }
 
-void update_attrib_phy_info(struct pkt_attrib *pattrib, struct sta_info *psta)
+static void update_attrib_vcs_info(_adapter *padapter, struct xmit_frame *pxmitframe)
+{
+	u32	sz;
+	struct pkt_attrib	*pattrib = &pxmitframe->attrib;
+	struct sta_info	*psta = pattrib->psta;
+	struct mlme_ext_priv	*pmlmeext = &(padapter->mlmeextpriv);
+	struct mlme_ext_info	*pmlmeinfo = &(pmlmeext->mlmext_info);
+
+
+	if (pattrib->nr_frags != 1)
+	{
+		sz = padapter->xmitpriv.frag_len;
+	}
+	else //no frag
+	{
+		sz = pattrib->last_txcmdsz;
+	}
+
+	// (1) RTS_Threshold is compared to the MPDU, not MSDU.
+	// (2) If there are more than one frag in  this MSDU, only the first frag uses protection frame.
+	//		Other fragments are protected by previous fragment.
+	//		So we only need to check the length of first fragment.
+	if(pmlmeext->cur_wireless_mode < WIRELESS_11N )
+	{
+		if(sz > padapter->registrypriv.rts_thresh)
+		{
+			pattrib->vcs_mode = RTS_CTS;
+		}
+		else
+		{
+			if(psta->rtsen)
+				pattrib->vcs_mode = RTS_CTS;
+			else if(psta->cts2self)
+				pattrib->vcs_mode = CTS_TO_SELF;
+			else
+				pattrib->vcs_mode = NONE_VCS;
+		}
+	}
+	else
+	{
+		while (_TRUE)
+		{
+#if 0 //Todo
+			//check IOT action
+			if(pHTInfo->IOTAction & HT_IOT_ACT_FORCED_CTS2SELF)
+			{
+				pattrib->vcs_mode = CTS_TO_SELF;
+				pattrib->rts_rate = MGN_24M;
+				break;
+			}
+			else if(pHTInfo->IOTAction & (HT_IOT_ACT_FORCED_RTS|HT_IOT_ACT_PURE_N_MODE))
+			{
+				pattrib->vcs_mode = RTS_CTS;
+				pattrib->rts_rate = MGN_24M;
+				break;
+			}
+#endif
+			//check ERP protection
+			if(psta->rtsen || psta->cts2self)
+			{
+				if(psta->rtsen)
+					pattrib->vcs_mode = RTS_CTS;
+				else if(psta->cts2self)
+					pattrib->vcs_mode = CTS_TO_SELF;
+
+				break;
+			}
+
+			//check HT op mode
+			if(pattrib->ht_en)
+			{
+				u8 HTOpMode = pmlmeinfo->HT_protection;
+				if((pmlmeext->cur_bwmode && (HTOpMode == 2 || HTOpMode == 3)) ||
+					(!pmlmeext->cur_bwmode && HTOpMode == 3) )
+				{
+					pattrib->vcs_mode = RTS_CTS;
+					break;
+				}
+			}
+
+			//check rts
+			if(sz > padapter->registrypriv.rts_thresh)
+			{
+				pattrib->vcs_mode = RTS_CTS;
+				break;
+			}
+
+			//to do list: check MIMO power save condition.
+
+			//check AMPDU aggregation for TXOP
+			if(pattrib->ampdu_en==_TRUE)
+			{
+				pattrib->vcs_mode = RTS_CTS;
+				break;
+			}
+
+			pattrib->vcs_mode = NONE_VCS;
+			break;
+		}
+	}
+}
+
+static void update_attrib_phy_info(struct pkt_attrib *pattrib, struct sta_info *psta)
 {
 	//
 	if(psta->rtsen)	
@@ -491,7 +595,7 @@ static s32 update_attrib(_adapter *padapter, _pkt *pkt, struct pkt_attrib *pattr
 
 
 			if (check_fwstate(pmlmepriv, WIFI_STATION_STATE)) {
-				pattrib->mac_id = 5;				
+				pattrib->mac_id = 0;				
 			} else {
 				pattrib->mac_id = psta->mac_id;
 			}
@@ -797,9 +901,11 @@ _func_enter_;
 	{
 		//printk("start xmitframe_swencrypt\n");
 		RT_TRACE(_module_rtl871x_xmit_c_,_drv_alert_,("### xmitframe_swencrypt\n"));
+		
 		switch(pattrib->encrypt){
 		case _WEP40_:
 		case _WEP104_:
+			//printk("### xmitframe_swencrypt WEP ###########\n");
 			rtw_wep_encrypt(padapter, (u8 *)pxmitframe);
 			break;
 		case _TKIP_:
@@ -1197,6 +1303,8 @@ _func_enter_;
 
 	xmitframe_swencrypt(padapter, pxmitframe);
 	
+	update_attrib_vcs_info(padapter, pxmitframe);
+	
 exit:	
 	
 _func_exit_;	
@@ -1389,6 +1497,7 @@ struct xmit_frame *rtw_alloc_xmitframe(struct xmit_priv *pxmitpriv)//(_queue *pf
 	struct xmit_frame *pxframe = NULL;
 	_list *plist, *phead;
 	_queue *pfree_xmit_queue = &pxmitpriv->free_xmit_queue;
+	_adapter *padapter = pxmitpriv->adapter;
 
 _func_enter_;
 
@@ -1428,6 +1537,15 @@ _func_enter_;
 		pxframe->agg_num = 0;
 		pxframe->pkt_offset = 1;
 #endif
+
+#ifdef PLATFORM_LINUX
+		if(pxmitpriv->free_xmitframe_cnt==1)
+		{
+			if (!netif_queue_stopped(padapter->pnetdev))
+		       	netif_stop_queue(padapter->pnetdev);		
+		}
+#endif
+
 	}
 
 	_exit_critical_bh(&pfree_xmit_queue->lock, &irqL);

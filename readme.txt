@@ -26,7 +26,9 @@
 			The tool help the wlan network to communicate under the
 			protection of WPAPSK mechanism (WPA/WPA2) and add WPS patch
 
-
+	5. install.sh
+	   Script to easy make 8192cu driver.
+	
 ==================================================================================================================
 		User Guide(1) - connecting wireless networking using "Network Manager" GUI utility (For PC Linux)
 ==================================================================================================================
@@ -124,13 +126,4 @@ WPAPSK/WPA2PSK mechanism. Please refer to the document/wpa_cli_with_wpa_supplica
 		Power Saving Mode
 ===============================================================================
 
-		(1) in order to enter PS Mode, you need to add the parameter of "power_mgnt=1" when executing "insmod 8192cu.ko" :
-		 		$>insmod 8192cu.ko power_mgnt=1
-		 		or
-		 		$>insmod 8192cu.ko power_mgnt=2
-
-		(2) Notes:
-				power_mgnt=0 ;//default, disable PS
-				power_mgnt=1 ;//enable PS, MIN_PS Mode
-				power_mgnt=2 ;//enable PS, MAX_PS Mode
-
+		(*) Please refer to the document/HowTo enable the power saving functionality.doc

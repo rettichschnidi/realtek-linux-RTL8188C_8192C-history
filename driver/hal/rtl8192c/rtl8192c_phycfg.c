@@ -1,4 +1,24 @@
 /******************************************************************************
+ *
+ * Copyright(c) 2007 - 2010 Realtek Corporation. All rights reserved.
+ *                                        
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
+ *
+ *
+ ******************************************************************************/
+
+/******************************************************************************
 
      (c) Copyright 2008, RealTEK Technologies Inc. All Rights Reserved.
 
@@ -750,6 +770,13 @@ PHY_MACConfig8192C(
 	rtStatus = phy_ConfigMACWithParaFile(Adapter, pszMACRegFile);
 #endif
 	
+	#if 0 
+	//this switching setting cause some 8192cu hw have redownload fw fail issue
+	//improve 2-stream TX EVM by Jenyu
+	if(IS_NORMAL_CHIP(pHalData->VersionID) && IS_92C_SERIAL(pHalData->VersionID))
+		rtw_write8(Adapter, 0x14,0x71);
+	#endif
+	
 	return rtStatus;
 
 }
@@ -781,18 +808,10 @@ PHY_BBConfig8192C(
 #else
 	rtw_write8(Adapter, REG_SYS_FUNC_EN, FEN_PPLL|FEN_PCIEA|FEN_DIO_PCIE|FEN_USBA|FEN_BB_GLB_RSTn|FEN_BBRSTB);
 #endif
-
+	//To Fix MAC loopback mode fail. Suggested by SD4 Johnny. 2010.03.23.
+	rtw_write8(Adapter, REG_LDOHCI12_CTRL, 0x0f);	
 	rtw_write8(Adapter, 0x15, 0xe9);
 	rtw_write8(Adapter, REG_AFE_XTAL_CTRL+1, 0x80);
-
-#if DEV_BUS_TYPE == DEV_BUS_PCI_INTERFACE
-	// Force use left antenna by default for 88C.
-	if(!IS_92C_SERIAL(pHalData->VersionID)|| IS_92C_1T2R(pHalData->VersionID))
-	{
-		RegVal = rtw_read32(Adapter, REG_LEDCFG0);
-		rtw_write32(Adapter, REG_LEDCFG0, RegVal|BIT23);
-	}
-#endif
 
 	//
 	// Config BB and AGC
@@ -841,7 +860,7 @@ PHY_BBConfig8192C(
 		RT_TRACE(
 			COMP_INIT, 
 			DBG_LOUD, 
-			("PHY_BBConfig8192C: RF_Type(%x) does not match RF_Num(%x)!!\n", pHalData->RF_Type, rf_num));
+			("PHY_BBConfig8192C: RF_Type(%x) does not match RF_Num(%x)!!\n", pHalData->rf_type, rf_num));
 	}
 #endif
 
@@ -885,6 +904,38 @@ PHY_RFConfig8192C(
 	return rtStatus;
 }
 
+VOID
+phy_BB8192C_Config_1T(
+	IN PADAPTER Adapter
+	)
+{
+#if 0
+	//for path - A
+	PHY_SetBBReg(Adapter, rFPGA0_TxInfo, 0x3, 0x1);
+	PHY_SetBBReg(Adapter, rFPGA1_TxInfo, 0x0303, 0x0101);
+	PHY_SetBBReg(Adapter, 0xe74, 0x0c000000, 0x1);
+	PHY_SetBBReg(Adapter, 0xe78, 0x0c000000, 0x1);
+	PHY_SetBBReg(Adapter, 0xe7c, 0x0c000000, 0x1);
+	PHY_SetBBReg(Adapter, 0xe80, 0x0c000000, 0x1);
+	PHY_SetBBReg(Adapter, 0xe88, 0x0c000000, 0x1);
+#endif
+	//for path - B
+	PHY_SetBBReg(Adapter, rFPGA0_TxInfo, 0x3, 0x2);
+	PHY_SetBBReg(Adapter, rFPGA1_TxInfo, 0x300033, 0x200022);
+
+	// 20100519 Joseph: Add for 1T2R config. Suggested by Kevin, Jenyu and Yunan.
+	PHY_SetBBReg(Adapter, rCCK0_AFESetting, bMaskByte3, 0x45);
+	PHY_SetBBReg(Adapter, rOFDM0_TRxPathEnable, bMaskByte0, 0x23);
+	PHY_SetBBReg(Adapter, rOFDM0_AGCParameter1, 0x30, 0x1);	// B path first AGC
+	
+	PHY_SetBBReg(Adapter, 0xe74, 0x0c000000, 0x2);
+	PHY_SetBBReg(Adapter, 0xe78, 0x0c000000, 0x2);
+	PHY_SetBBReg(Adapter, 0xe7c, 0x0c000000, 0x2);
+	PHY_SetBBReg(Adapter, 0xe80, 0x0c000000, 0x2);
+	PHY_SetBBReg(Adapter, 0xe88, 0x0c000000, 0x2);
+
+	
+}
 
 // Joseph test: new initialize order!!
 // Test only!! This part need to be re-organized.
@@ -943,6 +994,14 @@ phy_BB8192C_Config_ParaFile(
 	if(rtStatus != _SUCCESS){
 		//RT_TRACE(COMP_INIT, DBG_SERIOUS, ("phy_BB8192S_Config_ParaFile():Write BB Reg Fail!!"));
 		goto phy_BB8190_Config_ParaFile_Fail;
+	}
+
+	// 20100318 Config 2T2R to 1T2R if necessary.
+	//
+	if(pHalData->rf_type== RF_1T2R)
+	{
+		phy_BB8192C_Config_1T(Adapter);
+		//RT_TRACE(COMP_INIT, DBG_LOUD, ("phy_BB8192S_Config_ParaFile():Config to 1T!!\n"));
 	}
 
 	//
@@ -1183,15 +1242,45 @@ phy_ConfigBBWithHeaderFile(
 	{
 		AGCTAB_ArrayLen = AGCTAB_2TArrayLength;
 		Rtl819XAGCTAB_Array_Table = (u32*)Rtl819XAGCTAB_2TArray;
-		PHY_REGArrayLen = PHY_REG_2TArrayLength;
-		Rtl819XPHY_REGArray_Table = (u32*)Rtl819XPHY_REG_2TArray;
+#if DEV_BUS_TYPE==DEV_BUS_USB_INTERFACE
+		if(pHalData->BoardType == BOARD_MINICARD )
+		{
+			PHY_REGArrayLen = PHY_REG_2T_mCardArrayLength;
+			Rtl819XPHY_REGArray_Table = (u32*)Rtl819XPHY_REG_2T_mCardArray;			
+		}
+		else
+#endif
+		{
+			PHY_REGArrayLen = PHY_REG_2TArrayLength;
+			Rtl819XPHY_REGArray_Table = (u32*)Rtl819XPHY_REG_2TArray;
+		}
+	
 	}
 	else
 	{
 		AGCTAB_ArrayLen = AGCTAB_1TArrayLength;
 		Rtl819XAGCTAB_Array_Table = (u32*)Rtl819XAGCTAB_1TArray;
-		PHY_REGArrayLen = PHY_REG_1TArrayLength;
-		Rtl819XPHY_REGArray_Table = (u32*)Rtl819XPHY_REG_1TArray;
+		
+#if DEV_BUS_TYPE==DEV_BUS_USB_INTERFACE
+		if(pHalData->BoardType == BOARD_MINICARD )
+		{
+			PHY_REGArrayLen = PHY_REG_1T_mCardArrayLength;
+			Rtl819XPHY_REGArray_Table = (u32*)Rtl819XPHY_REG_1T_mCardArray;			
+		}
+		else if(pHalData->BoardType == BOARD_USB_High_PA)
+		{
+			AGCTAB_ArrayLen = AGCTAB_1T_HPArrayLength;
+			Rtl819XAGCTAB_Array_Table =(u32*) Rtl819XAGCTAB_1T_HPArray;
+			PHY_REGArrayLen = PHY_REG_1T_HPArrayLength;
+			Rtl819XPHY_REGArray_Table = (u32*)Rtl819XPHY_REG_1T_HPArray;			
+		}
+		else
+#endif
+		{
+		        PHY_REGArrayLen = PHY_REG_1TArrayLength;
+		        Rtl819XPHY_REGArray_Table = (u32*)Rtl819XPHY_REG_1TArray;
+		}
+
 	}
 
 	if(ConfigType == BaseBand_Config_PHY_REG)
@@ -1219,6 +1308,7 @@ phy_ConfigBBWithHeaderFile(
 		}
 		// for External PA
 		phy_ConfigBBExternalPA(Adapter);
+
 	}
 	else if(ConfigType == BaseBand_Config_AGC_TAB)
 	{
@@ -1481,12 +1571,26 @@ phy_ConfigBBWithPgHeaderFile(
 	int i;
 	u32*	Rtl819XPHY_REGArray_Table_PG;
 	u16	PHY_REGArrayPGLen;
-	//HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(Adapter);
+	HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(Adapter);
 
-	// Default: pHalData->RF_Type = RF_2T2R.
+	// Default: pHalData->rf_type = RF_2T2R.
 	
 	PHY_REGArrayPGLen = PHY_REG_Array_PGLength;
 	Rtl819XPHY_REGArray_Table_PG = (u32*)Rtl819XPHY_REG_Array_PG;
+
+#if DEV_BUS_TYPE==DEV_BUS_USB_INTERFACE
+	if(pHalData->BoardType == BOARD_MINICARD )
+	{
+		PHY_REGArrayPGLen = PHY_REG_Array_PG_mCardLength;
+		Rtl819XPHY_REGArray_Table_PG = (u32*)Rtl819XPHY_REG_Array_PG_mCard;
+	}
+	else if(pHalData->BoardType ==BOARD_USB_High_PA )
+	{
+		PHY_REGArrayPGLen = PHY_REG_Array_PG_HPLength;
+		Rtl819XPHY_REGArray_Table_PG = (u32*)Rtl819XPHY_REG_Array_PG_HP;		
+	}
+#endif		
+			
 
 	if(ConfigType == BaseBand_Config_PHY_REG)
 	{
@@ -1641,7 +1745,7 @@ PHY_ConfigRFWithHeaderFile(
 		Rtl819XRadioB_Array_Table = (u32*)Rtl819XRadioB_2TArray;
 			
 	}
-	else
+	else//8188
 	{
 #if (DEV_BUS_TYPE==DEV_BUS_USB_INTERFACE)		
 		if( BOARD_MINICARD == pHalData->BoardType )
@@ -1651,6 +1755,12 @@ PHY_ConfigRFWithHeaderFile(
 			RadioB_ArrayLen = RadioB_1T_mCardArrayLength;	
 			Rtl819XRadioB_Array_Table = (u32*)Rtl819XRadioB_1T_mCardArray;			
 		}
+		else if( BOARD_USB_High_PA == pHalData->BoardType )
+		{
+			RadioA_ArrayLen = RadioA_1T_HPArrayLength;
+			Rtl819XRadioA_Array_Table=(u32*)Rtl819XRadioA_1T_HPArray;
+		}
+
 		else
 #endif				
 		{
@@ -3647,7 +3757,7 @@ PHY_CheckIsLegalRfPath8192C(
 
 	// NOt check RF Path now.!
 #if 0	
-	if (pHalData->RF_Type == RF_1T2R && eRFPath != RF90_PATH_A)
+	if (pHalData->rf_type == RF_1T2R && eRFPath != RF90_PATH_A)
 	{		
 		rtValue = FALSE;
 	}
@@ -3665,11 +3775,15 @@ PHY_CheckIsLegalRfPath8192C(
 //	IQK
 //
 //-------------------------------------------------------------------------
-#define IQK_ADDA_REG_NUM	16
+
 #define MAX_TOLERANCE		5
 #define IQK_DELAY_TIME		1 	//ms
 
+#define PHY_SetMacReg			PHY_SetBBReg
 #define IQK_MAC_REG_NUM		4
+#define IQK_ADDA_REG_NUM		16
+#define IQK_BB_REG_NUM		9
+#define HP_THERMAL_NUM		8
 
 u8			//bit0 = 1 => Tx OK, bit1 = 1 => Rx OK
 _PHY_PathA_IQK(
@@ -4133,6 +4247,12 @@ _PHY_IQCalibrate(
 												0xed8, 0xedc, 0xee0, 0xeec };
 
 	u32			IQK_MAC_REG[IQK_MAC_REG_NUM] = {0x522, 0x550,	0x551,0x040};
+
+	u32			IQK_BB_REG[IQK_BB_REG_NUM] = {
+						0xc04, 	0xc08,	0x874,	0xb68,	0xb6c,
+						0x870,	0x860,	0x864,	0x800	
+						};	
+	
 #if MP_DRIVER
 	const u32	retryCount = 9;
 #else
@@ -4153,8 +4273,9 @@ _PHY_IQCalibrate(
 		//RTPRINT(FINIT, INIT_IQK, ("IQ Calibration for %s\n", (is2T ? "2T2R" : "1T1R")));
 	
 	 	// Save ADDA parameters, turn Path A ADDA on
-	 	_PHY_SaveADDARegisters(pAdapter, ADDA_REG, pHalData->ADDA_backup,16);
+	 	_PHY_SaveADDARegisters(pAdapter, ADDA_REG, pHalData->ADDA_backup,IQK_ADDA_REG_NUM);
 		_PHY_SaveMACRegisters(pAdapter, IQK_MAC_REG, pHalData->IQK_MAC_backup);
+		_PHY_SaveADDARegisters(pAdapter, IQK_BB_REG, pHalData->IQK_BB_backup, IQK_BB_REG_NUM);
 	}
  	_PHY_PathADDAOn(pAdapter, ADDA_REG, _TRUE, is2T);
 
@@ -4166,16 +4287,16 @@ _PHY_IQCalibrate(
 		// Switch BB to PI mode to do IQ Calibration.
 		_PHY_PIModeSwitch(pAdapter, _TRUE);
 	}
-	if(t==0)
-	{
-	// Store 0xC04, 0xC08, 0x874 vale
-	 	pHalData->RegC04 = PHY_QueryBBReg(pAdapter, 0xc04, bMaskDWord);
-	 	pHalData->RegC08 = PHY_QueryBBReg(pAdapter, 0xc08, bMaskDWord);
-	 	pHalData->Reg874 = PHY_QueryBBReg(pAdapter, 0x874, bMaskDWord);
-	}
+
+	
+	PHY_SetBBReg(pAdapter, 0x800, BIT24, 0x00);		
 	PHY_SetBBReg(pAdapter, 0xc04, bMaskDWord, 0x03a05600);
 	PHY_SetBBReg(pAdapter, 0xc08, bMaskDWord, 0x000800e4);
 	PHY_SetBBReg(pAdapter, 0x874, bMaskDWord, 0x22204000);
+	PHY_SetBBReg(pAdapter, 0x870, BIT10, 0x01);
+	PHY_SetBBReg(pAdapter, 0x870, BIT26, 0x01);	
+	PHY_SetBBReg(pAdapter, 0x860, BIT10, 0x00);
+	PHY_SetBBReg(pAdapter, 0x864, BIT10, 0x00);	
 
 	if(is2T)
 	{
@@ -4257,25 +4378,11 @@ _PHY_IQCalibrate(
 		}
 	}
 
-#if 0
-	_PHY_PathAFillIQKMatrix(pAdapter,bPathAOK);
-	if(is2T){
-		_PHY_PathBFillIQKMatrix(pAdapter,bPathBOK);
-	}
-#endif	
+
 	//Back to BB mode, load original value
 	//RTPRINT(FINIT, INIT_IQK, ("IQK:Back to BB mode, load original value!\n"));
-	PHY_SetBBReg(pAdapter, 0xc04, bMaskDWord, pHalData->RegC04);
-	PHY_SetBBReg(pAdapter, 0x874, bMaskDWord, pHalData->Reg874);
-	PHY_SetBBReg(pAdapter, 0xc08, bMaskDWord, pHalData->RegC08);
-
 	PHY_SetBBReg(pAdapter, 0xe28, bMaskDWord, 0);
 
-	// Restore RX initial gain
-	PHY_SetBBReg(pAdapter, 0x840, bMaskDWord, 0x00032ed3);
-	if(is2T){
-		PHY_SetBBReg(pAdapter, 0x844, bMaskDWord, 0x00032ed3);
-	}
 	if(t!=0)
 	{
 		if(!pHalData->bRfPiEnable){
@@ -4284,11 +4391,26 @@ _PHY_IQCalibrate(
 	        }
 
 		// Reload ADDA power saving parameters
-	 	_PHY_ReloadADDARegisters(pAdapter, ADDA_REG, pHalData->ADDA_backup,16);
+	 	_PHY_ReloadADDARegisters(pAdapter, ADDA_REG, pHalData->ADDA_backup, IQK_ADDA_REG_NUM);
 
 		// Reload MAC parameters
 		_PHY_ReloadMACRegisters(pAdapter, IQK_MAC_REG, pHalData->IQK_MAC_backup);
+		
+	 	// Reload BB parameters
+	 	_PHY_ReloadADDARegisters(pAdapter, IQK_BB_REG, pHalData->IQK_BB_backup, IQK_BB_REG_NUM);
+
+		// Restore RX initial gain
+		PHY_SetBBReg(pAdapter, 0x840, bMaskDWord, 0x00032ed3);
+		if(is2T){
+			PHY_SetBBReg(pAdapter, 0x844, bMaskDWord, 0x00032ed3);
+	        }
+
+		//load 0xe30 IQC default value
+		PHY_SetBBReg(pAdapter, 0xe30, bMaskDWord, 0x01008c00);		
+		PHY_SetBBReg(pAdapter, 0xe34, bMaskDWord, 0x01008c00);				
+		
 	}
+	
 	//RTPRINT(FINIT, INIT_IQK, ("_PHY_IQCalibrate() <==\n"));
 	
 }

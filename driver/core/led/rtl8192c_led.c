@@ -1,22 +1,22 @@
 /******************************************************************************
- * Copyright(c) 2008 - 2010 Realtek Corporation. All rights reserved.
+ *
+ * Copyright(c) 2007 - 2010 Realtek Corporation. All rights reserved.
+ *                                        
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
  *
  * This program is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
  * more details.
  *
  * You should have received a copy of the GNU General Public License along with
  * this program; if not, write to the Free Software Foundation, Inc.,
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
  *
- * The full GNU General Public License is included in this distribution in the
- * file called LICENSE.
  *
- * Contact Information:
- * wlanfae <wlanfae@realtek.com>
-******************************************************************************/
-
+ ******************************************************************************/
 #include "drv_types.h"
 
 //================================================================================
@@ -169,14 +169,20 @@ SwLedOn(
 			break;
 
 		case LED_PIN_LED0:
-#if 1
+
+#ifdef CONFIG_ANTENNA_DIVERSITY
+			if(pHalData->AntDivCfg)
+			{
+				LedCfg = rtw_read8(padapter, REG_LEDCFG2);
+				rtw_write8(padapter,REG_LEDCFG2, (LedCfg&0xe0)|BIT7|BIT6|BIT5); // SW control led0 on.							
+			}
+			else
+#endif
+			{
 				LedCfg = rtw_read8(padapter, REG_LEDCFG0);
 				rtw_write8(padapter,REG_LEDCFG0, LedCfg&0x70); // SW control led0 on.
-#else				//RT_TRACE(COMP_LED, DBG_LOUD, ("SwLedOn LED0 0x%lx\n", PlatformEFIORead4Byte(Adapter, REG_LEDCFG0)));
-
-				//LedCfg = rtw_read8(padapter, REG_LEDCFG2);
-				//rtw_write8(padapter,REG_LEDCFG2, (LedCfg&0xe0)|BIT7|BIT6|BIT5); // SW control led0 on.
-#endif
+				//RT_TRACE(COMP_LED, DBG_LOUD, ("SwLedOn LED0 0x%lx\n", PlatformEFIORead4Byte(Adapter, REG_LEDCFG0)));
+			}
 		break;
 
 		case LED_PIN_LED1:
@@ -226,8 +232,22 @@ SwLedOff(
 			break;
 
 		case LED_PIN_LED0:
-			LedCfg &= 0xf0; // Set to software control.
-				rtw_write8(padapter, REG_LEDCFG2, (LedCfg|BIT3|BIT5|BIT6));
+				if(BOARD_USB_COMBO == pHalData->BoardType)
+				{
+					LedCfg &= 0x90; // Set to software control.				
+					rtw_write8(padapter, REG_LEDCFG2, (LedCfg|BIT3));				
+					LedCfg = rtw_read8(padapter, REG_MAC_PINMUX_CFG);
+					LedCfg &= 0xFE;
+					rtw_write8(padapter, REG_MAC_PINMUX_CFG, (LedCfg|BIT3));									
+				}
+				else
+				{
+			                LedCfg &= 0xf0; // Set to software control.
+					if(padapter->ledpriv.bLedOpenDrain == _TRUE) // Open-drain arrangement for controlling the LED
+						rtw_write8(padapter,  REG_LEDCFG2, (LedCfg|BIT1|BIT5|BIT6));
+					else
+				                rtw_write8(padapter, REG_LEDCFG2, (LedCfg|BIT3|BIT5|BIT6));
+				}
 			break;
 
 		case LED_PIN_LED1:
@@ -247,17 +267,23 @@ SwLedOff(
 				break;
 
 			case LED_PIN_LED0:
-#if 1
-				LedCfg = rtw_read8(padapter, REG_LEDCFG0);
-				LedCfg &= 0x70; // Set to software control. 			
-				rtw_write8(padapter, REG_LEDCFG0, (LedCfg|BIT3));
-				//RT_TRACE(COMP_LED, DBG_LOUD, ("SwLedOff LED0 0x%lx\n", PlatformEFIORead4Byte(Adapter, REG_LEDCFG0)));
-#else		
-				LedCfg = rtw_read8(padapter, REG_LEDCFG2);
-				LedCfg &= 0xe0; // Set to software control. 			
-				rtw_write8(padapter, REG_LEDCFG2, (LedCfg|BIT3|BIT7|BIT6|BIT5));
-				//RT_TRACE(COMP_LED, DBG_LOUD, ("SwLedOff LED0 0x%x\n", PlatformEFIORead4Byte(Adapter, REG_LEDCFG2)));
-#endif				
+
+#ifdef CONFIG_ANTENNA_DIVERSITY
+				if(pHalData->AntDivCfg)
+				{
+					LedCfg = rtw_read8(padapter, REG_LEDCFG2);
+					LedCfg &= 0xe0; // Set to software control. 			
+					rtw_write8(padapter, REG_LEDCFG2, (LedCfg|BIT3|BIT7|BIT6|BIT5));
+					//RT_TRACE(COMP_LED, DBG_LOUD, ("SwLedOff LED0 0x%x\n", PlatformEFIORead4Byte(Adapter, REG_LEDCFG2)));		
+				}
+				else
+			#endif
+				{				
+					LedCfg = rtw_read8(padapter, REG_LEDCFG0);
+					LedCfg &= 0x70; // Set to software control. 			
+					rtw_write8(padapter, REG_LEDCFG0, (LedCfg|BIT3));
+					//RT_TRACE(COMP_LED, DBG_LOUD, ("SwLedOff LED0 0x%lx\n", PlatformEFIORead4Byte(Adapter, REG_LEDCFG0)));
+				}		
 				break;
 
 			case LED_PIN_LED1:
@@ -327,7 +353,7 @@ SwLedBlink(
 {
 	_adapter			*padapter = pLed->padapter;
 	struct mlme_priv	*pmlmepriv = &(padapter->mlmepriv);
-	bool 			bStopBlinking = _FALSE;
+	u8 			bStopBlinking = _FALSE;
 
 	// Change LED according to BlinkingLedState specified.
 	if( pLed->BlinkingLedState == LED_ON ) 
@@ -449,7 +475,7 @@ SwLedBlink1(
 	struct mlme_priv		*pmlmepriv = &(padapter->mlmepriv);
 	struct eeprom_priv	*peeprompriv = &(padapter->eeprompriv);
 	PLED_871x 			pLed1 = &(ledpriv->SwLed1);	
-	bool 				bStopBlinking = _FALSE;
+	u8 				bStopBlinking = _FALSE;
 
 	if(peeprompriv->EEPROMCustomerID == RT_CID_819x_CAMEO)
 		pLed = &(ledpriv->SwLed1);	
@@ -679,7 +705,7 @@ SwLedBlink2(
 {
 	_adapter				*padapter = pLed->padapter;
 	struct mlme_priv		*pmlmepriv = &(padapter->mlmepriv);
-	bool 				bStopBlinking = _FALSE;
+	u8 				bStopBlinking = _FALSE;
 
 	// Change LED according to BlinkingLedState specified.
 	if( pLed->BlinkingLedState == LED_ON) 
@@ -805,7 +831,7 @@ SwLedBlink3(
 {
 	_adapter			*padapter = pLed->padapter;
 	struct mlme_priv	*pmlmepriv = &(padapter->mlmepriv);
-	bool bStopBlinking = _FALSE;
+	u8 bStopBlinking = _FALSE;
 
 	// Change LED according to BlinkingLedState specified.
 	if( pLed->BlinkingLedState == LED_ON ) 
@@ -983,7 +1009,7 @@ SwLedBlink4(
 	struct led_priv	*ledpriv = &(padapter->ledpriv);
 	struct mlme_priv	*pmlmepriv = &(padapter->mlmepriv);
 	PLED_871x 		pLed1 = &(ledpriv->SwLed1);	
-	bool				bStopBlinking = _FALSE;
+	u8				bStopBlinking = _FALSE;
 
 	// Change LED according to BlinkingLedState specified.
 	if( pLed->BlinkingLedState == LED_ON ) 
@@ -1184,7 +1210,7 @@ SwLedBlink5(
 {
 	_adapter			*padapter = pLed->padapter;
 	struct mlme_priv	*pmlmepriv = &(padapter->mlmepriv);
-	bool bStopBlinking = _FALSE;
+	u8 bStopBlinking = _FALSE;
 
 	// Change LED according to BlinkingLedState specified.
 	if( pLed->BlinkingLedState == LED_ON ) 
@@ -1306,7 +1332,7 @@ SwLedBlink6(
 {
 	_adapter			*padapter = pLed->padapter;
 	struct mlme_priv	*pmlmepriv = &(padapter->mlmepriv);
-	bool 			bStopBlinking = _FALSE;
+	u8 			bStopBlinking = _FALSE;
 
 	// Change LED according to BlinkingLedState specified.
 	if( pLed->BlinkingLedState == LED_ON ) 
@@ -1319,72 +1345,6 @@ SwLedBlink6(
 		SwLedOff(padapter, pLed);
 		RT_TRACE(_module_rtl8712_led_c_,_drv_info_,("Blinktimes (%d): turn off\n", pLed->BlinkTimes));
 	}	
-
-	switch(pLed->CurrLedState)
-	{			
-		case LED_TXRX_BLINK:
-			pLed->BlinkTimes--;
-			if( pLed->BlinkTimes == 0 )
-			{
-				bStopBlinking = _TRUE;
-			}
-			
-			if(bStopBlinking)
-			{
-				//if( priv->rtllib->eRFPowerState != eRfOn )
-				if(0)
-				{
-					SwLedOff(padapter, pLed);
-				}
-				else 
-				{
-					pLed->CurrLedState = LED_ON;
-					pLed->BlinkingLedState = LED_ON;
-				
-					if( !pLed->bLedOn )
-						SwLedOn(padapter, pLed);
-
-					RT_TRACE(_module_rtl8712_led_c_,_drv_info_,("CurrLedState %d\n", pLed->CurrLedState));
-				}
-				pLed->bLedBlinkInProgress = _FALSE;	
-			}
-			else
-			{
-				//if( priv->rtllib->eRFPowerState != eRfOn )
-				if(0)
-				{
-					SwLedOff(padapter, pLed);
-				}
-				else
-				{
-					if( pLed->bLedOn )
-						pLed->BlinkingLedState = LED_OFF; 
-					else
-						pLed->BlinkingLedState = LED_ON;
-					_set_timer(&(pLed->BlinkTimer), LED_BLINK_FASTER_INTERVAL_ALPHA);
-				}
-			}
-			break;
-
-		case LED_BLINK_WPS:
-			//if( priv->rtllib->eRFPowerState != eRfOn )
-			if(0)
-			{
-				SwLedOff(padapter, pLed);
-			}
-			else
-			{
-				if( pLed->bLedOn )
-					pLed->BlinkingLedState = LED_OFF; 
-				else
-					pLed->BlinkingLedState = LED_ON;
-				_set_timer(&(pLed->BlinkTimer), LED_BLINK_SCAN_INTERVAL_ALPHA);
-			}
-			break;			
-					
-		default:
-			break;
-	}
 
 }
 
@@ -1850,9 +1810,7 @@ SwLedControlMode1(
 			{
 				_cancel_timer_ex(&(pLed->BlinkTimer));
 				pLed->bLedScanBlinkInProgress = _FALSE;
-			}			
-
-			_set_timer(&(pLed->BlinkTimer), 0);
+			}						
 			SwLedOff(padapter, pLed);
 			break;
 			
@@ -2561,13 +2519,16 @@ SwLedControlMode5(
 		case LED_CTL_POWER_ON:
 		case LED_CTL_NO_LINK:
 		case LED_CTL_LINK: 	//solid blue
+/*
 			if(pLed->CurrLedState == LED_SCAN_BLINK)
 			{
 				return;
-			}		
+			}	
+			pLed->bLedBlinkInProgress = _FALSE;
+*/
 			pLed->CurrLedState = LED_ON;
 			pLed->BlinkingLedState = LED_ON; 
-			pLed->bLedBlinkInProgress = _FALSE;
+		
 			_set_timer(&(pLed->BlinkTimer), 0);
 			break;
 

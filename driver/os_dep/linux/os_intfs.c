@@ -1,21 +1,22 @@
 /******************************************************************************
-* os_intfs.c                                                                                                                                 *
-*                                                                                                                                          *
-* Description :                      
-*		drv_entry
-*                                                                                                                                           *
-* Author :                                                                                                                       *
-*                                                                                                                                         *
-* History :                                                          
-*
-*                                        
-*                                                                                                                                       *
-* Copyright 2007, Realtek Corp.                                                                                                  *
-*                                                                                                                                        *
-* The contents of this file is the sole property of Realtek Corp.  It can not be                                     *
-* be used, copied or modified without written permission from Realtek Corp.                                         *
-*                                                                                                                                          *
-*******************************************************************************/
+ *
+ * Copyright(c) 2007 - 2010 Realtek Corporation. All rights reserved.
+ *                                        
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
+ *
+ *
+ ******************************************************************************/
 #define _OS_INTFS_C_
 
 #include <drv_conf.h>
@@ -75,7 +76,13 @@ int rtw_scan_mode = 1;//active, passive
 int rtw_adhoc_tx_pwr = 1;
 int rtw_soft_ap = 0;
 //int smart_ps = 1;  
+//#ifdef CONFIG_BEST_BATTERYLIFE
+#ifdef CONFIG_POWER_SAVING
+int rtw_power_mgnt = 1;
+#else
 int rtw_power_mgnt = PS_MODE_ACTIVE;
+#endif	
+
 int rtw_radio_enable = 1;
 int rtw_long_retry_lmt = 7;
 int rtw_short_retry_lmt = 7;
@@ -86,7 +93,7 @@ int rtw_mp_mode = 0;
 int rtw_software_encrypt = 0;
 int rtw_software_decrypt = 0;	  
  
-int rtw_wmm_enable = 0;// default is set to disable the wmm.
+int rtw_wmm_enable = 1;// default is set to enable the wmm.
 int rtw_uapsd_enable = 0;	  
 int rtw_uapsd_max_sp = NO_LIMIT;
 int rtw_uapsd_acbk_en = 0;
@@ -115,12 +122,14 @@ int AcceptAddbaReq = _TRUE;// 0:Reject AP's Add BA req, 1:Accept AP's Add BA req
 #ifdef CONFIG_ANTENNA_DIVERSITY
 int  antdiv_cfg = 2; // 0:OFF , 1:ON, 2:decide by Efuse config
 #endif
-
-#ifdef CONFIG_AUTOSUSPEND
+#ifdef CONFIG_USB_AUTOSUSPEND
 int enusbss = 1;//0:disable,1:enable
-int hwpdn_mode=2;//0:disable,1:enable,2:deside by EFUSE config
-int hwpwrp_detect = 1; //HW power  ping detect 0:disable , 1:enable
+#else
+int enusbss = 0;//0:disable,1:enable
 #endif
+
+int hwpdn_mode=2;//0:disable,1:enable,2: by EFUSE config
+int hwpwrp_detect = 1; //HW power  ping detect 0:disable , 1:enable
 
 char* rtw_initmac = 0;  // temp mac address if users want to use instead of the mac address in Efuse
 
@@ -150,12 +159,9 @@ module_param(wifi_spec, int, 0644);
 module_param(antdiv_cfg, int, 0644);
 #endif
 
-#ifdef CONFIG_AUTOSUSPEND
 module_param(enusbss, int, 0644);
 module_param(hwpdn_mode, int, 0644);
 module_param(hwpwrp_detect, int, 0644);
-#endif
-
 
 #ifdef CONFIG_R871X_TEST
 int start_pseudo_adhoc(_adapter *padapter);
@@ -175,6 +181,187 @@ struct net_device *rtw_init_netdev(void);
 static uint loadparam( _adapter *padapter,  _nic_hdl	pnetdev);
 static int netdev_open (struct net_device *pnetdev);
 static int netdev_close (struct net_device *pnetdev);
+
+//#ifdef RTK_DMP_PLATFORM
+#ifdef CONFIG_PROC_DEBUG
+#define RTL8192C_PROC_NAME "rtl819xC"
+#define RTL8192D_PROC_NAME "rtl819xD"
+static char rtw_proc_name[IFNAMSIZ];
+static struct proc_dir_entry *rtw_proc = NULL;
+static struct proc_dir_entry *dir_dev = NULL;
+
+void rtw_proc_init_one(struct net_device *dev)
+{
+	struct proc_dir_entry *entry=NULL;
+	_adapter	*padapter = netdev_priv(dev);
+
+	if(padapter->chip_type & RTL8188C_8192C)
+	{
+		_rtw_memcpy(rtw_proc_name, RTL8192C_PROC_NAME, sizeof(RTL8192C_PROC_NAME));
+	}
+	else if(padapter->chip_type & RTL8192D)
+	{
+		_rtw_memcpy(rtw_proc_name, RTL8192D_PROC_NAME, sizeof(RTL8192D_PROC_NAME));
+	}
+
+
+#if(LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24))
+	rtw_proc=create_proc_entry(rtw_proc_name, S_IFDIR, proc_net);
+#else
+	rtw_proc=create_proc_entry(rtw_proc_name, S_IFDIR, init_net.proc_net);
+#endif
+	if (rtw_proc == NULL) {
+		printk(KERN_ERR "Unable to create rtw_proc directory\n");
+		return;
+	}
+
+	dir_dev = create_proc_entry(dev->name, 
+					  S_IFDIR | S_IRUGO | S_IXUGO, 
+					  rtw_proc);
+
+	if(dir_dev==NULL)
+	{
+#if(LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24))
+		remove_proc_entry(rtw_proc_name, proc_net);
+#else
+		remove_proc_entry(rtw_proc_name, init_net.proc_net);
+#endif		
+		rtw_proc = NULL;
+	}
+
+	entry = create_proc_read_entry("write_reg", S_IFREG | S_IRUGO,
+				   dir_dev, proc_get_write_reg, dev);				   
+	if (!entry) {
+		DBG_871X("Unable to create_proc_read_entry!\n"); 
+		return;
+	}
+	entry->write_proc = proc_set_write_reg;
+
+	entry = create_proc_read_entry("read_reg", S_IFREG | S_IRUGO,
+				   dir_dev, proc_get_read_reg, dev);				   
+	if (!entry) {
+		DBG_871X("Unable to create_proc_read_entry!\n"); 
+		return;
+	}
+	entry->write_proc = proc_set_read_reg;
+
+	
+	entry = create_proc_read_entry("fwstate", S_IFREG | S_IRUGO,
+				   dir_dev, proc_get_fwstate, dev);				   
+	if (!entry) {
+		DBG_871X("Unable to create_proc_read_entry!\n"); 
+		return;
+	}
+
+
+	entry = create_proc_read_entry("sec_info", S_IFREG | S_IRUGO,
+				   dir_dev, proc_get_sec_info, dev);				   
+	if (!entry) {
+		DBG_871X("Unable to create_proc_read_entry!\n"); 
+		return;
+	}
+
+
+	entry = create_proc_read_entry("mlmext_state", S_IFREG | S_IRUGO,
+				   dir_dev, proc_get_mlmext_state, dev);				   
+	if (!entry) {
+		DBG_871X("Unable to create_proc_read_entry!\n"); 
+		return;
+	}
+
+
+	entry = create_proc_read_entry("qos_option", S_IFREG | S_IRUGO,
+				   dir_dev, proc_get_qos_option, dev);				   
+	if (!entry) {
+		DBG_871X("Unable to create_proc_read_entry!\n"); 
+		return;
+	}
+
+	entry = create_proc_read_entry("ht_option", S_IFREG | S_IRUGO,
+				   dir_dev, proc_get_ht_option, dev);				   
+	if (!entry) {
+		DBG_871X("Unable to create_proc_read_entry!\n"); 
+		return;
+	}
+
+	entry = create_proc_read_entry("rf_info", S_IFREG | S_IRUGO,
+				   dir_dev, proc_get_rf_info, dev);				   
+	if (!entry) {
+		DBG_871X("Unable to create_proc_read_entry!\n"); 
+		return;
+	}
+	
+	entry = create_proc_read_entry("ap_info", S_IFREG | S_IRUGO,
+				   dir_dev, proc_get_ap_info, dev);				   
+	if (!entry) {
+		DBG_871X("Unable to create_proc_read_entry!\n"); 
+		return;
+	}
+
+	entry = create_proc_read_entry("adapter_state", S_IFREG | S_IRUGO,
+				   dir_dev, proc_get_adapter_state, dev);				   
+	if (!entry) {
+		DBG_871X("Unable to create_proc_read_entry!\n"); 
+		return;
+	}
+
+	entry = create_proc_read_entry("trx_info", S_IFREG | S_IRUGO,
+				   dir_dev, proc_get_trx_info, dev);				   
+	if (!entry) {
+		DBG_871X("Unable to create_proc_read_entry!\n"); 
+		return;
+	}
+
+#ifdef CONFIG_AP_MODE
+
+	entry = create_proc_read_entry("all_sta_info", S_IFREG | S_IRUGO,
+				   dir_dev, proc_get_all_sta_info, dev);				   
+	if (!entry) {
+		DBG_871X("Unable to create_proc_read_entry!\n"); 
+		return;
+	}
+
+#endif
+	
+}
+
+void rtw_proc_remove_one(struct net_device *dev)
+{
+	_adapter	*padapter = netdev_priv(dev);
+
+	if (dir_dev) {
+
+		remove_proc_entry("write_reg", dir_dev);
+		remove_proc_entry("read_reg", dir_dev);
+		remove_proc_entry("fwstate", dir_dev);
+		remove_proc_entry("sec_info", dir_dev);
+		remove_proc_entry("mlmext_state", dir_dev);
+		remove_proc_entry("qos_option", dir_dev);
+		remove_proc_entry("ht_option", dir_dev);
+		remove_proc_entry("rf_info", dir_dev);		
+		remove_proc_entry("ap_info", dir_dev);
+		remove_proc_entry("adapter_state", dir_dev);
+		remove_proc_entry("trx_info", dir_dev);
+
+#ifdef CONFIG_AP_MODE	
+		remove_proc_entry("all_sta_info", dir_dev);
+#endif		
+
+		remove_proc_entry(dev->name, rtw_proc);
+		dir_dev = NULL;
+		
+	}
+
+	if(rtw_proc){
+#if(LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24))
+		remove_proc_entry(rtw_proc_name, proc_net);
+#else
+		remove_proc_entry(rtw_proc_name, init_net.proc_net);
+#endif		
+		rtw_proc = NULL;
+	}
+}
+#endif
 
 uint loadparam( _adapter *padapter,  _nic_hdl	pnetdev)
 {
@@ -251,7 +438,9 @@ _func_enter_;
 	
 #ifdef CONFIG_AUTOSUSPEND
 	registry_par->usbss_enable = (u8)enusbss;//0:disable,1:enable
-	registry_par->hwpdn_mode = (u8)hwpdn_mode;//0:disable,1:enable,2:deside by EFUSE config
+#endif
+#ifdef SUPPORT_HW_RFOFF_DETECTED
+	registry_par->hwpdn_mode = (u8)hwpdn_mode;//0:disable,1:enable,2:by EFUSE config
 	registry_par->hwpwrp_detect = (u8)hwpwrp_detect;//0:disable,1:enable
 #endif
 
@@ -327,7 +516,7 @@ struct net_device *rtw_init_netdev(void)
 	//pnetdev->init = NULL;
 #if (LINUX_VERSION_CODE>=KERNEL_VERSION(2,6,29))
 
-	printk("register rtl8712_netdev_ops to netdev_ops\n");
+	printk("register rtl8192_netdev_ops to netdev_ops\n");
 	pnetdev->netdev_ops = &rtw_netdev_ops;
 
 #else
@@ -357,7 +546,12 @@ struct net_device *rtw_init_netdev(void)
 	//pnetdev->wireless_data = &priv->wireless_data;
 #endif
 	
+	
+#ifdef CONFIG_PLATFORM_MT53XX		
+	if(dev_alloc_name(pnetdev,"rea%d") < 0)
+#else
 	if(dev_alloc_name(pnetdev,"wlan%d") < 0)
+#endif		
 	{
 		RT_TRACE(_module_os_intfs_c_,_drv_err_,("dev_alloc_name, fail! \n"));
 	}
@@ -463,6 +657,7 @@ u8 rtw_init_default_value(_adapter *padapter)
 
 	//mlme_priv
 	pmlmepriv->scan_interval = 0;
+	pmlmepriv->passive_mode = 1;
 	
 	//qos_priv
 	//pmlmepriv->qospriv.qos_option = pregistrypriv->wmm_enable;
@@ -518,20 +713,28 @@ u8 reset_drv_sw(_adapter *padapter)
 	HAL_DATA_TYPE *pHalData = GET_HAL_DATA(padapter);
 	//hal_priv	
 	padapter->halpriv.fw_ractrl = _FALSE;	
-	padapter->halpriv.LastHMEBoxNum = 0;	//misc.		
+	if(!pwrctrlpriv->bkeepfwalive)
+	{
+	   padapter->halpriv.LastHMEBoxNum = 0;	//misc.		
+	}
 	padapter->bReadPortCancel = _FALSE;		
 	padapter->bWritePortCancel = _FALSE;	
 	pmlmepriv->scan_interval = 0;
+	pmlmepriv->passive_mode = 1;
 
-	pwrctrlpriv->inactive_pwrstate = rf_on;
+	//pwrctrlpriv->current_rfpwrstate = rf_on;
 	pwrctrlpriv->bips_processing = _FALSE;		
-
-	pwrctrlpriv->bfassoc_pwrstate = rf_on;
 	
 	padapter->xmitpriv.tx_pkts = psitesurveyctrl->last_tx_pkts = 0;
 	padapter->recvpriv.rx_pkts = psitesurveyctrl->last_rx_pkts = 0;
 	psitesurveyctrl->traffic_busy = _FALSE;	
 	pHalData->IQKInitialized = _FALSE;
+#ifdef CONFIG_AUTOSUSPEND	
+	#if (LINUX_VERSION_CODE>=KERNEL_VERSION(2,6,22) && LINUX_VERSION_CODE<=KERNEL_VERSION(2,6,34))
+	padapter->dvobjpriv.pusbdev->autosuspend_disabled = 1;//autosuspend disabled by the user
+	#endif
+#endif
+	pwrctrlpriv->pwr_state_check_cnts = 0;
 	return ret8;
 }
 
@@ -626,12 +829,12 @@ exit:
 
 void cancel_all_timer(_adapter *padapter)
 {
-	u8 bool;
+	u8 bcancelled;
 	_set_timer(&padapter->mlmepriv.assoc_timer, 10000);
 	while(1)
 	{
-		_cancel_timer(&padapter->mlmepriv.assoc_timer, &bool);
-		if (bool == _TRUE)
+		_cancel_timer(&padapter->mlmepriv.assoc_timer, &bcancelled);
+		if (bcancelled == _TRUE)
 			break;
 	}
 	RT_TRACE(_module_os_intfs_c_,_drv_info_,("\n drv_halt:cancel association timer complete! \n"));
@@ -639,8 +842,8 @@ void cancel_all_timer(_adapter *padapter)
 /*
 	while(1)
 	{
-		_cancel_timer(&padapter->mlmepriv.sitesurveyctrl.sitesurvey_ctrl_timer, &bool);
-		if (bool == _TRUE)
+		_cancel_timer(&padapter->mlmepriv.sitesurveyctrl.sitesurvey_ctrl_timer, &bcancelled);
+		if (bcancelled == _TRUE)
 			break;
 	}
 	RT_TRACE(_module_os_intfs_c_,_drv_info_,("\n drv_halt:cancel sitesurvey_ctrl_timer! \n"));
@@ -648,8 +851,8 @@ void cancel_all_timer(_adapter *padapter)
 	_set_timer(&padapter->securitypriv.tkip_timer, 10000);
 	while(1)
 	{
-		_cancel_timer(&padapter->securitypriv.tkip_timer, &bool);
-		if (bool == _TRUE)
+		_cancel_timer(&padapter->securitypriv.tkip_timer, &bcancelled);
+		if (bcancelled == _TRUE)
 			break;
 	}
 	RT_TRACE(_module_os_intfs_c_,_drv_info_,("\n drv_halt:cancel tkip_timer! \n"));
@@ -658,16 +861,16 @@ void cancel_all_timer(_adapter *padapter)
 	 _set_timer(&padapter->mlmepriv.scan_to_timer, 10000);
    	 while(1)
    	 {
-       	 _cancel_timer(&padapter->mlmepriv.scan_to_timer, &bool);
-       	 if (bool == _TRUE)
+       	 _cancel_timer(&padapter->mlmepriv.scan_to_timer, &bcancelled);
+       	 if (bcancelled == _TRUE)
            	 break;
 	}
 	
 	 _set_timer(&padapter->mlmepriv.dynamic_chk_timer, 10000);
    	 while(1)
    	 {
-       	 _cancel_timer(&padapter->mlmepriv.dynamic_chk_timer, &bool);
-       	 if (bool == _TRUE)
+       	 _cancel_timer(&padapter->mlmepriv.dynamic_chk_timer, &bcancelled);
+       	 if (bcancelled == _TRUE)
            	 break;
 	}
 
@@ -677,8 +880,8 @@ void cancel_all_timer(_adapter *padapter)
 	_set_timer(&padapter->pwrctrlpriv.pwr_state_check_timer, 10000);
 	 while(1)
    	 {
-	       _cancel_timer(&padapter->pwrctrlpriv.pwr_state_check_timer, &bool);
-	       if (bool == _TRUE)
+	       _cancel_timer(&padapter->pwrctrlpriv.pwr_state_check_timer, &bcancelled);
+	       if (bcancelled == _TRUE)
 	       	break;
 	}	
 
@@ -688,8 +891,8 @@ void cancel_all_timer(_adapter *padapter)
 	_set_timer(&padapter->dmpriv.SwAntennaSwitchTimer, 10000);	
 	 while(1)
    	 {
-	       	 _cancel_timer(&padapter->dmpriv.SwAntennaSwitchTimer, &bool);
-	       	 if (bool == _TRUE)
+	       	 _cancel_timer(&padapter->dmpriv.SwAntennaSwitchTimer, &bcancelled);
+	       	 if (bcancelled == _TRUE)
 	           	 break;
 	}
 	
@@ -813,17 +1016,23 @@ static int netdev_open(struct net_device *pnetdev)
 			pHalData->hal_ops.inirp_init(padapter);
 		}			
 #endif
-                padapter->bup = _TRUE;
+
+#ifdef CONFIG_PROC_DEBUG
+		rtw_proc_init_one(pnetdev);
+#endif	
+
+             padapter->bup = _TRUE;
+		padapter->ledpriv.LedControlHandler(padapter, LED_CTL_POWER_ON);
+
 	}		
+
 	padapter->net_closed = _FALSE;	
 		
 
 	if( pwrctrlpriv->power_mgnt != PS_MODE_ACTIVE )
-	{
-		//if(pwrctrlpriv->ips_enable){
-			padapter->pwrctrlpriv.bips_processing = _FALSE;		
-			_set_timer(&padapter->pwrctrlpriv.pwr_state_check_timer, padapter->pwrctrlpriv.pwr_state_check_inverval);
-		//}
+	{	
+		padapter->pwrctrlpriv.bips_processing = _FALSE;		
+		_set_timer(&padapter->pwrctrlpriv.pwr_state_check_timer, padapter->pwrctrlpriv.pwr_state_check_inverval);	
 	}
  	
 		
@@ -911,15 +1120,19 @@ netdev_open_error:
 	return _FAIL;
 }
 #endif
+extern int rfpwrstate_check(_adapter *padapter);
 static int netdev_close(struct net_device *pnetdev)
 {
 	_adapter *padapter = (_adapter *)netdev_priv(pnetdev);
 		
 	RT_TRACE(_module_os_intfs_c_,_drv_info_,("+871x_drv - drv_close\n"));	
 
+	if(padapter->pwrctrlpriv.bInternalAutoSuspend == _TRUE)
+	{
+		rfpwrstate_check(padapter);
+	}
 
 	padapter->net_closed = _TRUE;
-
 /*	if(!padapter->hw_init_completed)
 	{
 		printk("(1)871x_drv - drv_close, bup=%d, hw_init_completed=%d\n", padapter->bup, padapter->hw_init_completed);
@@ -939,6 +1152,10 @@ static int netdev_close(struct net_device *pnetdev)
 				netif_stop_queue(pnetdev);
      		}
 		
+		#ifdef CONFIG_PLATFORM_ANDROID	
+		if(!padapter->bdisassoc_by_assoc){
+		#endif
+		
 		//s2.	
 		//s2-1.  issue rtw_disassoc_cmd to fw
 		rtw_disassoc_cmd(padapter);	
@@ -947,7 +1164,12 @@ static int netdev_close(struct net_device *pnetdev)
 		//s2-3. 
 	       rtw_free_assoc_resources(padapter);	
 		//s2-4.
-		rtw_free_network_queue(padapter);
+		rtw_free_network_queue(padapter,_TRUE);
+
+		#ifdef CONFIG_PLATFORM_ANDROID
+		} 
+		padapter->bdisassoc_by_assoc=0;//FON
+#endif
 
 	}
 

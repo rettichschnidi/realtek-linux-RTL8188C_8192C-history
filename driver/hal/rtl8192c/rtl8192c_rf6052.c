@@ -1,4 +1,24 @@
 /******************************************************************************
+ *
+ * Copyright(c) 2007 - 2010 Realtek Corporation. All rights reserved.
+ *                                        
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
+ *
+ *
+ ******************************************************************************/
+ 
+/******************************************************************************
  * 
  *     (c) Copyright  2008, RealTEK Technologies Inc. All Rights Reserved.
  * 
@@ -227,15 +247,17 @@ PHY_RF6052SetCckTxPower(
 	BOOLEAN			TurboScanOff = _FALSE;
 	u8			idx1, idx2;
 	u8*			ptr;
-	
-	if(pEEPROM->EEPROMRegulatory != 0)
+
+	// 2010/10/18 MH Accorsing to SD3 eechou's suggestion, we need to disable turbo scan for RU.	
+	// Otherwise, external PA will be broken if power index > 0x20.
+	if((pEEPROM->EEPROMRegulatory != 0)||( pHalData->ExternalPA))
 		TurboScanOff = _TRUE;
 
 		
 	if( pmlmeext->sitesurvey_res.state == _TRUE)
 	{
-		//TxAGC[RF90_PATH_A] = 0x3f3f3f3f;
-		//TxAGC[RF90_PATH_B] = 0x3f3f3f3f;
+		TxAGC[RF90_PATH_A] = 0x3f3f3f3f;
+		TxAGC[RF90_PATH_B] = 0x3f3f3f3f;
 
 		TurboScanOff = _TRUE;
 		
@@ -246,11 +268,21 @@ PHY_RF6052SetCckTxPower(
 				TxAGC[idx1] = 
 					pPowerlevel[idx1] | (pPowerlevel[idx1]<<8) |
 					(pPowerlevel[idx1]<<16) | (pPowerlevel[idx1]<<24);
+
+#if (DEV_BUS_TYPE == DEV_BUS_USB_INTERFACE)
+				// 2010/10/18 MH For external PA module. We need to limit power index to be less than 0x20.
+				if (TxAGC[idx1] > 0x20 && pHalData->ExternalPA)
+					TxAGC[idx1] = 0x20;
+#endif
 			}
 		}
 	}
 	else
 	{
+// 20100427 Joseph: Driver dynamic Tx power shall not affect Tx power. It shall be determined by power training mechanism.
+// Currently, we cannot fully disable driver dynamic tx power mechanism because it is referenced by BT coexist mechanism.
+// In the future, two mechanism shall be separated from each other and maintained independantly. Thanks for Lanhsin's reminder.
+#if 0
 		if(pdmpriv->DynamicTxHighPowerLvl == TxHighPwrLevel_Level1)
 		{	
 			TxAGC[RF90_PATH_A] = 0x10101010;
@@ -262,6 +294,7 @@ PHY_RF6052SetCckTxPower(
 			TxAGC[RF90_PATH_B] = 0x00000000;
 		}
 		else
+#endif
 		{
 			for(idx1=RF90_PATH_A; idx1<=RF90_PATH_B; idx1++)
 			{
@@ -633,6 +666,7 @@ phy_RF6052_Config_ParaFile(
 #if DEV_BUS_TYPE==DEV_BUS_USB_INTERFACE	
 	static u8				sz88CRadioAFile_mCard[] = RTL8188C_PHY_RADIO_A_mCard;	
 	static u8				sz88CRadioBFile_mCard[] = RTL8188C_PHY_RADIO_B_mCard;
+	static u8				sz88CRadioAFile_HP[] = RTL8188C_PHY_RADIO_A_HP;	
 #endif
 	static u8				sz92CCRadioAFile[] = RTL8192C_PHY_RADIO_A;	
 	static u8				sz92CRadioBFile[] = RTL8192C_PHY_RADIO_B;
@@ -649,6 +683,10 @@ phy_RF6052_Config_ParaFile(
 		{
 			pszRadioAFile = sz88CRadioAFile_mCard;
 			pszRadioBFile = sz88CRadioBFile_mCard;
+		}
+		else if( BOARD_USB_High_PA == pHalData->BoardType)
+		{
+			pszRadioAFile = sz88CRadioAFile_HP;
 		}
 		else
 #endif	

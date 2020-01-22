@@ -1,20 +1,22 @@
 /******************************************************************************
-* rtl8192cu_xmit.c                                                                                                                                 *
-*                                                                                                                                          *
-* Description :                                                                                                                       *
-*                                                                                                                                           *
-* Author :                                                                                                                       *
-*                                                                                                                                         *
-* History :									*
-*                                                                                                                                       *
-*										*
-*										*
-* Copyright 2010, Realtek Corp.							*
-*                                                                                                                                        *
-* The contents of this file is the sole property of Realtek Corp.  It can not be                                     *
-* be used, copied or modified without written permission from Realtek Corp.                                         *
-*                                                                                                                                          *
-*******************************************************************************/
+ *
+ * Copyright(c) 2007 - 2010 Realtek Corporation. All rights reserved.
+ *                                        
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
+ *
+ *
+ ******************************************************************************/
 #define _RTL8192C_XMIT_C_
 #include <drv_conf.h>
 #include <osdep_service.h>
@@ -240,6 +242,11 @@ void fill_txdesc_vcs(struct pkt_attrib *pattrib, u32 *pdw)
 			break;		
 	}
 
+	if(pattrib->vcs_mode)
+	{
+		*pdw |= cpu_to_le32(BIT(13));//ENABLE HW RTS
+	}
+
 }
 
 void fill_txdesc_phy(struct pkt_attrib *pattrib, u32 *pdw)
@@ -301,7 +308,7 @@ static void _update_txdesc(struct xmit_frame *pxmitframe, u8 *pmem, int sz)
 	if (pxmitframe->frame_tag == DATA_FRAMETAG)
 	{
 		//4 offset 4
-		ptxdesc->txdw1 |= cpu_to_le32((pattrib->mac_id-4) & 0x1f);//CAM_ID(MAC_ID)
+		ptxdesc->txdw1 |= cpu_to_le32(pattrib->mac_id & 0x1f);//CAM_ID(MAC_ID)
 
 		qsel = (uint)(pattrib->qsel & 0x0000001f);
 		ptxdesc->txdw1 |= cpu_to_le32((qsel << QSEL_SHT) & 0x00001f00);
@@ -336,7 +343,10 @@ static void _update_txdesc(struct xmit_frame *pxmitframe, u8 *pmem, int sz)
 			fill_txdesc_vcs(pattrib, &ptxdesc->txdw4);
 			fill_txdesc_phy(pattrib, &ptxdesc->txdw4);
 
+			
+			ptxdesc->txdw4 |= cpu_to_le32(0x00000008);//RTS Rate=24M
 			ptxdesc->txdw5 |= cpu_to_le32(0x0001ff00);
+			ptxdesc->txdw5 |= cpu_to_le32(0x0000000b);//DataRate - 54M
 
 			if (0)//for driver dbg
 			{
@@ -376,7 +386,7 @@ static void _update_txdesc(struct xmit_frame *pxmitframe, u8 *pmem, int sz)
 		//printk("pxmitframe->frame_tag == MGNT_FRAMETAG\n");	
 
 		//4 offset 4
-		ptxdesc->txdw1 |= cpu_to_le32((pattrib->mac_id-4) & 0x1f);//CAM_ID(MAC_ID)
+		ptxdesc->txdw1 |= cpu_to_le32(pattrib->mac_id & 0x1f);//(MAC_ID)
 
 		qsel = (uint)(pattrib->qsel&0x0000001f);
 		ptxdesc->txdw1 |= cpu_to_le32((qsel << QSEL_SHT) & 0x00001f00);
@@ -487,7 +497,7 @@ s32 rtw_update_txdesc(struct xmit_frame *pxmitframe, u32 *pmem, s32 sz)
 		//printk("pxmitframe->frame_tag == DATA_FRAMETAG\n");			
 
 		//offset 4
-		ptxdesc->txdw1 |= cpu_to_le32((pattrib->mac_id-4)&0x1f);//CAM_ID(MAC_ID)
+		ptxdesc->txdw1 |= cpu_to_le32(pattrib->mac_id & 0x1f);//(MAC_ID)
 
 		qsel = (uint)(pattrib->qsel & 0x0000001f);
 		ptxdesc->txdw1 |= cpu_to_le32((qsel << QSEL_SHT) & 0x00001f00);
@@ -520,7 +530,9 @@ s32 rtw_update_txdesc(struct xmit_frame *pxmitframe, u32 *pmem, s32 sz)
 			fill_txdesc_vcs(pattrib, &ptxdesc->txdw4);
 			fill_txdesc_phy(pattrib, &ptxdesc->txdw4);
 
+			ptxdesc->txdw4 |= cpu_to_le32(0x00000008);//RTS Rate=24M
 			ptxdesc->txdw5 |= cpu_to_le32(0x0001ff00);//
+			ptxdesc->txdw5 |= cpu_to_le32(0x0000000b);//DataRate - 54M
 				
               	if(0)//for driver dbg
 			{
@@ -567,7 +579,7 @@ s32 rtw_update_txdesc(struct xmit_frame *pxmitframe, u32 *pmem, s32 sz)
 		//printk("pxmitframe->frame_tag == MGNT_FRAMETAG\n");	
 		
 		//offset 4		
-		ptxdesc->txdw1 |= cpu_to_le32((pattrib->mac_id-4)&0x1f);//CAM_ID(MAC_ID)
+		ptxdesc->txdw1 |= cpu_to_le32(pattrib->mac_id & 0x1f);//(MAC_ID)
 		
 		qsel = (uint)(pattrib->qsel&0x0000001f);
 		ptxdesc->txdw1 |= cpu_to_le32((qsel<<QSEL_SHT)&0x00001f00);

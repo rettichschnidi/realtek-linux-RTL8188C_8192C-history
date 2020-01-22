@@ -1,20 +1,22 @@
 /******************************************************************************
-* rtl871x_mp_ioctl.c                                                                                                                                 *
-*                                                                                                                                          *
-* Description :                                                                                                                       *
-*                                                                                                                                           *
-* Author :                                                                                                                       *
-*                                                                                                                                         *
-* History :
-*
-*
-*                                                                                                                                       *
-* Copyright 2007, Realtek Corp.                                                                                                  *
-*                                                                                                                                        *
-* The contents of this file is the sole property of Realtek Corp.  It can not be                                     *
-* be used, copied or modified without written permission from Realtek Corp.                                         *
-*                                                                                                                                          *
-*******************************************************************************/
+ *
+ * Copyright(c) 2007 - 2010 Realtek Corporation. All rights reserved.
+ *                                        
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
+ *
+ *
+ ******************************************************************************/
 #define _RTL871X_MP_IOCTL_C_
 
 #include <drv_conf.h>
@@ -2071,9 +2073,9 @@ NDIS_STATUS oid_rt_pro_dele_sta_info_hdl(struct oid_par_priv *poid_par_priv)
 
 	psta = rtw_get_stainfo(&Adapter->stapriv, macaddr);
 	if (psta != NULL) {
-		_enter_critical(&(Adapter->stapriv.sta_hash_lock), &irqL);
+		_enter_critical_bh(&(Adapter->stapriv.sta_hash_lock), &irqL);
 		rtw_free_stainfo(Adapter, psta);
-		_exit_critical(&(Adapter->stapriv.sta_hash_lock), &irqL);
+		_exit_critical_bh(&(Adapter->stapriv.sta_hash_lock), &irqL);
 	}
 
 	return status;
@@ -2950,7 +2952,7 @@ unsigned int mp_ioctl_xmit_packet_hdl(struct oid_par_priv *poid_par_priv)
 
 	//update attribute
 	pattrib = &pxframe->attrib;
-	memset((u8 *)(pattrib), 0, sizeof (struct pkt_attrib));
+	_rtw_memset((u8 *)(pattrib), 0, sizeof (struct pkt_attrib));
 	pattrib->pktlen = pmp_xmitpkt->len;
 	pattrib->ether_type = ntohs(pethhdr->h_proto);
 	pattrib->hdrlen = 24;
@@ -2966,7 +2968,7 @@ unsigned int mp_ioctl_xmit_packet_hdl(struct oid_par_priv *poid_par_priv)
 #endif
 
 	//
-	memset(pxframe->mem, 0 , WLANHDR_OFFSET);
+	_rtw_memset(pxframe->mem, 0 , WLANHDR_OFFSET);
 	pframe = (u8 *)(pxframe->mem) + WLANHDR_OFFSET;
 
 	pwlanhdr = (struct ieee80211_hdr *)pframe;

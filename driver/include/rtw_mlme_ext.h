@@ -1,4 +1,22 @@
-
+/******************************************************************************
+ *
+ * Copyright(c) 2007 - 2010 Realtek Corporation. All rights reserved.
+ *                                        
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
+ *
+ *
+ ******************************************************************************/
 #ifndef __RTL871X_MLME_EXT_H_
 #define __RTL871X_MLME_EXT_H_
 
@@ -82,6 +100,22 @@ typedef enum _RT_CHANNEL_DOMAIN
 	//===== Add new channel plan above this line===============//
 	RT_CHANNEL_DOMAIN_MAX,
 }RT_CHANNEL_DOMAIN, *PRT_CHANNEL_DOMAIN;
+
+typedef struct _RT_CHANNEL_PLAN
+{
+	u8	Channel[32];
+	u8	Len;
+}RT_CHANNEL_PLAN, *PRT_CHANNEL_PLAN;
+
+
+// Scan type including active and passive scan.
+typedef enum _RT_SCAN_TYPE
+{
+	SCAN_ACTIVE,
+	SCAN_PASSIVE,
+	SCAN_MIX,
+}RT_SCAN_TYPE, *PRT_SCAN_TYPE;
+
 
 enum Associated_AP
 {
@@ -173,6 +207,7 @@ struct mlme_ext_info
 	unsigned char		HT_enable;
 	unsigned char		HT_caps_enable;
 	unsigned char		HT_info_enable;
+	unsigned char		HT_protection;
 	unsigned char		agg_enable_bitmap;
 	unsigned char		ADDBA_retry_count;
 	unsigned char		candidate_tid_bitmap;
@@ -185,6 +220,15 @@ struct mlme_ext_info
 	// Accept ADDBA Request
 	BOOLEAN				bAcceptAddbaReq;	
 };
+// The channel information about this channel including joining, scanning, and power constraints.
+typedef struct _RT_CHANNEL_INFO
+{
+	u8				ChannelNum;		// The channel number.
+	RT_SCAN_TYPE	ScanType;		// Scan type such as passive or active scan.
+	//u16				ScanPeriod;		// Listen time in millisecond in this channel.
+	//s32				MaxTxPwrDbm;	// Max allowed tx power.
+	//u32				ExInfo;			// Extended Information for this channel.
+}RT_CHANNEL_INFO, *PRT_CHANNEL_INFO;
 
 struct mlme_ext_priv
 {
@@ -199,7 +243,10 @@ struct mlme_ext_priv
 	unsigned char		cur_bwmode;
 	unsigned char 		cur_ch_offset;//PRIME_CHNL_OFFSET
 	unsigned char 		cur_wireless_mode;
-	unsigned char		channel_set[NUM_CHANNELS];
+	//unsigned char		channel_set[NUM_CHANNELS];
+	unsigned char			max_chan_nums;
+	RT_CHANNEL_INFO		channel_set[NUM_CHANNELS];
+	
 	unsigned char		basicrate[NumRates];
 	unsigned char		datarate[NumRates];
 	
@@ -248,6 +295,7 @@ void SetBWMode(_adapter *padapter, unsigned short bwmode, unsigned char channel_
 unsigned int decide_wait_for_beacon_timeout(unsigned int bcn_interval);
 
 void write_cam(_adapter *padapter, u8 entry, u16 ctrl, u8 *mac, u8 *key);
+void read_cam(_adapter *padapter ,u8 entry);
 
 void invalidate_cam_all(_adapter *padapter);
 void CAM_mark_invalid(PADAPTER Adapter, u8 ucIndex);
@@ -287,7 +335,7 @@ void update_IOT_info(_adapter *padapter);
 void update_EDCA_param(_adapter *padapter);
 int update_sta_support_rate(_adapter *padapter, u8* pvar_ie, uint var_ie_len, int cam_idx);
 
-void Update_RA_Entry(_adapter *padapter, unsigned int cam_idx);
+void Update_RA_Entry(_adapter *padapter, unsigned int mac_id);
 void enable_rate_adaptive(_adapter *padapter);
 void set_sta_rate(_adapter *padapter);
 

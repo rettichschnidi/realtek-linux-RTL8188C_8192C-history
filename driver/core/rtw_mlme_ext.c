@@ -1,20 +1,22 @@
 /******************************************************************************
-* rtl871x_mlme_ext.c                                                                                                                                 *
-*                                                                                                                                          *
-* Description :                                                                                                                       *
-*                                                                                                                                           *
-* Author :                                                                                                                       *
-*                                                                                                                                         *
-* History :
-*
-*
-*                                                                                                                                       *
-* Copyright 2009, Realtek Corp.                                                                                                  *
-*                                                                                                                                        *
-* The contents of this file is the sole property of Realtek Corp.  It can not be                                     *
-* be used, copied or modified without written permission from Realtek Corp.                                         *
-*                                                                                                                                          *
-*******************************************************************************/
+ *
+ * Copyright(c) 2007 - 2010 Realtek Corporation. All rights reserved.
+ *                                        
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
+ *
+ *
+ ******************************************************************************/
 #define _RTL871X_MLME_EXT_C_
 
 #include <drv_conf.h>
@@ -25,6 +27,23 @@
 #include <wlan_bssdef.h>
 #include <mlme_osdep.h>
 #include <recv_osdep.h>
+
+static RT_CHANNEL_PLAN	DefaultChannelPlan[RT_CHANNEL_DOMAIN_MAX] = {
+							{{1,2,3,4,5,6,7,8,9,10,11,36,40,44,48,52,56,60,64,149,153,157,161,165},24},	// RT_CHANNEL_DOMAIN_FCC
+							{{1,2,3,4,5,6,7,8,9,10,11},11},												// RT_CHANNEL_DOMAIN_IC
+							{{1,2,3,4,5,6,7,8,9,10,11,12,13,36,40,44,48,52,56,60,64},21},				// RT_CHANNEL_DOMAIN_ETSI
+							{{1,2,3,4,5,6,7,8,9,10,11,12,13},13},										// RT_CHANNEL_DOMAIN_SPAIN
+							{{1,2,3,4,5,6,7,8,9,10,11,12,13},13},										// RT_CHANNEL_DOMAIN_FRANCE
+							{{1,2,3,4,5,6,7,8,9,10,11,12,13,14,36,40,44,48,52,56,60,64},22},			// RT_CHANNEL_DOMAIN_MKK
+							{{1,2,3,4,5,6,7,8,9,10,11,12,13,14,36,40,44,48,52,56,60,64},22},			// RT_CHANNEL_DOMAIN_MKK1
+							{{1,2,3,4,5,6,7,8,9,10,11,12,13},13},										// RT_CHANNEL_DOMAIN_ISRAEL
+							{{1,2,3,4,5,6,7,8,9,10,11,12,13,14,36,40,44,48,52,56,60,64},22},			// RT_CHANNEL_DOMAIN_TELEC
+							{{1,2,3,4,5,6,7,8,9,10,11,12,13,36,40,44,48,52,56,60,64},21},				// RT_CHANNEL_DOMAIN_MIC
+							{{1,2,3,4,5,6,7,8,9,10,11,12,13,14},14},									// RT_CHANNEL_DOMAIN_GLOBAL_DOAMIN
+							{{1,2,3,4,5,6,7,8,9,10,11,12,13},13},										// RT_CHANNEL_DOMAIN_WORLD_WIDE_13
+							{{1,2,3,4,5,6,7,8,9,10,11,12,13,36,40,44,48,52,56,60,64},21},				// RT_CHANNEL_DOMAIN_TELEC_NETGEAR
+							{{1,2,3,4,5,6,7,8,9,10,11,36,40,44,48,52,56,60,64,149,153,157,161,165},24},	// RT_CHANNEL_DOMAIN_NCC							
+							};
 
 struct mlme_handler mlme_sta_tbl[]={
 	{WIFI_ASSOCREQ,		"OnAssocReq",	&OnAssocReq},
@@ -138,7 +157,7 @@ static void init_mlme_ext_priv_value(struct mlme_ext_priv *pmlmeext)
 	pmlmeext->cur_bwmode = HT_CHANNEL_WIDTH_20;
 	pmlmeext->cur_ch_offset = HAL_PRIME_CHNL_OFFSET_DONT_CARE;
 
-	_rtw_memcpy(pmlmeext->channel_set, default_channel_set, NUM_CHANNELS);
+//	_rtw_memcpy(pmlmeext->channel_set, default_channel_set, NUM_CHANNELS);
 	_rtw_memcpy(pmlmeext->datarate, mixed_datarate, NumRates);
 	_rtw_memcpy(pmlmeext->basicrate, mixed_basicrate, NumRates);
 
@@ -163,6 +182,70 @@ static void init_mlme_ext_priv_value(struct mlme_ext_priv *pmlmeext)
 
 }
 
+static u8 init_channel_set(u8 ChannelPlan, RT_CHANNEL_INFO *channel_set)
+{
+	//_rtw_memcpy(channel_set, default_channel_set, NUM_CHANNELS);
+	u8 index,chanset_size = 11;
+	_rtw_memset(channel_set, 0, sizeof(RT_CHANNEL_INFO)*NUM_CHANNELS);
+
+	if(ChannelPlan >= RT_CHANNEL_DOMAIN_MAX)
+	{
+		printk("channel plan id error \n");
+		return chanset_size;
+	}	
+
+	switch(ChannelPlan)
+	{
+		case RT_CHANNEL_DOMAIN_FCC:
+		case RT_CHANNEL_DOMAIN_IC:	
+			chanset_size = 11;			 
+			break;
+		case RT_CHANNEL_DOMAIN_MKK:
+		case RT_CHANNEL_DOMAIN_MKK1:
+		case RT_CHANNEL_DOMAIN_TELEC:	
+			chanset_size = 14;			 
+			break;
+		case RT_CHANNEL_DOMAIN_GLOBAL_DOAMIN:
+			chanset_size = DefaultChannelPlan[ChannelPlan].Len;			 
+			break;
+		case RT_CHANNEL_DOMAIN_WORLD_WIDE_13:
+			chanset_size = DefaultChannelPlan[ChannelPlan].Len;			 
+			break;
+		case RT_CHANNEL_DOMAIN_ETSI:
+			chanset_size = 13;
+			break;
+		default:
+			chanset_size =11;
+			break;			
+	}
+			
+	for(index=0;index<chanset_size;index++)
+	{
+		channel_set[index].ChannelNum = DefaultChannelPlan[ChannelPlan].Channel[index];
+
+		if(RT_CHANNEL_DOMAIN_GLOBAL_DOAMIN == ChannelPlan) //Channel 1~11 is active, and 12~14 is passive
+		{
+			if(channel_set[index].ChannelNum >= 1 && channel_set[index].ChannelNum <= 11)
+				channel_set[index].ScanType = SCAN_ACTIVE;
+			else if((channel_set[index].ChannelNum  >= 12 && channel_set[index].ChannelNum  <= 14))
+				channel_set[index].ScanType  = SCAN_PASSIVE;			
+		}
+		else if(RT_CHANNEL_DOMAIN_WORLD_WIDE_13 == ChannelPlan)// channel 12~13, passive scan
+		{
+			if(channel_set[index].ChannelNum <= 11)
+				channel_set[index].ScanType = SCAN_ACTIVE;
+			else
+				channel_set[index].ScanType = SCAN_PASSIVE;
+		}
+		else
+		{
+			channel_set[index].ScanType = SCAN_ACTIVE;
+		}
+	}
+
+	return chanset_size;
+}
+
 int	init_mlme_ext_priv(_adapter* padapter)
 {
 	int	res = _SUCCESS;
@@ -170,6 +253,10 @@ int	init_mlme_ext_priv(_adapter* padapter)
 	struct	mlme_ext_priv *pmlmeext = &padapter->mlmeextpriv;
 	struct mlme_priv *pmlmepriv = &(padapter->mlmepriv);
 	struct mlme_ext_info	*pmlmeinfo = &(pmlmeext->mlmext_info);
+
+	if(padapter->pwrctrlpriv.bInternalAutoSuspend )
+		return res;
+
 	_rtw_memset((u8 *)pmlmeext, 0, sizeof(struct mlme_ext_priv));
 	pmlmeext->padapter = padapter;
 
@@ -185,8 +272,7 @@ int	init_mlme_ext_priv(_adapter* padapter)
 #endif
 
 	res = init_hw_mlme_ext(padapter);
-
-
+#if 0
 	//update channel_set depends on channel plan
 	switch(pmlmepriv->ChannelPlan)
 	{
@@ -215,7 +301,9 @@ int	init_mlme_ext_priv(_adapter* padapter)
 		default:
 			break;			
 	}	
-
+#else
+	pmlmeext->max_chan_nums = init_channel_set(pmlmepriv->ChannelPlan,pmlmeext->channel_set);
+#endif	
 	pmlmeext->chan_scan_time = SURVEY_TO;
 	pmlmeext->mlmeext_init = _TRUE;
 
@@ -434,14 +522,14 @@ unsigned int OnProbeRsp(_adapter *padapter, union recv_frame *precv_frame)
 	if (pmlmeext->sitesurvey_res.state == _TRUE)
 	{
 		report_survey_event(padapter, precv_frame);
-		if (_rtw_memcmp(GetAddr3Ptr(pframe), get_my_bssid(&pmlmeinfo->network), ETH_ALEN))				
-			pHalData->hal_ops.process_phy_info(padapter, precv_frame);
+		//if (_rtw_memcmp(GetAddr3Ptr(pframe), get_my_bssid(&pmlmeinfo->network), ETH_ALEN))				
+		//	pHalData->hal_ops.process_phy_info(padapter, precv_frame);
 		return _SUCCESS;
 	}
 
 	if (_rtw_memcmp(GetAddr3Ptr(pframe), get_my_bssid(&pmlmeinfo->network), ETH_ALEN))
 	{
-		pHalData->hal_ops.process_phy_info(padapter, precv_frame);
+		//pHalData->hal_ops.process_phy_info(padapter, precv_frame);
 	
 		if (pmlmeinfo->state & WIFI_FW_ASSOC_SUCCESS)
 		{
@@ -462,7 +550,7 @@ unsigned int OnBeacon(_adapter *padapter, union recv_frame *precv_frame)
 	struct sta_info	*psta;
 	HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(padapter);
 	struct mlme_ext_priv	*pmlmeext = &padapter->mlmeextpriv;
-	struct mlme_ext_info	*pmlmeinfo = &(pmlmeext->mlmext_info);
+	struct mlme_ext_info	*pmlmeinfo = &(pmlmeext->mlmext_info);		
 	struct sta_priv	*pstapriv = &padapter->stapriv;
 	u8 *pframe = precv_frame->u.hdr.rx_data;
 	uint len = precv_frame->u.hdr.len;
@@ -470,15 +558,15 @@ unsigned int OnBeacon(_adapter *padapter, union recv_frame *precv_frame)
 	if (pmlmeext->sitesurvey_res.state == _TRUE)
 	{
 		report_survey_event(padapter, precv_frame);
-		if (_rtw_memcmp(GetAddr3Ptr(pframe), get_my_bssid(&pmlmeinfo->network), ETH_ALEN))	
-			pHalData->hal_ops.process_phy_info(padapter, precv_frame);
+		//if (_rtw_memcmp(GetAddr3Ptr(pframe), get_my_bssid(&pmlmeinfo->network), ETH_ALEN))	
+		//	pHalData->hal_ops.process_phy_info(padapter, precv_frame);
 
 		return _SUCCESS;
 	}
 
 	if (_rtw_memcmp(GetAddr3Ptr(pframe), get_my_bssid(&pmlmeinfo->network), ETH_ALEN))
 	{
-		pHalData->hal_ops.process_phy_info(padapter, precv_frame);
+		//pHalData->hal_ops.process_phy_info(padapter, precv_frame);
 	
 		if (pmlmeinfo->state & WIFI_FW_AUTH_NULL)
 		{
@@ -746,15 +834,19 @@ unsigned int OnDeAuth(_adapter *padapter, union recv_frame *precv_frame)
 {
 	struct mlme_ext_priv	*pmlmeext = &padapter->mlmeextpriv;
 	struct mlme_ext_info	*pmlmeinfo = &(pmlmeext->mlmext_info);
+	struct mlme_priv *pmlmepriv= &padapter->mlmepriv;	
+	struct sitesurvey_ctrl *psitesurveyctrl=&pmlmepriv->sitesurveyctrl;
+	
 	u8 *pframe = precv_frame->u.hdr.rx_data;
 	uint len = precv_frame->u.hdr.len;
-
+	unsigned short	reason;
 	//check A3
 	if (!(_rtw_memcmp(GetAddr3Ptr(pframe), get_my_bssid(&pmlmeinfo->network), ETH_ALEN)))
 		return _SUCCESS;
-	
-	DBG_871X("%s\n", __FUNCTION__);
-	
+	reason = le16_to_cpu(*(unsigned short *)(pframe + WLAN_HDR_A3_LEN));
+	DBG_871X("%s Reason code(%d)\n", __FUNCTION__,reason);
+
+	psitesurveyctrl->traffic_busy= _FALSE;
 	receive_disconnect(padapter, GetAddr3Ptr(pframe));
 	
 	return _SUCCESS;
@@ -764,15 +856,18 @@ unsigned int OnDisassoc(_adapter *padapter, union recv_frame *precv_frame)
 {
 	struct mlme_ext_priv	*pmlmeext = &padapter->mlmeextpriv;
 	struct mlme_ext_info	*pmlmeinfo = &(pmlmeext->mlmext_info);
+	struct mlme_priv *pmlmepriv= &padapter->mlmepriv;	
+	struct sitesurvey_ctrl *psitesurveyctrl=&pmlmepriv->sitesurveyctrl;
+	
 	u8 *pframe = precv_frame->u.hdr.rx_data;
 	uint len = precv_frame->u.hdr.len;
-
+	unsigned short	reason;
 	//check A3
 	if (!(_rtw_memcmp(GetAddr3Ptr(pframe), get_my_bssid(&pmlmeinfo->network), ETH_ALEN)))
 		return _SUCCESS;
-	
-	DBG_871X("%s\n", __FUNCTION__);
-	
+	reason = le16_to_cpu(*(unsigned short *)(pframe + WLAN_HDR_A3_LEN));
+	DBG_871X("%s Reason code(%d)\n", __FUNCTION__,reason);
+	psitesurveyctrl->traffic_busy= _FALSE;
 	receive_disconnect(padapter, GetAddr3Ptr(pframe));
 	
 	return _SUCCESS;
@@ -1003,7 +1098,7 @@ void update_mgntframe_attrib(_adapter *padapter, struct pkt_attrib *pattrib)
 	pattrib->hdrlen = 24;
 	pattrib->nr_frags = 1;
 	pattrib->priority = 7;
-	pattrib->mac_id = 4;
+	pattrib->mac_id = 0;
 	pattrib->qsel = 0x12;
 
 	pattrib->pktlen = 0;
@@ -1348,7 +1443,8 @@ void issue_auth(_adapter *padapter, struct sta_info *psta, unsigned short status
 		_rtw_memcpy(pwlanhdr->addr1, get_my_bssid(&pmlmeinfo->network), ETH_ALEN);
 		_rtw_memcpy(pwlanhdr->addr2, myid(&padapter->eeprompriv), ETH_ALEN);
 		_rtw_memcpy(pwlanhdr->addr3, get_my_bssid(&pmlmeinfo->network), ETH_ALEN);
-	
+
+		
 		// setting auth algo number		
 		val16 = (pmlmeinfo->auth_algo == dot11AuthAlgrthm_Shared)? 1: 0;// 0:OPEN System, 1:Shared key
 		if (val16)	{
@@ -1366,6 +1462,9 @@ void issue_auth(_adapter *padapter, struct sta_info *psta, unsigned short status
 		else if(pmlmeinfo->auth_algo == dot11AuthAlgrthm_Auto)
 		{
 			printk("%s auth_algo= %s auth_seq=%d\n",__FUNCTION__,"AUTO",pmlmeinfo->auth_seq);
+		}else
+		{
+			printk("%s auth_algo= %s(algo:%d) auth_seq=%d\n",__FUNCTION__,"#####",pmlmeinfo->auth_algo,pmlmeinfo->auth_seq);
 		}
 
 		
@@ -1386,6 +1485,7 @@ void issue_auth(_adapter *padapter, struct sta_info *psta, unsigned short status
 		// setting auth seq number
 		val16 = pmlmeinfo->auth_seq;
 		val16 = cpu_to_le16(val16);	
+		printk("==> %s set auth_seq_num(%d)\n",__FUNCTION__,val16);
 		pframe = rtw_set_fixed_ie(pframe, _AUTH_SEQ_NUM_, (unsigned char *)&val16, &(pattrib->pktlen));
 
 		
@@ -1438,6 +1538,9 @@ void issue_assocreq(_adapter *padapter)
 	struct xmit_priv			*pxmitpriv = &(padapter->xmitpriv);
 	struct mlme_ext_priv	*pmlmeext = &(padapter->mlmeextpriv);
 	struct mlme_ext_info	*pmlmeinfo = &(pmlmeext->mlmext_info);
+	struct mlme_priv 		*pmlmepriv = &padapter->mlmepriv;	
+	struct ht_priv			*phtpriv = &pmlmepriv->htpriv;
+	
 	int	bssrate_len = 0;
 
 	if ((pmgntframe = alloc_mgtxmitframe(pxmitpriv)) == NULL)
@@ -1511,6 +1614,8 @@ void issue_assocreq(_adapter *padapter)
 	}
 
 	//HT caps
+	if(phtpriv->ht_option==1)
+	{
 	p = rtw_get_ie((pmlmeinfo->network.IEs + sizeof(NDIS_802_11_FIXED_IEs)), _HT_CAPABILITY_IE_, &ie_len, (pmlmeinfo->network.IELength - sizeof(NDIS_802_11_FIXED_IEs)));
 	if ((p != NULL) && (!(is_ap_in_tkip(padapter))))
 	{
@@ -1547,7 +1652,8 @@ void issue_assocreq(_adapter *padapter)
 
 		pmlmeinfo->HT_caps.HT_cap_element.HT_caps_info = cpu_to_le16(pmlmeinfo->HT_caps.HT_cap_element.HT_caps_info);
 		pframe = rtw_set_ie(pframe, _HT_CAPABILITY_IE_, ie_len , (u8 *)(&(pmlmeinfo->HT_caps)), &(pattrib->pktlen));
-		
+			
+	}
 	}
 
 	//vendor specific IE, such as WPA, WMM, WPS
@@ -1858,15 +1964,16 @@ Following are some utitity fuctions for WiFi MLME
 void site_survey(_adapter *padapter)
 {
 	unsigned char					survey_channel;
+	RT_SCAN_TYPE	ScanType;	
 	HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(padapter);
 	struct mlme_ext_priv	*pmlmeext = &padapter->mlmeextpriv;
 	struct mlme_ext_info	*pmlmeinfo = &(pmlmeext->mlmext_info);
 
-	survey_channel = pmlmeext->channel_set[pmlmeext->sitesurvey_res.channel_idx];
+	survey_channel = pmlmeext->channel_set[pmlmeext->sitesurvey_res.channel_idx].ChannelNum;
+	ScanType = pmlmeext->channel_set[pmlmeext->sitesurvey_res.channel_idx].ScanType ;
 
 	if (survey_channel != 0)
 	{
-
 		//PAUSE 4-AC Queue when site_survey
 		rtw_write8(padapter, REG_TXPAUSE, (rtw_read8(padapter, REG_TXPAUSE)|0x0f));	
 	
@@ -1876,7 +1983,7 @@ void site_survey(_adapter *padapter)
 		//send issue_probereq frames while active scan but not in channel 12 & 13
 		//if ((pmlmeext->sitesurvey_res.active_mode == _TRUE) && (survey_channel < 12))
 		//(survey_channel ==  0xff) //passive scan according to channel plan
-		if((pmlmeext->sitesurvey_res.active_mode == _TRUE) && (survey_channel !=0xff))
+		if((pmlmeext->sitesurvey_res.active_mode == _TRUE) && (ScanType == SCAN_ACTIVE))
 		{
 			//todo: to issue two probe req???
 			issue_probereq(padapter, 1);
@@ -1952,10 +2059,12 @@ void site_survey(_adapter *padapter)
 
 		if(IS_NORMAL_CHIP(pHalData->VersionID))
 		{
-			if((pmlmeinfo->state&0x03) == WIFI_FW_AP_STATE)
+			if((pmlmeinfo->state&0x03) == WIFI_FW_AP_STATE){
 				rtw_write32(padapter, REG_RCR, rtw_read32(padapter, REG_RCR)|RCR_CBSSID_BCN);
-			else			
+			}
+			else	{		
 			        rtw_write32(padapter, REG_RCR, rtw_read32(padapter, REG_RCR)|RCR_CBSSID_DATA|RCR_CBSSID_BCN);
+			}
 		}
 		else
 		{
@@ -2174,7 +2283,6 @@ void start_create_ibss(_adapter* padapter)
 			val32 &= ~(RCR_CBSSID_DATA | RCR_CBSSID_BCN);
 			rtw_write32(padapter, REG_RCR, val32);
 
-					
 			report_join_res(padapter, 1);
 			
 			pmlmeinfo->state |= WIFI_FW_ASSOC_SUCCESS;
@@ -2207,6 +2315,21 @@ void start_clnt_join(_adapter* padapter)
 		//set_opmode_cmd(padapter, infra_client_with_mlme);//removed
 
 		(pmlmeinfo->auth_algo == dot11AuthAlgrthm_8021X)? rtw_write8(padapter, REG_SECCFG, 0xcc): rtw_write8(padapter, REG_SECCFG, 0xcf);
+
+		//2010-11-05 georgia for test
+	#if ( RTL8192C_WEP_ISSUE==1)		
+		{
+			HAL_DATA_TYPE		*pHalData	= GET_HAL_DATA(padapter);
+			struct pwrctrl_priv 	*pwrctrlpriv = &padapter->pwrctrlpriv;
+			if(( pwrctrlpriv->power_mgnt != PS_MODE_ACTIVE )  && IS_92C_SERIAL(pHalData->VersionID)){
+				if (	( padapter->securitypriv.dot11PrivacyAlgrthm == _WEP40_ ) ||
+					( padapter->securitypriv.dot11PrivacyAlgrthm == _WEP104_ )){				
+					//workaround_#1 use sw descryption
+					rtw_write8(padapter, REG_SECCFG, (rtw_read8(padapter, REG_SECCFG)&(~BIT3)));			
+				}			
+			}
+		}		
+	#endif
 
 		//switch channel
 		//SelectChannel(padapter, pmlmeext->cur_channel, HAL_PRIME_CHNL_OFFSET_DONT_CARE);
@@ -2454,7 +2577,7 @@ void report_join_res(_adapter *padapter, int res)
 	_rtw_memcpy((unsigned char *)(&(pjoinbss_evt->network.network)), &(pmlmeinfo->network), sizeof(WLAN_BSSID_EX));
 	pjoinbss_evt->network.join_res 	= pjoinbss_evt->network.aid = res;
 
-	DBG_871X("report_join_res(%x)\n", res);
+	DBG_871X("report_join_res(%d)\n", res);
 
 	rtw_enqueue_cmd(pcmdpriv, pcmd_obj);
 
@@ -2619,6 +2742,7 @@ static void update_sta_info(_adapter *padapter, struct sta_info *psta)
 
 void mlmeext_joinbss_event_callback(_adapter *padapter)
 {
+	u8 SIFS_Time;
 	struct sta_info *psta, *psta_bmc;
 	HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(padapter);
 	struct mlme_ext_priv	*pmlmeext = &padapter->mlmeextpriv;
@@ -2642,7 +2766,7 @@ void mlmeext_joinbss_event_callback(_adapter *padapter)
 	psta = rtw_get_stainfo(pstapriv, cur_network->MacAddress);
 	if (psta)//only for infra. mode
 	{
-		pmlmeinfo->FW_sta_info[psta->mac_id].psta = psta;//psta->mac_id=5 for infra. mode
+		pmlmeinfo->FW_sta_info[psta->mac_id].psta = psta;//psta->mac_id=0 for infra. mode
 	}
 
 
@@ -2714,14 +2838,12 @@ void mlmeext_joinbss_event_callback(_adapter *padapter)
 		if(IS_NORMAL_CHIP(pHalData->VersionID))
 		{
 			rtw_write32(padapter, REG_RCR, rtw_read32(padapter, REG_RCR)|RCR_CBSSID_DATA|RCR_CBSSID_BCN);
-
 			//enable update TSF
 			rtw_write8(padapter, REG_BCN_CTRL, rtw_read8(padapter, REG_BCN_CTRL)&(~BIT(4)));
 		}
 		else
 		{
 			rtw_write32(padapter, REG_RCR, rtw_read32(padapter, REG_RCR)|RCR_CBSSID_DATA);
-
 			//enable update TSF
 			rtw_write8(padapter, REG_BCN_CTRL, rtw_read8(padapter, REG_BCN_CTRL)&(~(BIT(4)|BIT(5))));
 		}
@@ -2735,6 +2857,29 @@ void mlmeext_joinbss_event_callback(_adapter *padapter)
 
 	//turn on dynamic functions
 	Switch_DM_Func(padapter, DYNAMIC_FUNC_DIG|DYNAMIC_FUNC_HP|DYNAMIC_FUNC_SS, _TRUE);
+
+	
+	//
+	if(pmlmeext->cur_wireless_mode & WIRELESS_11N)
+	{		
+		SIFS_Time = 0x0e;
+	}
+	else
+	{
+		SIFS_Time = 0x0a;
+	}
+
+	// SIFS for OFDM Data ACK
+	rtw_write8(padapter, REG_SIFS_CTX+1, SIFS_Time);
+	// SIFS for OFDM consecutive tx like CTS data!
+	rtw_write8(padapter, REG_SIFS_TRX+1, SIFS_Time);
+		
+	rtw_write8(padapter,REG_SPEC_SIFS+1, SIFS_Time);
+	rtw_write8(padapter,REG_MAC_SPEC_SIFS+1, SIFS_Time);
+
+	// 20100719 Joseph: Revise SIFS setting due to Hardware register definition change.
+	rtw_write8(padapter, REG_R2T_SIFS+1, SIFS_Time);
+	rtw_write8(padapter, REG_T2T_SIFS+1, SIFS_Time);
 
 	
 	DBG_871X("=>%s\n", __FUNCTION__);
@@ -2793,9 +2938,8 @@ void mlmeext_sta_add_event_callback(_adapter *padapter, struct sta_info *psta)
 		}
 
 		rtw_write32(padapter, REG_RCR, rtw_read32(padapter, REG_RCR)|RCR_CBSSID_DATA|RCR_CBSSID_BCN);
-
 		//accept all data frame
-		rtw_write16(padapter, REG_RXFLTMAP2, 0xff);
+		rtw_write16(padapter, REG_RXFLTMAP2, 0xFFFF);
 
 		//enable update TSF
 		rtw_write8(padapter, REG_BCN_CTRL, rtw_read8(padapter, REG_BCN_CTRL)&(~BIT(4)));
@@ -2953,7 +3097,8 @@ void linked_status_chk(_adapter *padapter)
 			}
 			else if ((pmlmeinfo->link_count & 0xf) == 0)
 			{
-				if ( (tx_cnt == pxmitpriv->tx_pkts) && (!padapter->pwrctrlpriv.bFwCurrentInPSMode))
+				//if ( (tx_cnt == pxmitpriv->tx_pkts) && (!padapter->pwrctrlpriv.bFwCurrentInPSMode))
+				if (tx_cnt == pxmitpriv->tx_pkts)
 				{
 	                                DBG_871X("issue nulldata to keep alive\n");
 					issue_nulldata(padapter, 0);
@@ -2969,7 +3114,7 @@ void linked_status_chk(_adapter *padapter)
 				if( ((NumRxOkInPeriod + NumTxOkInPeriod) > 8 ) ||
 					(NumRxOkInPeriod > 2) )
 				{
-					printk("Tx = %d, Rx = %d \n",NumTxOkInPeriod,NumRxOkInPeriod);
+					//printk("Tx = %d, Rx = %d \n",NumTxOkInPeriod,NumRxOkInPeriod);
 					bEnterPS= _FALSE;
 				}
 				else

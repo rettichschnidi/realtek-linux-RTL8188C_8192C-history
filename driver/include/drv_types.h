@@ -1,3 +1,23 @@
+/******************************************************************************
+ *
+ * Copyright(c) 2007 - 2010 Realtek Corporation. All rights reserved.
+ *                                        
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
+ *
+ *
+ ******************************************************************************/
+
 /*-------------------------------------------------------------------------------
 	
 	For type defines and data structure defines
@@ -161,11 +181,9 @@ struct registry_priv
 	u8		antdiv_cfg;
 #endif
 	  
-#ifdef CONFIG_AUTOSUSPEND
 	u8		usbss_enable;//0:disable,1:enable
 	u8		hwpdn_mode;//0:disable,1:enable,2:deside by EFUSE config
 	u8		hwpwrp_detect;//0:disable,1:enable
-#endif
 	  
 };
 
@@ -299,9 +317,7 @@ struct _ADAPTER{
 #endif
 
 	int 	chip_type;
-#ifdef CONFIG_BT_COEXIST
-	struct btcoexist_priv		bt_coexist;	
-#endif
+
 	s32	bDriverStopped; 
 	s32	bSurpriseRemoved;
 	s32  bCardDisableWOHSM;
@@ -347,6 +363,10 @@ struct _ADAPTER{
 	u8 bFWReady;
 	u8 bReadPortCancel;
 	u8 bWritePortCancel;
+	
+#ifdef CONFIG_PLATFORM_ANDROID
+	u8 bdisassoc_by_assoc;
+#endif
 };	
   
 __inline static u8 *myid(struct eeprom_priv *peepriv)

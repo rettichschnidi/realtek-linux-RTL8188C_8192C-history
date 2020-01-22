@@ -1,3 +1,22 @@
+/******************************************************************************
+ *
+ * Copyright(c) 2007 - 2010 Realtek Corporation. All rights reserved.
+ *                                        
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
+ *
+ *
+ ******************************************************************************/
 #define  _RTL871X_IOCTL_LINUX_C_
 
 #include <drv_conf.h>
@@ -55,6 +74,12 @@ static const char * const iw_operation_mode[] =
 { 
 	"Auto", "Ad-Hoc", "Managed",  "Master", "Repeater", "Secondary", "Monitor" 
 };
+
+
+//prototype declare
+static int rtw_wx_get_rate(struct net_device *dev, 
+			     struct iw_request_info *info, 
+			     union iwreq_data *wrqu, char *extra);
 
 static int hex2num_i(char c)
 {
@@ -205,7 +230,7 @@ inline static char *translate_scan(_adapter *padapter,
 	u32 ht_ielen = 0;
 	char custom[MAX_CUSTOM_LEN];
 	char *p;
-	u16 max_rate, rate, ht_cap=_FALSE;
+	u16 max_rate=0, rate, ht_cap=_FALSE;
 	u32 i = 0;	
 	char	*current_val;
 	long rssi;	
@@ -222,7 +247,7 @@ inline static char *translate_scan(_adapter *padapter,
 
 
 	/* Add the ESSID */
-#ifdef PLATFORM_ANDROID	
+#ifdef CONFIG_PLATFORM_ANDROID	
 	if(rtw_validate_ssid(&(pnetwork->network.Ssid))==_FALSE)
 	{		
 		RT_TRACE(_module_rtl871x_ioctl_os_c, _drv_err_, ("translate_scan : rtw_validate_ssid==FALSE \n"));
@@ -247,6 +272,7 @@ inline static char *translate_scan(_adapter *padapter,
 		ht_cap = _TRUE;			
 		pht_capie = (struct ieee80211_ht_cap *)(p+2);		
 		_rtw_memcpy(&mcs_rate , pht_capie->supp_mcs_set, 2);
+			
 		bw_40MHz = (pht_capie->cap_info&IEEE80211_HT_CAP_SUP_WIDTH) ? 1:0;
 		short_GI = (pht_capie->cap_info&(IEEE80211_HT_CAP_SGI_20|IEEE80211_HT_CAP_SGI_40)) ? 1:0;
 	}
@@ -433,7 +459,11 @@ inline static char *translate_scan(_adapter *padapter,
 	iwe.u.qual.updated = IW_QUAL_QUAL_UPDATED | IW_QUAL_LEVEL_UPDATED | IW_QUAL_NOISE_INVALID;
 	
 	//H(signal strength) = H(signal quality) + H(noise level);	
-	iwe.u.qual.level = (u8)pnetwork->network.PhyInfo.SignalStrength; //.Rssi;
+#ifdef CONFIG_PLATFORM_ANDROID
+	iwe.u.qual.level = (u8)pnetwork->network.Rssi;//dbm
+#else
+	iwe.u.qual.level = (u8)pnetwork->network.PhyInfo.SignalStrength;//%
+#endif	
 	iwe.u.qual.qual = (u8)pnetwork->network.PhyInfo.SignalStrength;   // signal quality
 	iwe.u.qual.noise = 0; // noise level
 	
@@ -1164,7 +1194,8 @@ static int rtw_wx_get_range(struct net_device *dev,
 				union iwreq_data *wrqu, char *extra)
 {
 	struct iw_range *range = (struct iw_range *)extra;
-//	_adapter *padapter = (_adapter *)netdev_priv(dev);
+	_adapter *padapter = (_adapter *)netdev_priv(dev);
+	struct	mlme_ext_priv *pmlmeext = &padapter->mlmeextpriv;
 
 	u16 val;
 	int i;
@@ -1245,9 +1276,9 @@ static int rtw_wx_get_range(struct net_device *dev,
 //	range->min_r_time;	/* Minimal retry lifetime */
 //	range->max_r_time;	/* Maximal retry lifetime */
 
-        range->num_channels = 14;
+        range->num_channels = pmlmeext->max_chan_nums;
 
-	for (i = 0, val = 0; i < 14; i++) {
+	for (i = 0, val = 0; i < range->num_channels; i++) {
 		
 		// Include only legal frequencies for some countries
 		//if ((priv->challow)[i+1]) {
@@ -1304,13 +1335,20 @@ static int rtw_wx_set_priv(struct net_device *dev,
 				union iwreq_data *awrq,
 				char *extra)
 {
-	int ret = 0, len = 0;
+
+#ifdef CONFIG_DEBUG_RTW_WX_SET_PRIV
+	char *ext_dbg;
+#endif
+
+	int ret = 0;
+#ifdef CONFIG_PLATFORM_ANDROID
+	int len = 0;
 	char *ext;
 
 	_adapter *padapter = netdev_priv(dev);
 	struct iw_point *dwrq = (struct iw_point*)awrq;
-
-	RT_TRACE(_module_rtl871x_ioctl_os_c, _drv_notice_, ("+rtw_wx_set_priv\n"));
+	
+	//RT_TRACE(_module_rtl871x_ioctl_os_c, _drv_notice_, ("+rtw_wx_set_priv\n"));
 
 	len = dwrq->length;
 	if (!(ext = _rtw_malloc(len)))
@@ -1321,21 +1359,125 @@ static int rtw_wx_set_priv(struct net_device *dev,
 		return -EFAULT;
 	}
 
-	RT_TRACE(_module_rtl871x_ioctl_os_c, _drv_notice_,
-		 ("rtw_wx_set_priv: (SIOCSIWPRIV) %s req=%s\n",
-		  dev->name, ext));
-#if 0
-//#define MAX_WX_STRING 80
-//	snprintf(ext, MAX_WX_STRING, "OK");
-	snprintf(ext, 80, "OK");
-	dwrq->length = strlen("OK") + 1;
+	//RT_TRACE(_module_rtl871x_ioctl_os_c, _drv_notice_,
+	//	 ("rtw_wx_set_priv: %s req=%s\n",
+	//	  dev->name, ext));
 
-	if (copy_to_user(dwrq->pointer, ext, dwrq->length))
+	#ifdef CONFIG_DEBUG_RTW_WX_SET_PRIV	
+	if (!(ext_dbg = _rtw_malloc(len)))
+	{
+		_rtw_mfree(ext, len);
+		return -ENOMEM;
+	}	
+	
+	_rtw_memcpy(ext_dbg, ext, len);
+	#endif
+
+	//DBG_871X("rtw_wx_set_priv: %s req=%s\n", dev->name, ext);
+
+	if(0 == strcasecmp(ext,"START")){
+		//Turn on Wi-Fi hardware
+		//OK if successful
+		ret=-1;
+		//sprintf(ext, "OK");
+		goto FREE_EXT;
+		
+	}else if(0 == strcasecmp(ext,"STOP")){
+		//Turn off Wi-Fi hardwoare
+		//OK if successful
+		ret=-1;
+		//sprintf(ext, "OK");
+		goto FREE_EXT;
+		
+	}else if(0 == strcasecmp(ext,"RSSI")){
+		//Return received signal strength indicator in -db for current AP
+		//<ssid> Rssi xx 
+		struct	mlme_priv	*pmlmepriv = &(padapter->mlmepriv);	
+		struct	wlan_network	*pcur_network = &pmlmepriv->cur_network;
+
+		if(check_fwstate(pmlmepriv, _FW_LINKED) == _TRUE) {
+			sprintf(ext, "%s rssi %ld",
+				pcur_network->network.Ssid.Ssid,
+				(long)(pcur_network->network.Rssi)); ///where to get rx statistic 
+				
+		} else {
+			sprintf(ext, "OK");
+		}
+		
+	}else if(0 == strcasecmp(ext,"LINKSPEED")){
+		//Return link speed in MBPS
+		//LinkSpeed xx 
+		union iwreq_data wrqd;
+		int ret_inner;
+		int mbps;
+		
+		if( 0!=(ret_inner=rtw_wx_get_rate(dev, info, &wrqd, extra)) ){
+			//DBG_8192C("rtw_wx_set_priv: (SIOCSIWPRIV) %s req=%s rtw_wx_get_rate return %d\n", 
+			//dev->name, ext, ret);
+			//goto FREE_EXT;
+			mbps=0;
+		} else {
+			mbps=wrqd.bitrate.value / 1000000;
+		}
+		
+		sprintf(ext, "LINKSPEED %d", mbps);
+		
+		
+	}else if(0 == strcasecmp(ext,"MACADDR")){
+		//Return mac address of the station
+		//Macaddr = xx.xx.xx.xx.xx.xx 
+		sprintf(ext,
+			"MACADDR = %02x.%02x.%02x.%02x.%02x.%02x",
+			*(dev->dev_addr),*(dev->dev_addr+1),*(dev->dev_addr+2),
+			*(dev->dev_addr+3),*(dev->dev_addr+4),*(dev->dev_addr+5));
+
+	}else if(0 == strcasecmp(ext,"SCAN-ACTIVE")){
+		//Set scan type to active
+		//OK if successful
+		struct	mlme_priv	*pmlmepriv = &(padapter->mlmepriv);
+		pmlmepriv->passive_mode=1;
+		sprintf(ext, "OK");
+		
+	}else if(0 == strcasecmp(ext,"SCAN-PASSIVE")){
+		//Set scan type to passive
+		//OK if successfu
+		struct	mlme_priv	*pmlmepriv = &(padapter->mlmepriv);
+		pmlmepriv->passive_mode=0;
+		sprintf(ext, "OK");
+		
+	}else{
+		#ifdef  CONFIG_DEBUG_RTW_WX_SET_PRIV
+		DBG_8192C("rtw_wx_set_priv: %s unknowned req=%s\n", 
+		dev->name, ext_dbg);
+		#endif
+		goto FREE_EXT;
+		
+	}
+
+	if (copy_to_user(dwrq->pointer, ext, min(dwrq->length, (u16)(strlen(ext)+1)) ) )
 		ret = -EFAULT;
-#endif
-	_rtw_mfree(ext, len);
 
+	//#if 1
+	//DBG_8192C("rtw_wx_set_priv: %s rep=%s :strlen(ext):%d\n", 
+	//	dev->name, ext ,strlen(ext));
+	//#endif
+	#ifdef CONFIG_DEBUG_RTW_WX_SET_PRIV
+	DBG_8192C("rtw_wx_set_priv: %s req=%s rep=%s\n", 
+	dev->name, ext_dbg ,ext);
+	#endif
+
+FREE_EXT:
+
+	_rtw_mfree(ext, len);
+	#ifdef CONFIG_DEBUG_RTW_WX_SET_PRIV
+	_rtw_mfree(ext_dbg, len);
+	#endif
+
+	//DBG_8192C("rtw_wx_set_priv: (SIOCSIWPRIV) %s ret=%d\n", 
+	//		dev->name, ret);
+#endif
 	return ret;
+	
 }
 
 //set bssid flow
@@ -1521,6 +1663,52 @@ struct	iw_mlme
 	
 }	
 
+int rfpwrstate_check(_adapter *padapter)
+{
+	struct pwrctrl_priv *pwrpriv = &padapter->pwrctrlpriv;
+	struct pwrctrl_priv *pwrctrlpriv = &padapter->pwrctrlpriv;
+		
+	if( pwrctrlpriv->power_mgnt == PS_MODE_ACTIVE )
+		return _TRUE;		
+	
+	if(rf_off == pwrpriv->current_rfpwrstate )
+	{		
+#if (DEV_BUS_TYPE==DEV_BUS_USB_INTERFACE)
+#ifdef CONFIG_AUTOSUSPEND
+		 if(pwrpriv->brfoffbyhw==_TRUE)
+		{
+			printk("hw still in rf_off state ...........\n");
+			return _FAIL;
+		}
+		else if(padapter->registrypriv.usbss_enable)
+		{
+			printk("\n rfpwrstate_check call autoresume_enter....\n");	
+			if(_FAIL ==  autoresume_enter(padapter))
+			{
+				printk("======> autoresume fail.............\n");
+				return _FAIL;			
+			}	
+		}
+		
+		else
+#endif
+#endif
+		{
+#ifdef CONFIG_IPS
+			printk("\n rfpwrstate_check call ips_leave....\n");				
+			if(_FAIL ==  ips_leave(padapter))
+			{
+				printk("======> ips_leave fail.............\n");
+				return _FAIL;			
+			}
+#endif
+		}
+			
+	}
+	return _SUCCESS;
+
+}
+
 static int rtw_wx_set_scan(struct net_device *dev, struct iw_request_info *a,
 			     union iwreq_data *wrqu, char *extra)
 {
@@ -1528,39 +1716,19 @@ static int rtw_wx_set_scan(struct net_device *dev, struct iw_request_info *a,
 	int ret = 0;	
 	_adapter *padapter = (_adapter *)netdev_priv(dev);		
 	struct mlme_priv *pmlmepriv= &padapter->mlmepriv;
-	struct pwrctrl_priv *pwrpriv = &padapter->pwrctrlpriv;
+
 		
 	RT_TRACE(_module_rtl871x_mlme_c_,_drv_info_,("rtw_wx_set_scan\n"));
 	
 	_func_enter_;
-	
-#if (DEV_BUS_TYPE==DEV_BUS_USB_INTERFACE)
-#ifdef CONFIG_AUTOSUSPEND	
-	if(rf_off == pwrpriv->bfassoc_pwrstate )
-	{
-		printk("rtw_wx_set_scan call autoresume....\n");	
-		ret = autoresume_enter(padapter);
-		if(_FAIL == ret){
-			printk("======> autoresume fail.............\n");
-			return ret;			
-		}		
-	}
-#endif
-#endif
 
-#ifdef CONFIG_IPS	
-	if(rf_off == pwrpriv->inactive_pwrstate)
+	if(_FAIL == rfpwrstate_check(padapter))
 	{
-		printk("r8711_wx_set_scan call ips_leave....\n");
-		ret = ips_leave(padapter);
-		if(_FAIL == ret){
-			printk("======> ips_leave fail.............\n");
-			return ret;			
-		}
-	}	
-#endif
+		return _FAIL;
+	}
+
 	if(padapter->bDriverStopped){
-           printk("bDriverStopped=%d\n", padapter->bDriverStopped);
+           printk("rtw_wx_set_scan bDriverStopped=%d\n", padapter->bDriverStopped);
 		ret= -1;
 		goto exit;
 	}
@@ -1575,9 +1743,16 @@ static int rtw_wx_set_scan(struct net_device *dev, struct iw_request_info *a,
 		goto exit;
 	}
 
-	if ((check_fwstate(pmlmepriv, _FW_UNDER_SURVEY|_FW_UNDER_LINKING) == _TRUE) ||
-	    (pmlmepriv->sitesurveyctrl.traffic_busy == _TRUE))
+	if (check_fwstate(pmlmepriv, _FW_UNDER_SURVEY|_FW_UNDER_LINKING) == _TRUE) 
 	{
+		printk("%s exit cause fw state(%x) mismatch\n",__FUNCTION__,pmlmepriv->fw_state);
+		ret = -1;
+		goto exit;
+	}
+
+	if(pmlmepriv->sitesurveyctrl.traffic_busy == _TRUE)
+	{
+		printk("%s exit cause traffic_busy(%x) RCR(0x%04x)\n",__FUNCTION__,pmlmepriv->sitesurveyctrl.traffic_busy,rtw_read16(padapter,REG_RCR));
 		ret = -1;
 		goto exit;
 	} 
@@ -1660,11 +1835,13 @@ static int rtw_wx_get_scan(struct net_device *dev, struct iw_request_info *a,
 
 	_func_enter_;
 	
-	if(padapter->bDriverStopped){                
-		ret= -EINVAL;
-		goto exit;
+	 if(padapter->pwrctrlpriv.brfoffbyhw && padapter->bDriverStopped)	
+	 {		         
+		return -EINVAL;
+		
 	}		
   
+  	//printk("==> %s \n",__FUNCTION__);
  	while((check_fwstate(pmlmepriv, (_FW_UNDER_SURVEY|_FW_UNDER_LINKING))) == _TRUE)
 	{	
 		rtw_msleep_os(30);
@@ -1736,31 +1913,11 @@ static int rtw_wx_set_essid(struct net_device *dev,
 	
 	RT_TRACE(_module_rtl871x_ioctl_os_c, _drv_info_,
 		 ("+rtw_wx_set_essid: fw_state=0x%08x\n", get_fwstate(pmlmepriv)));
-#if (DEV_BUS_TYPE==DEV_BUS_USB_INTERFACE)
-#ifdef CONFIG_AUTOSUSPEND
-	if(rf_off == pwrpriv->bfassoc_pwrstate )
-	{
-		printk("rtw_wx_set_scan call autoresume....\n");	
-		ret = autoresume_enter(padapter);
-		if(_FAIL == ret){
-			printk("======> autoresume fail.............\n");
-			return ret;			
-		}		
-	}
-#endif
-#endif
 
-#ifdef CONFIG_IPS	
-	if(rf_off == pwrpriv->inactive_pwrstate)
-	{		
-		printk("r8711_wx_set_essid call ips_leave....\n");
-		status = ips_leave(padapter);
-		if(_FALSE == status){
-			printk("======> ips_leave fail.............\n");
-			return status;			
-		}
-	}	
-#endif
+	if(_FAIL == rfpwrstate_check(padapter))
+	{
+		return _FAIL;
+	}
 
 	if(!padapter->bup){
 		ret = -1;
@@ -2017,7 +2174,7 @@ static int rtw_wx_get_rate(struct net_device *dev,
 {	
 	int i;
 	u8 *p;
-	u16 rate, max_rate, ht_cap=_FALSE;
+	u16 rate, max_rate=0, ht_cap=_FALSE;
 	u32 ht_ielen = 0;	
 	_adapter *padapter = (_adapter *)netdev_priv(dev);
 	struct mlme_priv	*pmlmepriv = &padapter->mlmepriv;
@@ -2026,18 +2183,22 @@ static int rtw_wx_get_rate(struct net_device *dev,
 	u8 bw_40MHz=0, short_GI=0;
 	u16 mcs_rate=0;
 	struct registry_priv *pregpriv = &padapter->registrypriv;
-	
+	unsigned char rf_type = GET_RF_TYPE(padapter);
+	struct ht_priv	*phtpriv = &pmlmepriv->htpriv;
+
 	i=0;
 	if((check_fwstate(pmlmepriv, _FW_LINKED) == _TRUE) || (check_fwstate(pmlmepriv, WIFI_ADHOC_MASTER_STATE) == _TRUE))
 	{
 		p = rtw_get_ie(&pcur_bss->IEs[12], _HT_CAPABILITY_IE_, &ht_ielen, pcur_bss->IELength-12);
 		if(p && ht_ielen>0)
 		{
-			ht_cap = _TRUE;	
+			ht_cap = (phtpriv->ht_option==1)?_TRUE:_FALSE;	
 
 			pht_capie = (struct ieee80211_ht_cap *)(p+2);
 		
 			_rtw_memcpy(&mcs_rate , pht_capie->supp_mcs_set, 2);
+			if((rf_type == RF_1T1R) ||(rf_type == RF_1T2R))
+				mcs_rate &= 0xFF;
 
 			bw_40MHz = (pht_capie->cap_info&IEEE80211_HT_CAP_SUP_WIDTH) ? 1:0;
 
@@ -2055,8 +2216,16 @@ static int rtw_wx_get_rate(struct net_device *dev,
 			i++;
 		}
 	
+		/* 
+		 * The mcs_rate got from cur_network will be replaced by scan result,
+		 * which is the AP capability rather than the negotiated one. We need to
+		 * consider the RF type of our device to get the final MCS
+		 */
 		if(ht_cap == _TRUE)
 		{
+
+
+#if 0 //have some issue,neet to debug - 20101008-georgia
 			if(mcs_rate&0x8000)//MCS15
 			{
 				max_rate = (bw_40MHz) ? ((short_GI)?300:270):((short_GI)?144:130);
@@ -2071,6 +2240,12 @@ static int rtw_wx_get_rate(struct net_device *dev,
 				//printk("wx_get_rate, mcs_rate_bitmap=0x%x\n", mcs_rate);
 				max_rate = (bw_40MHz) ? ((short_GI)?150:135):((short_GI)?72:65);
 			}
+#else
+			if(rf_type == RF_1T1R)
+				max_rate = (bw_40MHz) ? ((short_GI)?150:135):((short_GI)?72:65);				
+			else
+				max_rate = (bw_40MHz) ? ((short_GI)?300:270):((short_GI)?144:130);
+#endif
 
 			max_rate = max_rate*2;//Mbps/2			
 			wrqu->bitrate.value = max_rate*500000;
@@ -2085,8 +2260,7 @@ static int rtw_wx_get_rate(struct net_device *dev,
 	else
 	{
 		return -1;
-	}
-
+	}	
 	return 0;
 	
 }
@@ -2457,7 +2631,7 @@ static int rtw_wx_set_gen_ie(struct net_device *dev,
 	return ret;
 }	
 
-#ifdef CONFIG_PLATFORM_MT53XX
+//#ifdef CONFIG_PLATFORM_MT53XX
 static int rtw_wx_set_mtk_wps_ie(struct net_device *dev,
 				struct iw_request_info *info,
 				union iwreq_data *wrqu, char *extra)
@@ -2466,7 +2640,7 @@ static int rtw_wx_set_mtk_wps_ie(struct net_device *dev,
 
 	return rtw_set_wpa_ie(padapter, wrqu->data.pointer, wrqu->data.length);
 }
-#endif
+//#endif
 
 
 static int rtw_wx_set_auth(struct net_device *dev, 
@@ -2536,6 +2710,19 @@ static int rtw_wx_set_auth(struct net_device *dev,
 		}
 
 	case IW_AUTH_80211_AUTH_ALG:
+
+		#ifdef CONFIG_PLATFORM_ANDROID
+		/*
+		 *  It's the starting point of a link layer connection using wpa_supplicant
+		*/
+		if(check_fwstate(&padapter->mlmepriv, _FW_LINKED)) {
+			rtw_disassoc_cmd(padapter);
+			rtw_indicate_disconnect(padapter);
+			rtw_free_assoc_resources(padapter);
+			padapter->bdisassoc_by_assoc=1;
+
+		}
+		#endif
 
 		ret = wpa_set_auth_algs(dev, (u32)param->value);		
 	
@@ -2809,7 +2996,7 @@ static int dummy(struct net_device *dev, struct iw_request_info *a,
 	
 }
 
-#ifdef CONFIG_PLATFORM_MT53XX
+//#ifdef CONFIG_PLATFORM_MT53XX
 static int rtw_wx_set_mtk_wps_probe_ie(struct net_device *dev,
 		struct iw_request_info *a,
 		union iwreq_data *wrqu, char *b)
@@ -2833,13 +3020,13 @@ static int rtw_wx_get_sensitivity(struct net_device *dev,
 
     //wrqu->qual.level = (u8)padapter->mlmepriv.cur_network.network.Rssi;
 
-	wrqu->qual.level = padapter->recvpriv.fw_rssi;
+	wrqu->qual.level = padapter->recvpriv.signal_strength;
 
     printk(" level = %u\n",  wrqu->qual.level );
 
 	return 0;
 }
-#endif
+//#endif
 
 
 /*
@@ -3379,6 +3566,7 @@ static int rtw_dbg_port(struct net_device *dev,
 	struct security_priv *psecuritypriv = &padapter->securitypriv;
 	struct wlan_network *cur_network = &(pmlmepriv->cur_network);
 	struct sta_priv *pstapriv = &padapter->stapriv;
+	HAL_DATA_TYPE		*pHalData = GET_HAL_DATA(padapter);	
 	
 
 	pdata = (u32*)&wrqu->data;	
@@ -3557,6 +3745,117 @@ static int rtw_dbg_port(struct net_device *dev,
 	
 						_exit_critical_bh(&pstapriv->sta_hash_lock, &irqL);
 
+					}
+					break;
+				case 0x0a:
+					{
+						struct dm_priv *pdmpriv = &padapter->dmpriv;
+						PFALSE_ALARM_STATISTICS FalseAlmCnt = &(pdmpriv->FalseAlmCnt);
+						
+						printk("S-PWDB=%d\n", pdmpriv->UndecoratedSmoothedPWDB);
+						
+						printk("Ofdm_fail=%d\n", FalseAlmCnt->Cnt_Ofdm_fail);
+
+						printk("Parity_Fail=%d\n", FalseAlmCnt->Cnt_Parity_Fail);
+
+						printk("Rate_Illegal=%d\n", FalseAlmCnt->Cnt_Rate_Illegal);
+
+						printk("Crc8_fail=%d\n", FalseAlmCnt->Cnt_Crc8_fail);
+
+						printk("Mcs_fail=%d\n", FalseAlmCnt->Cnt_Mcs_fail);
+
+						printk("Cck_fail=%d\n", FalseAlmCnt->Cnt_Cck_fail);
+
+						printk("Cnt_all=%d\n", FalseAlmCnt->Cnt_all);		
+								
+					}
+					break;
+				case 0x0b:
+					{
+/*						
+#define		rTxAGC_A_Rate18_06			0xe00
+#define		rTxAGC_A_Rate54_24			0xe04
+#define		rTxAGC_A_CCK1_Mcs32			0xe08
+#define		rTxAGC_A_Mcs03_Mcs00			0xe10
+#define		rTxAGC_A_Mcs07_Mcs04			0xe14
+#define		rTxAGC_A_Mcs11_Mcs08			0xe18
+#define		rTxAGC_A_Mcs15_Mcs12			0xe1c
+
+#define		rTxAGC_B_Rate18_06			0x830
+#define		rTxAGC_B_Rate54_24			0x834
+#define		rTxAGC_B_CCK1_55_Mcs32		0x838
+#define		rTxAGC_B_Mcs03_Mcs00			0x83c
+#define		rTxAGC_B_Mcs07_Mcs04			0x848
+#define		rTxAGC_B_Mcs11_Mcs08			0x84c
+#define		rTxAGC_B_Mcs15_Mcs12			0x868
+#define		rTxAGC_B_CCK11_A_CCK2_11		0x86c
+*/
+					printk("rTxAGC_A_Rate18_06=0x%x\n", PHY_QueryBBReg(padapter, rTxAGC_A_Rate18_06, bMaskDWord));
+					printk("rTxAGC_A_Rate54_24=0x%x\n", PHY_QueryBBReg(padapter, rTxAGC_A_Rate54_24, bMaskDWord));
+					printk("rTxAGC_A_Mcs03_Mcs00=0x%x\n", PHY_QueryBBReg(padapter, rTxAGC_A_Mcs03_Mcs00, bMaskDWord));					
+					printk("rTxAGC_A_Mcs07_Mcs04=0x%x\n", PHY_QueryBBReg(padapter, rTxAGC_A_Mcs07_Mcs04, bMaskDWord));
+					printk("rTxAGC_A_Mcs11_Mcs08=0x%x\n", PHY_QueryBBReg(padapter, rTxAGC_A_Mcs11_Mcs08, bMaskDWord));
+					printk("rTxAGC_A_Mcs15_Mcs12=0x%x\n", PHY_QueryBBReg(padapter, rTxAGC_A_Mcs15_Mcs12, bMaskDWord));
+
+
+					printk("rTxAGC_A_CCK1_Mcs32=0x%x\n", PHY_QueryBBReg(padapter, rTxAGC_A_CCK1_Mcs32, bMaskDWord));	
+
+					printk("rTxAGC_B_CCK11_A_CCK2_11=0x%x\n", PHY_QueryBBReg(padapter, rTxAGC_B_CCK11_A_CCK2_11, bMaskDWord));
+
+					printk("rTxAGC_B_CCK1_55_Mcs32=0x%x\n", PHY_QueryBBReg(padapter, rTxAGC_B_CCK1_55_Mcs32, bMaskDWord));				
+
+
+					printk("rTxAGC_B_Rate18_06=0x%x\n", PHY_QueryBBReg(padapter, rTxAGC_B_Rate18_06, bMaskDWord));
+					printk("rTxAGC_B_Rate54_24=0x%x\n", PHY_QueryBBReg(padapter, rTxAGC_B_Rate54_24, bMaskDWord));					
+					printk("rTxAGC_B_Mcs03_Mcs00=0x%x\n", PHY_QueryBBReg(padapter, rTxAGC_B_Mcs03_Mcs00, bMaskDWord));
+					printk("rTxAGC_B_Mcs07_Mcs04=0x%x\n", PHY_QueryBBReg(padapter, rTxAGC_B_Mcs07_Mcs04, bMaskDWord));
+					printk("rTxAGC_B_Mcs11_Mcs08=0x%x\n", PHY_QueryBBReg(padapter, rTxAGC_B_Mcs11_Mcs08, bMaskDWord));
+					printk("rTxAGC_B_Mcs15_Mcs12=0x%x\n", PHY_QueryBBReg(padapter, rTxAGC_B_Mcs15_Mcs12, bMaskDWord));
+							
+					}
+					break;
+				case 0x0c:
+					{
+						printk("dump rx packet (%d)\n",extra_arg);
+						pHalData->bDumpRxPkt =extra_arg;						
+					}
+					break;
+				case 0x0d:
+					{
+						//u8 entry = (u8) extra_arg;
+						u8 entry=0;
+						//dump cam
+						for(entry=0;entry<32;entry++)
+							read_cam(padapter,entry);
+					}				
+					break;
+				case 0xdd://dump registers
+					{
+						int i,j=1,path;
+						u32 value;		
+						for(i=0;i<0x1000;i+=4)
+						{
+							if(j%4==1)
+							{
+							        if(i==0x800)	printk("\n======= BB REG =======\n");
+								printk("0x%02x",i);
+							}
+							
+							printk(" 0x%08x ",rtw_read32(padapter,i));		
+							if((j++)%4 == 0)	printk("\n");	
+						}						
+
+						for(path=0;path<2;path++)
+						{
+							printk("\nRF_Path(%x)\n",path);
+							for(i=0;i<0x100;i++)
+							{								
+								value = PHY_QueryRFReg(padapter, (RF90_RADIO_PATH_E)path,i, bMaskDWord);
+								if(j%4==1)	printk("0x%02x ",i);
+								printk(" 0x%08x ",value);
+								if((j++)%4==0)	printk("\n");	
+							}	
+						}					
 					}
 					break;
 				case 0xfd:
@@ -3974,7 +4273,7 @@ static void add_RATid(_adapter *padapter, struct sta_info *psta)
 		if(pHalData->rf_type == RF_2T2R)
 			limit=16;// 2R
 		else
-		limit=8;// 1R
+			limit=8;// 1R
 
 		for (i=0; i<limit; i++) {
 			if (psta_ht->ht_cap.supp_mcs_set[i/8] & BIT(i%8))
@@ -5525,37 +5824,35 @@ static const struct iw_priv_args rtw_private_args[] = {
 	{
 		SIOCIWFIRSTPRIV + 0x6,
 		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "wps_start"
-	},
+	},	
+
+//#ifdef CONFIG_PLATFORM_MT53XX	
 	{
 		SIOCIWFIRSTPRIV + 0x7,
-		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 2, 0, "dbg"
-	},
-	{
-		SIOCIWFIRSTPRIV + 0x8,
-		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 3, 0, "rfw"
-	},
-	{
-		SIOCIWFIRSTPRIV + 0x9,
-		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 2,
-		IW_PRIV_TYPE_CHAR | IW_PRIV_SIZE_FIXED | IFNAMSIZ, "rfr"
-	}
-
-#ifdef CONFIG_PLATFORM_MT53XX
-//	Need to set the correct ioctl code.
-	,
-	{
-		SIOCIWFIRSTPRIV + 0xA,
 		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "get_sensitivity"
 	},
 	{
-		SIOCIWFIRSTPRIV + 0xB,
+		SIOCIWFIRSTPRIV + 0x8,
 		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "wps_prob_req_ie"
 	},	
 	{
-		SIOCIWFIRSTPRIV + 0xC,
+		SIOCIWFIRSTPRIV + 0x9,
 		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "wps_assoc_req_ie"
 	},
-#endif
+//#endif
+	{
+		SIOCIWFIRSTPRIV + 0xA,
+		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 2, 0, "dbg"
+	},
+	{
+		SIOCIWFIRSTPRIV + 0xB,
+		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 3, 0, "rfw"
+	},
+	{
+		SIOCIWFIRSTPRIV + 0xC,
+		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 2,
+		IW_PRIV_TYPE_CHAR | IW_PRIV_SIZE_FIXED | IFNAMSIZ, "rfr"
+	}
 
 };
 
@@ -5567,16 +5864,16 @@ static iw_handler rtw_private_handler[] =
 	rtw_mp_ioctl_hdl,
 	rtw_get_ap_info, /*for MM DTV platform*/
 	rtw_set_pid,
-	rtw_wps_start,
-	rtw_dbg_port,
-	r8192_wx_write_rf,
-	r8192_wx_read_rf,				//0x9
+	rtw_wps_start,	
+//#ifdef CONFIG_PLATFORM_MT53XX
+	rtw_wx_get_sensitivity,			//0x7
+	rtw_wx_set_mtk_wps_probe_ie,	//0x8
+	rtw_wx_set_mtk_wps_ie,			//0x9
+//#endif
+	rtw_dbg_port,					//0xa
+	r8192_wx_write_rf,				//0xb
+	r8192_wx_read_rf,				//0xc
 
-#ifdef CONFIG_PLATFORM_MT53XX
-	rtw_wx_get_sensitivity,			//0xa
-	rtw_wx_set_mtk_wps_probe_ie,
-	rtw_wx_set_mtk_wps_ie,			//0xc
-#endif
 
 };
 

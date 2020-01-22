@@ -1,4 +1,22 @@
-
+/******************************************************************************
+ *
+ * Copyright(c) 2007 - 2010 Realtek Corporation. All rights reserved.
+ *                                        
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
+ *
+ *
+ ******************************************************************************/
 #ifndef __RTL8192C_SPEC_H__
 #define __RTL8192C_SPEC_H__
 
@@ -119,6 +137,7 @@
 #define REG_PCIE_MIO_INTD			0x00E8
 #define REG_HPON_FSM				0x00EC
 #define REG_SYS_CFG					0x00F0
+#define REG_GPIO_OUTSTS			0x00F4	// For RTL8723 only.
 
 //-----------------------------------------------------
 //
@@ -283,6 +302,8 @@
 #define REG_RDG_PIFS				0x0513
 #define REG_SIFS_CCK				0x0514
 #define REG_SIFS_OFDM				0x0516
+#define REG_SIFS_CTX				0x0514
+#define REG_SIFS_TRX				0x0516
 #define REG_AGGR_BREAK_TIME			0x051A
 #define REG_SLOT					0x051B
 #define REG_TX_PTCL_CTRL			0x0520
@@ -338,6 +359,12 @@
 #define REG_MBIDCAMCFG				0x0628
 
 #define REG_USTIME_EDCA				0x0638
+#define REG_MAC_SPEC_SIFS			0x063A
+
+// 20100719 Joseph: Hardware register definition change. (HW datasheet v54)
+#define REG_R2T_SIFS				0x063C	// [15:8]SIFS_R2T_OFDM, [7:0]SIFS_R2T_CCK
+#define REG_T2T_SIFS				0x063E	// [15:8]SIFS_T2T_OFDM, [7:0]SIFS_T2T_CCK
+
 #define REG_RESP_SIFS_CCK			0x063C
 #define REG_RESP_SIFS_OFDM			0x063F
 #define REG_ACKTO					0x0640
@@ -1345,10 +1372,12 @@ Current IOREG MAP
 #define PCIRSTB						BIT(4)
 #define V15_VLD						BIT(5)
 #define TRP_B15V_EN					BIT(7)
-#define SIC_IDLE					BIT(8)
+#define SIC_IDLE						BIT(8)
 #define BD_MAC2						BIT(9)
 #define BD_MAC1						BIT(10)
-#define IC_MACPHY_MODE				BIT(11)
+#define IC_MACPHY_MODE			BIT(11)
+#define BT_FUNC						BIT(16)
+#define VENDOR_ID					BIT(19)
 #define PAD_HWPD_IDN				BIT(22)
 #define TRP_VAUX_EN					BIT(23)
 #define TRP_BT_EN					BIT(24)
@@ -1356,9 +1385,31 @@ Current IOREG MAP
 #define BD_HCI_SEL					BIT(26)
 #define TYPE_ID						BIT(27)
 
+
 #define CHIP_VER_RTL_MASK			0xF000	//Bit 12 ~ 15
 #define CHIP_VER_RTL_SHIFT			12
 
+//REG_GPIO_OUTSTS (For RTL8723 only)
+#define	EFS_HCI_SEL				(BIT(0)|BIT(1))
+#define	PAD_HCI_SEL				(BIT(2)|BIT(3))
+#define	HCI_SEL						(BIT(4)|BIT(5)) 
+#define	PKG_SEL_HCI				BIT(6)
+#define	FEN_GPS					BIT(7)
+#define	FEN_BT						BIT(8)
+#define	FEN_WL						BIT(9)
+#define	FEN_PCI						BIT(10)
+#define	FEN_USB					BIT(11)
+#define	BTRF_HWPDN_N				BIT(12)
+#define	WLRF_HWPDN_N				BIT(13)
+#define	PDN_BT_N					BIT(14)
+#define	PDN_GPS_N					BIT(15)
+#define	BT_CTL_HWPDN				BIT(16)
+#define	GPS_CTL_HWPDN				BIT(17)
+#define	PPHY_SUSB					BIT(20)
+#define	UPHY_SUSB					BIT(21)
+#define	PCI_SUSEN					BIT(22)
+#define	USB_SUSEN					BIT(23)
+#define	RF_RL_ID					(BIT(31)|BIT(30)|BIT(29)|BIT(28))
 //-----------------------------------------------------
 //
 //	0x0100h ~ 0x01FFh	MACTOP General Configuration

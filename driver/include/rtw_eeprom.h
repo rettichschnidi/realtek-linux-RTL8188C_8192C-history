@@ -1,3 +1,22 @@
+/******************************************************************************
+ *
+ * Copyright(c) 2007 - 2010 Realtek Corporation. All rights reserved.
+ *                                        
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
+ *
+ *
+ ******************************************************************************/
 #ifndef __RTL871X_EEPROM_H__
 #define __RTL871X_EEPROM_H__
 
@@ -69,8 +88,13 @@ typedef enum _RT_CUSTOMER_ID
 	RT_CID_819x_Acer = 24,
 	RT_CID_819x_AzWave_ASUS = 25,
 	RT_CID_819x_AzWave = 26, // For AzWave in PCIe, The ID is AzWave use and not only Asus
-	RT_CID_819x_WNC_COREGA = 27,
-	RT_CID_819x_CLEVO = 28,
+	RT_CID_819x_HP = 27,
+	RT_CID_819x_WNC_COREGA = 28,
+	RT_CID_819x_Arcadyan_Belkin = 29,
+	RT_CID_819x_SAMSUNG = 30,
+	RT_CID_819x_CLEVO = 31,
+	RT_CID_819x_DELL = 32,
+	RT_CID_819x_PRONETS = 33,
 }RT_CUSTOMER_ID, *PRT_CUSTOMER_ID;
 
 struct eeprom_priv 

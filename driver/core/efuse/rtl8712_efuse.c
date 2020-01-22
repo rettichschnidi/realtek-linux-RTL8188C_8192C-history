@@ -1,20 +1,22 @@
-/*
- * rtl8712_efuse.c
+/******************************************************************************
  *
- * Description :
+ * Copyright(c) 2007 - 2010 Realtek Corporation. All rights reserved.
+ *                                        
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
  *
- * Author :
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
  *
-* History :                                                          
-*
-*                                        
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
  *
- * Copyright 2008, Realtek Corp.
  *
- * The contents of this file is the sole property of Realtek Corp. It can not be
- * be used, copied or modified without written permission from Realtek Corp.
- *
- */
+ ******************************************************************************/
 #define _RTL8712_EFUSE_C_
 
 #include <drv_conf.h>
@@ -254,7 +256,7 @@ u8 rtw_efuse_pg_packet_read(_adapter *padapter, u8 offset, u8 *data)
 {
 	u8 ReadState = EFUSE_PG_STATE_HEADER;	
 	
-	bool bContinual = _TRUE;	
+	u8 bContinual = _TRUE;	
 
 	u8 efuse_data,word_cnts=0;
 	u16 efuse_addr = 0;
@@ -348,7 +350,7 @@ u8 rtw_efuse_pg_packet_write(_adapter *padapter, const u8 offset, const u8 word_
 {
 	u8 WriteState = EFUSE_PG_STATE_HEADER;		
 
-	bool bContinual = _TRUE,bDataEmpty=_TRUE,bResult = _TRUE;
+	u8 bContinual = _TRUE,bDataEmpty=_TRUE,bResult = _TRUE;
 	u16 efuse_addr = 0;
 	u8 efuse_data;
 

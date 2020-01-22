@@ -17,9 +17,10 @@ CONFIG_RTL8192C			=       y
 CONFIG_USB_HCI			=	y
 CONFIG_SDIO_HCI			= 	n
 CONFIG_MP_INCLUDED		=	n
-
-CONFIG_PLATFORM_I386_PC	        =	y
-
+CONFIG_POWER_SAVING	 					= 	n
+CONFIG_USB_AUTOSUSPEND 				= 	n
+CONFIG_PLATFORM_I386_PC	      =	y
+CONFIG_PLATFORM_ANDROID_X86		=		n
 CONFIG_PLATFORM_ARM_S3C2K4		= 	n
 CONFIG_PLATFORM_ARM_PXA2XX		= 	n
 CONFIG_PLATFORM_ARM_S3C6K4		= 	n
@@ -31,7 +32,7 @@ CONFIG_PLATFORM_RTK_DMP			=	n
 
 CONFIG_DRVEXT_MODULE	        =       n
 
-export TOPDIR := $(PWD)
+export TopDIR ?= $(shell pwd)
 
 
 ifeq ($(CONFIG_RTL8712), y)
@@ -82,12 +83,20 @@ ifeq ($(CONFIG_USB_HCI), y)
 ifeq ($(CONFIG_BUILT_IN), y)
 $(shell cp $(src)/autoconf_$(RTL871X)_usb_linux.h $(src)/include/autoconf.h)
 else
-$(shell cp $(PWD)/autoconf_$(RTL871X)_usb_linux.h $(PWD)/include/autoconf.h)
+$(shell cp $(TopDIR)/autoconf_$(RTL871X)_usb_linux.h $(TopDIR)/include/autoconf.h)
 endif
 
+#ifeq ($(CONFIG_BEST_BATTERYLIFE), y)
+#EXTRA_CFLAGS += -DCONFIG_BEST_BATTERYLIFE
+#endif
 
-PWD := $(shell pwd)
+ifeq ($(CONFIG_POWER_SAVING), y)
+EXTRA_CFLAGS += -DCONFIG_POWER_SAVING
+endif
 
+ifeq ($(CONFIG_USB_AUTOSUSPEND), y)
+EXTRA_CFLAGS += -DCONFIG_USB_AUTOSUSPEND
+endif
 
 ifeq ($(CONFIG_PLATFORM_I386_PC), y)
 EXTRA_CFLAGS += -DCONFIG_LITTLE_ENDIAN
@@ -98,6 +107,14 @@ KVER  := $(shell uname -r)
 KSRC := /lib/modules/$(KVER)/build
 MODDESTDIR := /lib/modules/$(KVER)/kernel/drivers/net/wireless/
 INSTALL_PREFIX :=
+endif
+
+ifeq ($(CONFIG_PLATFORM_ANDROID_X86), y)
+EXTRA_CFLAGS += -DCONFIG_LITTLE_ENDIAN -DCONFIG_PLATFORM_ANDROID
+SUBARCH := $(shell uname -m | sed -e s/i.86/i386/)
+ARCH := $(SUBARCH)
+CROSS_COMPILE ?= i686-unknown-linux-gnu-
+KSRC := /usr/src/froyo-x86/out/target/product/eeepc/obj/kernel
 endif
 
 ifeq ($(CONFIG_PLATFORM_ARM_PXA2XX), y)
@@ -259,7 +276,7 @@ else
 all: modules
 
 modules:
-	$(MAKE) ARCH=$(ARCH) CROSS_COMPILE=$(CROSS_COMPILE) -C $(KSRC) M=$(PWD)  modules
+	$(MAKE) ARCH=$(ARCH) CROSS_COMPILE=$(CROSS_COMPILE) -C $(KSRC) M=$(shell pwd)  modules
 
 install:
 	install -p -m 644 $(MODULE_NAME).ko  $(MODDESTDIR)

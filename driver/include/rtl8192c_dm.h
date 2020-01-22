@@ -1,3 +1,22 @@
+/******************************************************************************
+ *
+ * Copyright(c) 2007 - 2010 Realtek Corporation. All rights reserved.
+ *                                        
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
+ *
+ *
+ ******************************************************************************/
 #ifndef	__HAL8190PCIDM_H__
 #define __HAL8190PCIDM_H__
 //============================================================
@@ -114,9 +133,9 @@ typedef	enum _BT_Ant_NUM{
 typedef	enum _BT_CoType{
 	BT_2Wire		= 0,		
 	BT_ISSC_3Wire	= 1,
-	BT_Accel			= 2,
-	BT_CSR			= 3,
-	BT_CSR_ENHAN	= 4,
+	BT_Accel		= 2,
+	BT_CSR_BC4		= 3,
+	BT_CSR_BC8		= 4,
 	BT_RTL8756		= 5,
 } BT_CoType, *PBT_CoType;
 
@@ -163,6 +182,17 @@ struct btcoexist_priv	{
 	u32					BtEdcaDL;
 	u32					BT_EDCA[2];
 	u8					bCOBT;
+
+	u8					bInitSet;
+	u8					bBTBusyTraffic;
+	u8					bBTTrafficModeSet;
+	u8					bBTNonTrafficModeSet;
+//	BTTraffic				BT21TrafficStatistics;
+	u32					CurrentState;
+	u32					PreviousState;
+	u8					BtPreRssiState;
+	u8					bFWCoexistAllOff;
+	u8					bSWCoexistAllOff;
 };
 
 #define		BW_AUTO_SWITCH_HIGH_LOW	25
@@ -369,7 +399,7 @@ void issue_delete_ba(_adapter *padapter, u8 dir);
 #ifdef CONFIG_ANTENNA_DIVERSITY
 void SwAntDivRSSICheck(_adapter *padapter ,u32 RxPWDBAll); 
 
-bool SwAntDivBeforeLink8192C(IN PADAPTER Adapter);
+u8 SwAntDivBeforeLink8192C(IN PADAPTER Adapter);
 void dm_SW_AntennaSwitchCallback(void *FunctionContext);
 void SwAntDivRestAfterLink(	IN	PADAPTER	Adapter);
 #endif

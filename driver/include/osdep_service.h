@@ -1,4 +1,22 @@
-
+/******************************************************************************
+ *
+ * Copyright(c) 2007 - 2010 Realtek Corporation. All rights reserved.
+ *                                        
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
+ *
+ *
+ ******************************************************************************/
 #ifndef __OSDEP_SERVICE_H_
 #define __OSDEP_SERVICE_H_
 
@@ -29,14 +47,15 @@
 	#include <linux/netdevice.h>
 	#include <linux/etherdevice.h>
 	#include <net/iw_handler.h>
-	
+	#include <linux/proc_fs.h>	// Necessary because we use the proc fs
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,19))
-	#ifndef bool
-		typedef enum{false = 0, true} bool;
-	#endif
-#endif	
-	
+#if (LINUX_VERSION_CODE>=KERNEL_VERSION(2,6,22))
+#ifdef CONFIG_USB_SUSPEND
+#define CONFIG_AUTOSUSPEND	1
+#endif
+#endif
+
+
 #ifdef CONFIG_USB_HCI
 	typedef struct urb *  PURB;
 #endif
@@ -367,11 +386,11 @@ __inline static unsigned char _cancel_timer_ex(_timer *ptimer)
 #endif
 
 #ifdef PLATFORM_WINDOWS
-	u8 bool;
+	u8 bcancelled;
 	
-	_cancel_timer(ptimer, &bool);
+	_cancel_timer(ptimer, &bcancelled);
 	
-	return bool;
+	return bcancelled;
 #endif
 }
 

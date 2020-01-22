@@ -1,20 +1,22 @@
 /******************************************************************************
-* rtl8192cu_recv.c                                                                                                                                 *
-*                                                                                                                                          *
-* Description :                                                                                                                       *
-*                                                                                                                                           *
-* Author :                                                                                                                       *
-*                                                                                                                                         *
-* History :
-*
-*
-*                                                                                                                                       *
-* Copyright 2008, Realtek Corp.                                                                                                  *
-*                                                                                                                                        *
-* The contents of this file is the sole property of Realtek Corp.  It can not be                                     *
-* be used, copied or modified without written permission from Realtek Corp.                                         *
-*                                                                                                                                          *
-*******************************************************************************/
+ *
+ * Copyright(c) 2007 - 2010 Realtek Corporation. All rights reserved.
+ *                                        
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
+ *
+ *
+ ******************************************************************************/
 #define _RTL8192CU_RECV_C_
 #include <drv_conf.h>
 #include <osdep_service.h>
@@ -229,15 +231,19 @@ int rtw_init_recvbuf(_adapter *padapter, struct recv_buf *precvbuf)
 
 }
 
-
 void rtl8192cu_update_recvframe_attrib_from_recvstat(union recv_frame *precvframe, struct recv_stat *prxstat)
 {
 	u8 physt, qos, shift, icverr, htc,crcerr;
 	u32 *pphy_info;
 	u16 drvinfo_sz=0;
-	struct rx_pkt_attrib *pattrib = &precvframe->u.hdr.attrib;	
-	
+	struct rx_pkt_attrib *pattrib = &precvframe->u.hdr.attrib;		
+	_adapter *padapter = precvframe->u.hdr.adapter;
 
+	HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(padapter);
+	
+	u8 bPacketMatchBSSID=_FALSE;
+	u8 bPacketToSelf = _FALSE;
+	u8 bPacketBeacon = _FALSE;
 	//Offset 0
 	drvinfo_sz = (le32_to_cpu(prxstat->rxdw0)&0x000f0000)>>16;
 	drvinfo_sz = drvinfo_sz<<3;
@@ -245,6 +251,7 @@ void rtl8192cu_update_recvframe_attrib_from_recvstat(union recv_frame *precvfram
 	pattrib->bdecrypted = ((le32_to_cpu(prxstat->rxdw0) & BIT(27)) >> 27)? 0:1;
 
 	physt = ((le32_to_cpu(prxstat->rxdw0) & BIT(26)) >> 26)? 1:0;
+	pattrib->physt = physt;
 
 	shift = (le32_to_cpu(prxstat->rxdw0)&0x03000000)>>24;
 
@@ -252,7 +259,7 @@ void rtl8192cu_update_recvframe_attrib_from_recvstat(union recv_frame *precvfram
 
 	icverr = ((le32_to_cpu(prxstat->rxdw0) & BIT(15)) >> 15)? 1:0;
 
-	crcerr =  ((le32_to_cpu(prxstat->rxdw0) & BIT(14)) >> 14 );
+	crcerr =  ((le32_to_cpu(prxstat->rxdw0) & BIT(14)) >> 14 )?1:0;
 
 
 	//Offset 4
@@ -290,21 +297,34 @@ void rtl8192cu_update_recvframe_attrib_from_recvstat(union recv_frame *precvfram
 
 
 #if 0 //dump rxdesc for debug
-	printk("drvinfo_sz=%d\n", drvinfo_sz);
-	printk("physt=%d\n", physt);
-	printk("shift=%d\n", shift);
-	printk("qos=%d\n", qos);
-	printk("icverr=%d\n", icverr);
-	printk("htc=%d\n", htc);
-	printk("bdecrypted=%d\n", pattrib->bdecrypted);
-	printk("mcs_rate=%d\n", pattrib->mcs_rate);
-	printk("rxht=%d\n", pattrib->rxht);
+	if(pHalData->bDumpRxPkt){
+		printk("### rxdw0=0x%08x #### \n", le32_to_cpu(prxstat->rxdw0));	
+		printk("pkt_len=0x%04x\n",(le32_to_cpu(prxstat->rxdw0)&0x3FFF));
+		printk("drvinfo_sz=%d\n", drvinfo_sz);
+		printk("physt=%d\n", physt);
+		printk("shift=%d\n", shift);
+		printk("qos=%d\n", qos);
+		printk("icverr=%d\n", icverr);
+		printk("htc=%d\n", htc);
+		printk("bdecrypted=%d\n", pattrib->bdecrypted);
+		printk("mcs_rate=%d\n", pattrib->mcs_rate);
+		printk("rxht=%d\n", pattrib->rxht);
+	}
 #endif
-
+	
 	//phy_info
 	if(drvinfo_sz && physt)
 	{
+		bPacketMatchBSSID = ((!IsFrameTypeCtrl(precvframe->u.hdr.rx_data)) && 
+							!icverr && !crcerr && _rtw_memcmp(get_hdr_bssid(precvframe->u.hdr.rx_data), 
+							get_my_bssid(&padapter->mlmeextpriv.mlmext_info.network), ETH_ALEN));
 
+			
+
+		bPacketToSelf = bPacketMatchBSSID &&  (_rtw_memcmp(get_da(precvframe->u.hdr.rx_data), myid(&padapter->eeprompriv), ETH_ALEN));
+
+		bPacketBeacon =bPacketMatchBSSID && (GetFrameSubType(precvframe->u.hdr.rx_data) ==  WIFI_BEACON);
+				
 		pphy_info=(u32 *)prxstat+1;
 
 		//printk("pphy_info, of0=0x%08x\n", *pphy_info);
@@ -318,6 +338,21 @@ void rtl8192cu_update_recvframe_attrib_from_recvstat(union recv_frame *precvfram
 		
 		
 		rtl8192c_query_rx_phy_status(precvframe, prxstat);
+
+#ifdef CONFIG_ANTENNA_DIVERSITY
+		// If we switch to the antenna for testing, the signal strength 
+		// of the packets in this time shall not be counted into total receiving power. 
+		// This prevents error counting Rx signal strength and affecting other dynamic mechanism.
+
+		// Select the packets to do RSSI checking for antenna switching.
+		if(bPacketToSelf || bPacketBeacon)
+		{	
+			SwAntDivRSSICheck(padapter, precvframe->u.hdr.attrib.RxPWDBAll);	
+		}
+		
+#endif
+		if(bPacketToSelf || bPacketBeacon)	
+			rtl8192c_process_phy_info(padapter,precvframe);		
 
 #if 0 //dump phy_status for debug
 

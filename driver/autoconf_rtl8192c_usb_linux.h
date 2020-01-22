@@ -1,6 +1,7 @@
 /*
  * Automatically generated C config: don't edit
  */
+
 #define AUTOCONF_INCLUDED
 #define RTL871X_MODULE_NAME "92CU"
 
@@ -50,11 +51,12 @@
 #define CONFIG_PM 	1
 #define CONFIG_BT_COEXIST  	1
 #define CONFIG_ANTENNA_DIVERSITY	1
-//#define CONFIG_AUTOSUSPEND	1
 
-#ifdef CONFIG_AUTOSUSPEND
-#define CONFIG_MEEGO_PLATFORM	1
-//#define SUPPORT_HW_RFOFF_DETECTED	1
+
+#define SUPPORT_HW_RFOFF_DETECTED	1
+
+#ifdef PLATFORM_LINUX
+//	#define CONFIG_PROC_DEBUG 1
 #endif
 
 #ifdef CONFIG_RTL8192C
@@ -66,6 +68,7 @@
 	#define DEV_BUS_PCI_INTERFACE				1
 	#define DEV_BUS_USB_INTERFACE				2	
 
+	#define RTL8192C_WEP_ISSUE					1
 	#define RTL8192C_RX_PACKET_NO_INCLUDE_CRC	1
 
 	#define SUPPORTED_BLOCK_IO

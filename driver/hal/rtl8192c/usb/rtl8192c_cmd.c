@@ -1,20 +1,22 @@
 /******************************************************************************
-* rtl8192c_cmd.c                                                                                                                                 *
-*                                                                                                                                          *
-* Description :                                                                                                                       *
-*                                                                                                                                           *
-* Author :                                                                                                                       *
-*                                                                                                                                         *
-* History :                                                          
-*
-*                                        
-*                                                                                                                                       *
-* Copyright 2010, Realtek Corp.                                                                                                  *
-*                                                                                                                                        *
-* The contents of this file is the sole property of Realtek Corp.  It can not be                                     *
-* be used, copied or modified without written permission from Realtek Corp.                                         *
-*                                                                                                                                          *
-*******************************************************************************/
+ *
+ * Copyright(c) 2007 - 2010 Realtek Corporation. All rights reserved.
+ *                                        
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
+ *
+ *
+ ******************************************************************************/
 #define _RTL8192C_CMD_C_
 
 #include <drv_conf.h>
@@ -420,6 +422,7 @@ u8 rtl8192c_disconnect_hdl(_adapter *padapter, unsigned char *pbuf)
 	struct mlme_ext_priv	*pmlmeext = &padapter->mlmeextpriv;
 	struct mlme_ext_info	*pmlmeinfo = &(pmlmeext->mlmext_info);
 	WLAN_BSSID_EX		*pnetwork = (WLAN_BSSID_EX*)(&(pmlmeinfo->network));
+	struct	mlme_priv 	*pmlmepriv = &padapter->mlmepriv;	
 	
 	if (is_client_associated_to_ap(padapter))
 	{
@@ -462,13 +465,15 @@ u8 rtl8192c_disconnect_hdl(_adapter *padapter, unsigned char *pbuf)
 	}
 
 	pmlmeinfo->state = WIFI_FW_NULL_STATE;
-	
+
+	pmlmepriv->sitesurveyctrl.traffic_busy = _FALSE;		
 	set_channel_bwmode(padapter, pmlmeext->cur_channel, pmlmeext->cur_ch_offset, pmlmeext->cur_bwmode);
 
 	flush_all_cam_entry(padapter);
 		
 	_cancel_timer_ex(&pmlmeext->link_timer);
 	pmlmeext->linked_to = 0;
+
 	
 	return 	H2C_SUCCESS;
 }
@@ -529,7 +534,6 @@ u8 rtl8192c_sitesurvey_cmd_hdl(_adapter *padapter, u8 *pbuf)
 			//config RCR to receive different BSSID & not to receive data frame			
 			rtw_write32(padapter, REG_RCR, rtw_read32(padapter, REG_RCR) & 0xfffff7bf);
 
-
 			//disable update TSF
 			rtw_write8(padapter, REG_BCN_CTRL, rtw_read8(padapter, REG_BCN_CTRL)|BIT(4)|BIT(5));
 		}
@@ -562,6 +566,7 @@ u8 rtl8192c_setauth_hdl(_adapter *padapter, unsigned char *pbuf)
 	return 	H2C_SUCCESS;
 }
 
+#define CAM_CFG_VALID BIT15
 u8 rtl8192c_setkey_hdl(_adapter *padapter, u8 *pbuf)
 {
 	unsigned short				ctrl;
@@ -573,7 +578,7 @@ u8 rtl8192c_setkey_hdl(_adapter *padapter, u8 *pbuf)
 	pmlmeinfo->key_index = pparm->keyid;
 	
 	//write cam
-	ctrl = BIT(15) | ((pparm->algorithm) << 2) | pparm->keyid;	
+	ctrl = CAM_CFG_VALID | ((pparm->algorithm) << 2) | pparm->keyid;	
 	
 	write_cam(padapter, pparm->keyid, ctrl, null_sta, pparm->key);
 	
@@ -629,7 +634,7 @@ u8 rtl8192c_set_stakey_hdl(_adapter *padapter, u8 *pbuf)
 	
 	ctrl = BIT(15) | ((pparm->algorithm) << 2);	
 
-	write_cam(padapter, 5, ctrl, pparm->addr, pparm->key);
+	write_cam(padapter, 4, ctrl, pparm->addr, pparm->key);//CAM_ID(CAM_ENTRY)=4	
 
 	pmlmeinfo->enc_algo = pparm->algorithm;
 	
@@ -999,9 +1004,9 @@ static BOOLEAN CheckFwReadLastMSG(
 #define EX_MESSAGE_BOX_SIZE	2
 
 
-static bool _is_fw_read_cmd_down(_adapter* padapter, bool isvern, u8 msgbox_num)
+static u8 _is_fw_read_cmd_down(_adapter* padapter, u8 isvern, u8 msgbox_num)
 {
-	bool read_down = _FALSE;
+	u8 read_down = _FALSE;
 	int  retry_cnts = 100;
 	
 	u8 valid;
@@ -1035,13 +1040,13 @@ static bool _is_fw_read_cmd_down(_adapter* padapter, bool isvern, u8 msgbox_num)
 void FillH2CCmd(_adapter* padapter, u8 ElementID, u32 CmdLen, u8* pCmdBuffer)
 {	
 #if 1
-	bool bcmd_down = _FALSE;
+	u8 bcmd_down = _FALSE;
 	int 	retry_cnts = 100;
 	u8	h2c_box_num;
 	u32	msgbox_addr;
 	u32  msgbox_ex_addr;
 	HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(padapter);
-	bool isnchip =IS_NORMAL_CHIP(pHalData->VersionID);
+	u8 isnchip =IS_NORMAL_CHIP(pHalData->VersionID);
 	u32	h2c_cmd = 0;
 	u16	h2c_cmd_ex = 0;
 
@@ -1073,7 +1078,7 @@ void FillH2CCmd(_adapter* padapter, u8 ElementID, u32 CmdLen, u8* pCmdBuffer)
 		}
 
 		*(u8*)(&h2c_cmd) |= ElementID;
-		
+			
 		if(h2c_cmd & BIT(7)){
 			msgbox_ex_addr = REG_HMEBOX_EXT_0 + (h2c_box_num *EX_MESSAGE_BOX_SIZE);
 			h2c_cmd_ex = cpu_to_le16( h2c_cmd_ex );
@@ -1294,16 +1299,19 @@ u8 rtl8192c_h2c_msg_hdl(_adapter *padapter, unsigned char *pbuf)
 
 	return H2C_SUCCESS;
 }
+#ifdef CONFIG_AUTOSUSPEND
 #ifdef SUPPORT_HW_RFOFF_DETECTED
-u8 set_FWSelectSuspend_cmd(_adapter*padapter,u8 bRFon, u16 polling_period)
+u8 set_FWSelectSuspend_cmd(_adapter *padapter ,u8 bfwpoll, u16 period)
 {
 	u8	res=_SUCCESS;
-	H2C_SS_RFOFF_PARAM param;
-	param.gpio_period = polling_period;//Polling GPIO_11 period time
-	param.ROFOn = (_TRUE == bRFon)?1:0;
+	struct H2C_SS_RFOFF_PARAM param;
+	printk("==>%s \n",__FUNCTION__);
+	param.gpio_period = period;//Polling GPIO_11 period time
+	param.ROFOn = (_TRUE == bfwpoll)?1:0;
 	FillH2CCmd(padapter, SELECTIVE_SUSPEND_ROF_CMD, sizeof(param), (u8*)(&param));		
 	return res;
 }
+#endif
 #endif
 
 u8 set_rssi_cmd(_adapter*padapter, u8 *param)
@@ -1504,7 +1512,7 @@ _func_enter_;
 
 	H2CSetPwrMode.Mode = Mode;
 	H2CSetPwrMode.SmartPS = 1;
-	H2CSetPwrMode.BcnPassTime = 1;//pPSC->RegMaxLPSAwakeIntvl;
+	H2CSetPwrMode.AwakeInterval = 1;//pPSC->RegMaxLPSAwakeIntvl;
 
 	FillH2CCmd(padapter, SET_PWRMODE_EID, sizeof(H2CSetPwrMode), (u8 *)&H2CSetPwrMode);
 	
@@ -1930,7 +1938,7 @@ void SetFwRsvdPagePkt(PADAPTER Adapter, BOOLEAN bDLFinished)
 
 	if(bDLOK)
 	{
-		DBG_871X("Set RSVD page location to Fw.\n");
+		DBG_871X("Set RSVD page location to Fw Len(%d).\n",sizeof(RsvdPageLoc));		
 		FillH2CCmd(Adapter, RSVD_PAGE_EID, sizeof(RsvdPageLoc), (u8 *)&RsvdPageLoc);
 	}
 
@@ -2009,7 +2017,7 @@ _func_enter_;
 	}
 
 	JoinBssRptParm.OpMode = mstatus;
-
+	printk("%s H2C len(%d)\n",__FUNCTION__,sizeof(JoinBssRptParm));
 	FillH2CCmd(padapter, JOINBSS_RPT_EID, sizeof(JoinBssRptParm), (u8 *)&JoinBssRptParm);
 	
 _func_exit_;

@@ -1,3 +1,22 @@
+/******************************************************************************
+ *
+ * Copyright(c) 2007 - 2010 Realtek Corporation. All rights reserved.
+ *                                        
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
+ *
+ *
+ ******************************************************************************/
 #ifndef __RTL871X_PWRCTRL_H_
 #define __RTL871X_PWRCTRL_H_
 
@@ -148,25 +167,6 @@ struct	pwrctrl_priv {
 	uint pwr_mode;
 	uint smart_ps;
 	uint alives;
-
-
-	_timer 	pwr_state_check_timer;
-	int		pwr_state_check_inverval;
-
-	//u8	ips_enable;//for dbg
-	//u8	lps_enable;//for dbg
-	
-	uint 	bips_processing;
-	rt_rf_power_state	inactive_pwrstate;
-	rt_rf_power_state	change_pwrstate;
-	rt_rf_power_state	bfassoc_pwrstate;
-	uint 	ips_enter_cnts;
-	uint 	ips_leave_cnts;
-		
-	_workitem InactivePSWorkItem;
-	_timer 	ips_check_timer;
-
-
 	u8	bLeisurePs;
 	u8	LpsIdleCount;
 	//u8	FWCtrlPSMode;
@@ -176,13 +176,29 @@ struct	pwrctrl_priv {
 
 	s32		pnp_current_pwr_state;
 	u8		pnp_bstop_trx;
-	u8		bAutoSuspend;
+	u8		bInternalAutoSuspend;
 	u8		bSupportRemoteWakeup;
-	//u8		autospend_level;
+//===========================================
+	_timer 	pwr_state_check_timer;
+	int		pwr_state_check_inverval;
+	u8		pwr_state_check_cnts;
+	uint 		bips_processing;
+
+	_workitem InactivePSWorkItem;
+	rt_rf_power_state current_rfpwrstate;
+	rt_rf_power_state	change_rfpwrstate;
+	
+	uint 		ips_enter_cnts;
+	uint 		ips_leave_cnts;		
+	
 	u8		wepkeymask;
-	u8		bHWPowerdown;
+	u8		bHWPowerdown;//if support hw power down
 	u8		bHWPwrPindetect;
+	u8		bkeepfwalive;		
+	u8		brfoffbyhw;
 	unsigned long PS_BBRegBackup[PSBBREG_TOTALCNT];
+	//=========================================
+	
 };
 
 
@@ -204,6 +220,9 @@ extern void LeaveAllPowerSaveMode(PADAPTER Adapter);
 
 #ifdef CONFIG_AUTOSUSPEND
 int autoresume_enter(_adapter* padapter);
+#endif
+#ifdef SUPPORT_HW_RFOFF_DETECTED
+rt_rf_power_state RfOnOffDetect(IN	PADAPTER pAdapter );
 #endif
 
 #ifdef CONFIG_IPS

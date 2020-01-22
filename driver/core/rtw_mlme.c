@@ -1,20 +1,22 @@
 /******************************************************************************
-* rtl871x_mlme.c                                                                                                                                 *
-*                                                                                                                                          *
-* Description :                                                                                                                       *
-*                                                                                                                                           *
-* Author :                                                                                                                       *
-*                                                                                                                                         *
-* History :                                                          
-*
-*                                        
-*                                                                                                                                       *
-* Copyright 2007, Realtek Corp.                                                                                                  *
-*                                                                                                                                        *
-* The contents of this file is the sole property of Realtek Corp.  It can not be                                     *
-* be used, copied or modified without written permission from Realtek Corp.                                         *
-*                                                                                                                                          *
-*******************************************************************************/
+ *
+ * Copyright(c) 2007 - 2010 Realtek Corporation. All rights reserved.
+ *                                        
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
+ *
+ *
+ ******************************************************************************/
 #define _RTL871X_MLME_C_
 
 
@@ -219,7 +221,7 @@ _func_exit_;
 	return pnetwork;	
 }
 
-void _rtw_free_network(struct	mlme_priv *pmlmepriv ,struct wlan_network *pnetwork)
+void _rtw_free_network(struct	mlme_priv *pmlmepriv ,struct wlan_network *pnetwork,u8 isfreeall)
 {
 	u32 curr_time, delta_time;
 	_irqL irqL;	
@@ -234,7 +236,8 @@ _func_enter_;
 		goto exit;
 
 	curr_time = rtw_get_current_time();	
-	
+	if(!isfreeall)
+	{
 #ifdef PLATFORM_WINDOWS
 
 	delta_time = (curr_time -pnetwork->last_scanned)/10;
@@ -256,6 +259,7 @@ _func_enter_;
 	}
 	
 #endif
+	}
 
 	_enter_critical(&free_queue->lock, &irqL);
 	
@@ -350,7 +354,7 @@ _func_exit_;
 }
 
 
-void _rtw_free_network_queue(_adapter *padapter)
+void _rtw_free_network_queue(_adapter *padapter,u8 isfreeall)
 {
 	_irqL irqL;
 	_list *phead, *plist;
@@ -375,7 +379,7 @@ _func_enter_;
 
 		plist = get_next(plist);
 
-		_rtw_free_network(pmlmepriv,pnetwork);
+		_rtw_free_network(pmlmepriv,pnetwork,isfreeall);
 		
 	}
 
@@ -493,11 +497,11 @@ _func_exit_;
 	return pnetwork;
 }
 
-void rtw_free_network(struct mlme_priv *pmlmepriv, struct	wlan_network *pnetwork )//(struct	wlan_network *pnetwork, _queue	*free_queue)
+void rtw_free_network(struct mlme_priv *pmlmepriv, struct	wlan_network *pnetwork,u8 is_freeall )//(struct	wlan_network *pnetwork, _queue	*free_queue)
 {
 _func_enter_;		
 	RT_TRACE(_module_rtl871x_mlme_c_,_drv_err_,("rtw_free_network==> ssid = %s \n\n" , pnetwork->network.Ssid.Ssid));
-	_rtw_free_network(pmlmepriv, pnetwork);
+	_rtw_free_network(pmlmepriv, pnetwork,is_freeall);
 _func_exit_;		
 }
 
@@ -511,10 +515,10 @@ _func_exit_;
 }
 
 
-void rtw_free_network_queue(_adapter* dev)
+void rtw_free_network_queue(_adapter* dev,u8 isfreeall)
 {
 _func_enter_;		
-	_rtw_free_network_queue(dev);
+	_rtw_free_network_queue(dev,isfreeall);
 _func_exit_;			
 }
 
@@ -862,6 +866,7 @@ static int is_desired_network(_adapter *adapter, struct wlan_network *pnetwork)
 {
 	struct security_priv *psecuritypriv = &adapter->securitypriv;
 	struct mlme_priv *pmlmepriv = &adapter->mlmepriv;
+	struct registry_priv	 *pregpriv = &adapter->registrypriv;
 	u32 desired_encmode;
 	u32 privacy;
 
@@ -887,9 +892,12 @@ static int is_desired_network(_adapter *adapter, struct wlan_network *pnetwork)
 			return _FALSE;
 		}	
 	}
-
-	if ((desired_encmode == Ndis802_11EncryptionDisabled) && (privacy != 0))
-            bselected = _FALSE;
+	if (pregpriv->wifi_spec == 1) //for  correct flow of 8021X  to do....
+	{
+		if ((desired_encmode == Ndis802_11EncryptionDisabled) && (privacy != 0))	
+				bselected = _FALSE;
+	}
+	
 
  	if ((desired_encmode != Ndis802_11EncryptionDisabled) && (privacy == 0))
 		bselected = _FALSE;
@@ -991,9 +999,11 @@ _func_enter_;
 		}	
 		else
 		{
+#ifndef CONFIG_PLATFORM_MT53XX
 			pnetwork->Ssid.SsidLength = 8;
 			_rtw_memcpy(pnetwork->Ssid.Ssid, "<hidden>", 8);
 			rtw_add_network(adapter, pnetwork);			
+#endif
 		}
 	}
 
@@ -1228,7 +1238,8 @@ _func_enter_;
 	
 	RT_TRACE(_module_rtl871x_mlme_c_, _drv_err_, ("+rtw_indicate_disconnect\n"));
 
-	if((pmlmepriv->fw_state & _FW_LINKED))//if(!(pmlmepriv->fw_state & _FW_LINKED))
+	if((pmlmepriv->fw_state & _FW_LINKED))
+	{
 	        pmlmepriv->fw_state ^= _FW_LINKED;
 
 	padapter->ledpriv.LedControlHandler(padapter, LED_CTL_NO_LINK);
@@ -1239,7 +1250,10 @@ _func_enter_;
 	lps_ctrl_wk_cmd(padapter, LPS_CTRL_DISCONNECT, 1);
 #endif
  	
+	}
+ 	
 _func_exit_;	
+
 }
 
 //Notes:
@@ -1334,9 +1348,9 @@ _func_enter_;
 					pcur_wlan->fixed = _FALSE;					
 
 					pcur_sta = rtw_get_stainfo(pstapriv, cur_network->network.MacAddress);
-					_enter_critical(&(pstapriv->sta_hash_lock), &irqL2);
+					_enter_critical_bh(&(pstapriv->sta_hash_lock), &irqL2);
 					rtw_free_stainfo(adapter,  pcur_sta);
-					_exit_critical(&(pstapriv->sta_hash_lock), &irqL2);
+					_exit_critical_bh(&(pstapriv->sta_hash_lock), &irqL2);
 
 					ptarget_wlan = find_network(&pmlmepriv->scanned_queue, pnetwork->network.MacAddress);
 					if(ptarget_wlan)	ptarget_wlan->fixed = _TRUE;						
@@ -1375,7 +1389,7 @@ _func_enter_;
 				{
 					ptarget_sta->aid  = pnetwork->join_res;					
 					ptarget_sta->qos_option = 1;//? 
-					ptarget_sta->mac_id=5;
+					ptarget_sta->mac_id=0;
 
 					if(adapter->securitypriv.dot11AuthAlgrthm== dot11AuthAlgrthm_8021X)
 					{						
@@ -1680,11 +1694,11 @@ _func_enter_;
 	{
 		psta = rtw_get_stainfo(&adapter->stapriv, pstadel->macaddr);
 		
-		_enter_critical(&(pstapriv->sta_hash_lock), &irqL);
+		_enter_critical_bh(&(pstapriv->sta_hash_lock), &irqL);
 		
 		rtw_free_stainfo(adapter,  psta);
 		
-		_exit_critical(&(pstapriv->sta_hash_lock), &irqL);
+		_exit_critical_bh(&(pstapriv->sta_hash_lock), &irqL);
 		
 		if(adapter->stapriv.asoc_sta_count== 1) //a sta + bc/mc_stainfo (not Ibss_stainfo)
 		{ 
@@ -1758,7 +1772,7 @@ void _rtw_sitesurvey_ctrl_handler (_adapter *adapter)
 	struct	sitesurvey_ctrl	*psitesurveyctrl=&pmlmepriv->sitesurveyctrl;
 	struct	registry_priv	*pregistrypriv=&adapter->registrypriv;
 	u64 current_tx_pkts;
-	uint current_rx_pkts;
+	u64 current_rx_pkts;
 	
 _func_enter_;		
 	
@@ -1769,7 +1783,8 @@ _func_enter_;
 	psitesurveyctrl->last_rx_pkts=adapter->recvpriv.rx_pkts;
 
 	if( (current_tx_pkts>pregistrypriv->busy_thresh)||(current_rx_pkts>pregistrypriv->busy_thresh)) 
-	{		
+	{	
+		//printk("traffic_busy Curr_tx(%lld),Curr_rx(%lld)\n",current_tx_pkts,current_rx_pkts);
 		psitesurveyctrl->traffic_busy= _TRUE;
 	}
 	else 
@@ -1870,8 +1885,8 @@ void dynamic_check_timer_handlder(_adapter *adapter)
 
 	//pbc_polling_wk_cmd(adapter);
 
-	//if(check_fwstate(pmlmepriv, _FW_LINKED) == _TRUE)
-	      _rtw_sitesurvey_ctrl_handler(adapter);
+	if(check_fwstate(pmlmepriv, _FW_LINKED) == _TRUE)
+		_rtw_sitesurvey_ctrl_handler(adapter);
 
 
 	if(pmlmepriv->scan_interval >0)
@@ -2159,7 +2174,7 @@ _func_enter_;
 	psetkeyparm->keyid=(u8)keyid;//0~3
 	pmlmeinfo->key_mask |= BIT(psetkeyparm->keyid);
 #ifdef CONFIG_AUTOSUSPEND
-	if( _TRUE  == adapter->pwrctrlpriv.bAutoSuspend)
+	if( _TRUE  == adapter->pwrctrlpriv.bInternalAutoSuspend)
 	{
 		adapter->pwrctrlpriv.wepkeymask = pmlmeinfo->key_mask;
 		printk("....AutoSuspend pwrctrlpriv.wepkeymask(%x)\n",adapter->pwrctrlpriv.wepkeymask);

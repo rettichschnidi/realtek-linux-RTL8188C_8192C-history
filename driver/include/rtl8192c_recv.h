@@ -1,3 +1,22 @@
+/******************************************************************************
+ *
+ * Copyright(c) 2007 - 2010 Realtek Corporation. All rights reserved.
+ *                                        
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
+ *
+ *
+ ******************************************************************************/
 #ifndef _RTL8192C_RECV_H_
 #define _RTL8192C_RECV_H_
 
@@ -257,7 +276,7 @@ void rtl8192cu_update_recvframe_attrib_from_recvstat(union recv_frame *precvfram
 
 void rtw_reordering_ctrl_timeout_handler(void *pcontext);
 
-void rtl8192c_query_rx_phy_status(union recv_frame *prframe, struct recv_stat *prxstat);
+void rtl8192c_query_rx_phy_status(union recv_frame *prframe, struct recv_stat *prxstat );
 
 //void rtl8192c_process_phy_info(_adapter *padapter, union recv_frame *prframe);
 void rtl8192c_process_phy_info(_adapter *padapter, void *prframe);

@@ -1,3 +1,22 @@
+/******************************************************************************
+ *
+ * Copyright(c) 2007 - 2010 Realtek Corporation. All rights reserved.
+ *                                        
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
+ *
+ *
+ ******************************************************************************/
 #ifndef __RTL871X_MLME_H_
 #define __RTL871X_MLME_H_
 
@@ -136,6 +155,8 @@ struct mlme_priv {
  
 	u8	ChannelPlan;
  
+	u8 	passive_mode; // active: 1, passive: 0
+ 
 };
 
 #ifdef CONFIG_AP_MODE
@@ -194,7 +215,7 @@ extern void rtw_join_timeout_handler(void* FunctionContext);
 extern void _rtw_scan_timeout_handler(void* FunctionContext);
 #endif
 
-extern void rtw_free_network_queue(_adapter *adapter);
+extern void rtw_free_network_queue(_adapter *adapter,u8 isfreeall);
 extern int rtw_init_mlme_priv(_adapter *adapter);// (struct mlme_priv *pmlmepriv);
 
 extern void rtw_free_mlme_priv (struct mlme_priv *pmlmepriv);
@@ -327,13 +348,13 @@ extern struct wlan_network* _rtw_dequeue_network(_queue *queue);
 extern struct wlan_network* _rtw_alloc_network(struct mlme_priv *pmlmepriv);
 
 
-extern void _rtw_free_network(struct mlme_priv *pmlmepriv, struct wlan_network *pnetwork);
+extern void _rtw_free_network(struct mlme_priv *pmlmepriv, struct wlan_network *pnetwork,u8 isfreeall);
 static void _free_network_nolock(struct mlme_priv *pmlmepriv, struct wlan_network *pnetwork);
 
 
 extern struct wlan_network* _rtw_find_network(_queue *scanned_queue, u8 *addr);
 
-extern void _rtw_free_network_queue(_adapter* padapter);
+extern void _rtw_free_network_queue(_adapter* padapter,u8 isfreeall);
 
 extern sint rtw_if_up(_adapter *padapter);
 

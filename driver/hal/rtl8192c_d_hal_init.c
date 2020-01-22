@@ -1,20 +1,22 @@
 /******************************************************************************
-* rtl8192c_d_hal_init.c                                                                                                                                 *
-*                                                                                                                                          *
-* Description :                                                                                                                       *
-*                                                                                                                                           *
-* Author :                                                                                                                       *
-*                                                                                                                                         *
-* History :                                                          
-*
-*                                        
-*                                                                                                                                       *
-* Copyright 2007, Realtek Corp.                                                                                                  *
-*                                                                                                                                        *
-* The contents of this file is the sole property of Realtek Corp.  It can not be                                     *
-* be used, copied or modified without written permission from Realtek Corp.                                         *
-*                                                                                                                                          *
-*******************************************************************************/
+ *
+ * Copyright(c) 2007 - 2010 Realtek Corporation. All rights reserved.
+ *                                        
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
+ *
+ *
+ ******************************************************************************/
 
 #define _RTL8192C_D_HAL_INIT_C_
 #include <drv_conf.h>
@@ -41,25 +43,10 @@ _FWDownloadEnable(
 	IN	BOOLEAN			enable
 	)
 {
-#if DEV_BUS_TYPE == DEV_BUS_USB_INTERFACE
-
-	u32	value32 = rtw_read32(Adapter, REG_MCUFWDL);
-
-	if(enable){
-		value32 |= MCUFWDL_EN;
-	}
-	else{
-		value32 &= ~MCUFWDL_EN;
-	}
-
-	rtw_write32(Adapter, REG_MCUFWDL, value32);
-
-#else
 	u8	tmp;
-
 	if(enable)
 	{
-		// 8051 enable
+		// 8051 with wrapper enable
 		tmp = rtw_read8(Adapter, REG_SYS_FUNC_EN+1);
 		rtw_write8(Adapter, REG_SYS_FUNC_EN+1, tmp|0x04);
 
@@ -67,7 +54,7 @@ _FWDownloadEnable(
 		tmp = rtw_read8(Adapter, REG_MCUFWDL);
 		rtw_write8(Adapter, REG_MCUFWDL, tmp|0x01);
 
-		// 8051 reset
+		// 8051 enable
 		tmp = rtw_read8(Adapter, REG_MCUFWDL+2);
 		rtw_write8(Adapter, REG_MCUFWDL+2, tmp&0xf7);
 	}
@@ -80,7 +67,7 @@ _FWDownloadEnable(
 		// Reserved for fw extension.
 		rtw_write8(Adapter, REG_MCUFWDL+1, 0x00);
 	}
-#endif
+
 }
 
 
@@ -244,7 +231,7 @@ static int _FWFreeToGo(
 	}while((counter ++ < POLLING_READY_TIMEOUT_COUNT) && (!(value32 & FWDL_ChkSum_rpt)));	
 
 	if(counter >= POLLING_READY_TIMEOUT_COUNT){	
-		//RT_TRACE(COMP_INIT, DBG_SERIOUS, ("chksum report faill ! REG_MCUFWDL:0x%08x .\n",value32));		
+		DBG_8192C("chksum report faill ! REG_MCUFWDL:0x%08x .\n",value32);		
 		return _FAIL;
 	}
 	//RT_TRACE(COMP_INIT, DBG_LOUD, ("Checksum report OK ! REG_MCUFWDL:0x%08x .\n",value32));
@@ -266,25 +253,36 @@ static int _FWFreeToGo(
 		rtw_mdelay_os(5);
 	}while(counter++ < POLLING_READY_TIMEOUT_COUNT);
 
-	//RT_TRACE(COMP_INIT, DBG_SERIOUS, ("Polling FW ready fail!! REG_MCUFWDL:0x%08x .\n",PlatformIORead4Byte(Adapter, REG_MCUFWDL)) );
+	DBG_8192C("Polling FW ready fail!! REG_MCUFWDL:0x%08x .\n",rtw_read32(Adapter, REG_MCUFWDL));
 	return _FAIL;
 	
 }
 
 
-static VOID
-_FirmwareSelfReset(
-	IN		PADAPTER		Adapter
-)
+static void  _FirmwareSelfReset(PADAPTER Adapter)
 {
 	u8	u1bTmp;
 	u8	Delay = 100;
 	HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(Adapter);
 		
+	
 	if((pHalData->FirmwareVersion > 0x21) ||
 		(pHalData->FirmwareVersion == 0x21 &&
 		pHalData->FirmwareSubVersion >= 0x01))
 	{
+/*
+	printk("==> %s REG 02(0x%04x),80(0x%08x),130(0x%08x),134(0x%08x),138(0x%08x),13c(0x%08x),\
+		1c0(0x%08x),1c4(0x%08x),1c8(0x%08x),1cc(0x%08x),\n",
+		__FUNCTION__,rtw_read16(Adapter,0x02),rtw_read32(Adapter,0x80),
+		rtw_read32(Adapter,0x130),
+		rtw_read32(Adapter,0x134),
+		rtw_read32(Adapter,0x138),
+		rtw_read32(Adapter,0x13c),
+		rtw_read32(Adapter,0x1c0),
+		rtw_read32(Adapter,0x1c4),
+		rtw_read32(Adapter,0x1c8),
+		rtw_read32(Adapter,0x1cc));
+*/		
 		//0x1cf=0x20. Inform 8051 to reset. 2009.12.25. tynli_test
 		rtw_write8(Adapter, REG_HMETFR+3, 0x20);
 	
@@ -302,9 +300,23 @@ _FirmwareSelfReset(
 	
 		if((u1bTmp&BIT2) && (Delay == 0))
 		{
-			//DbgPrint("FirmwareDownload92C(): Fail!!!!!! 0x03 = %x\n", u1bTmp);
+			DBG_8192C("FirmwareDownload92C():fw reset by itself Fail!!!!!! 0x03 = %x\n", u1bTmp);
 			//RT_ASSERT(FALSE, ("PowerOffAdapter8192CE(): 0x03 = %x\n", u1bTmp));
+			rtw_write8(Adapter,REG_SYS_FUNC_EN+1,(rtw_read8(Adapter, REG_SYS_FUNC_EN+1)&~BIT2));
 		}
+/*
+		printk("==> %s REG 02(0x%04x),80(0x%08x),130(0x%08x),134(0x%08x),138(0x%08x),13c(0x%08x),\
+		1c0(0x%08x),1c4(0x%08x),1c8(0x%08x),1cc(0x%08x),\n",
+		__FUNCTION__,rtw_read16(Adapter,0x02),rtw_read32(Adapter,0x80),
+		rtw_read32(Adapter,0x130),
+		rtw_read32(Adapter,0x134),
+		rtw_read32(Adapter,0x138),
+		rtw_read32(Adapter,0x13c),
+		rtw_read32(Adapter,0x1c0),
+		rtw_read32(Adapter,0x1c4),
+		rtw_read32(Adapter,0x1c8),
+		rtw_read32(Adapter,0x1cc));
+*/		
 	}
 }
 
@@ -319,10 +331,16 @@ int FirmwareDownload92C(
 {	
 	int	rtStatus = _SUCCESS;	
 	HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(Adapter);
-	char 			R88CFwImageFileName[] ={RTL8188C_FW_IMG};
-	char 			R92CFwImageFileName[] ={RTL8192C_FW_IMG};
+
+	char 			R92CFwImageFileName_TSMC[] ={RTL8192C_FW_TSMC_IMG};
+	char 			R92CFwImageFileName_UMC[] ={RTL8192C_FW_UMC_IMG};
+	char 			R8723FwImageFileName_UMC[] ={RTL8723_FW_UMC_IMG};
+
+	char *			FwImage;
+	u32				FwImageLen;	
+	
 	char*			pFwImageFileName;	
-	u8*			pucMappedFile = NULL;
+
 	//vivi, merge 92c and 92s into one driver, 20090817
 	//vivi modify this temply, consider it later!!!!!!!!
 	//PRT_FIRMWARE	pFirmware = GET_FIRMWARE_819X(Adapter);	
@@ -339,12 +357,6 @@ int FirmwareDownload92C(
 		goto Exit;
 	}
 	
-	if(IS_92C_SERIAL(pHalData->VersionID)){	
-		pFwImageFileName = (char*)&R92CFwImageFileName;
-	}
-	else{
-		pFwImageFileName = (char*)&R88CFwImageFileName;
-	}
 	
 
 	//RT_TRACE(COMP_INIT, DBG_LOUD, (" ===> FirmwareDownload91C() fw:%s\n", pFwImageFileName));
@@ -352,32 +364,58 @@ int FirmwareDownload92C(
 #ifdef CONFIG_EMBEDDED_FWIMG
 	pFirmware->eFWSource = FW_SOURCE_HEADER_FILE;
 #else
-	pFirmware->eFWSource = FW_SOURCE_IMG_FILE; // We should decided by Reg.
+	pFirmware->eFWSource = FW_SOURCE_IMG_FILE; 
 #endif
+	if(IS_NORMAL_CHIP(pHalData->VersionID))
+	{
+		if(IS_VENDOR_UMC_A_CUT(pHalData->VersionID) && !IS_92C_SERIAL(pHalData->VersionID))// UMC , 8188
+		{						
+			pFwImageFileName = R92CFwImageFileName_UMC;
+			FwImage = Rtl819XFwUMCImageArray;
+			FwImageLen = UMCImgArrayLength;
+			DBG_871X(" ===> FirmwareDownload91C() fw:Rtl819XFwImageArray_UMC\n");
+				
+		}
+		else
+		{
+			pFwImageFileName = R92CFwImageFileName_TSMC;
+			FwImage = Rtl819XFwTSMCImageArray;
+			FwImageLen = TSMCImgArrayLength;
+			DBG_871X(" ===> FirmwareDownload91C() fw:Rtl819XFwImageArray_TSMC\n");
+		}
+	}
+	else
+	{
+	#if 0
+		pFwImageFileName = TestChipFwFile;
+		FwImage = Rtl8192CTestFwImg;
+		FwImageLen = Rtl8192CTestFwImgLen;
+		RT_TRACE(COMP_INIT, DBG_LOUD, (" ===> FirmwareDownload91C() fw:Rtl8192CTestFwImg\n"));
+	#endif
+	}
+		
 
 	switch(pFirmware->eFWSource)
 	{
 		case FW_SOURCE_IMG_FILE:
-			//TODO:
+			//TODO:load fw bin file
 			break;
 		case FW_SOURCE_HEADER_FILE:
-			if(ImgArrayLength > FW_8192C_SIZE){
+			if(TSMCImgArrayLength > FW_8192C_SIZE){
 				rtStatus = _FAIL;
 				//RT_TRACE(COMP_INIT, DBG_SERIOUS, ("Firmware size exceed 0x%X. Check it.\n", FW_8192C_SIZE) );
 				DBG_871X("Firmware size exceed 0x%X. Check it.\n", FW_8192C_SIZE);
 				goto Exit;
 			}
-
-			//RtlCopyMemory(pFirmware->szFwBuffer, Rtl819XFwImageArray, ImgArrayLength);
-			_rtw_memcpy(pFirmware->szFwBuffer, Rtl819XFwImageArray, ImgArrayLength);
-			pFirmware->ulFwLength = ImgArrayLength;
+			_rtw_memcpy(pFirmware->szFwBuffer, FwImage, FwImageLen);
+			pFirmware->ulFwLength = FwImageLen;
 			break;
 	}
 
 	pFirmwareBuf = pFirmware->szFwBuffer;
 	FirmwareLen = pFirmware->ulFwLength;
 
-	// To Check Fw header. Added by tynli. 2009.12.04.
+	// To Check Fw header. 
 	pFwHdr = (PRT_8192C_FIRMWARE_HDR)pFirmware->szFwBuffer;
 
 	pHalData->FirmwareVersion =  le16_to_cpu(pFwHdr->Version); 
@@ -400,6 +438,7 @@ int FirmwareDownload92C(
 	// or it will cause download Fw fail. 2010.02.01. by tynli.
 	if(rtw_read8(Adapter, REG_MCUFWDL)&BIT7) //8051 RAM code
 	{	
+		DBG_8192C("8051 in Ram......prepare to reset by itself\n");
 		_FirmwareSelfReset(Adapter);
 		rtw_write8(Adapter, REG_MCUFWDL, 0x00);		
 	}
@@ -697,9 +736,10 @@ ReadChipVersion(
 	IN	PADAPTER	Adapter
 	)
 {
-	u32			value32;
-	VERSION_8192C	version = VERSION_NORMAL_CHIP_88C;
-
+	u32				value32;
+	VERSION_8192C	version;
+	u8				ChipVersion=0;	
+	
 	value32 = rtw_read32(Adapter, REG_SYS_CFG);
 #if 0
 	if(value32 & TRP_VAUX_EN){		
@@ -729,23 +769,68 @@ ReadChipVersion(
 		version = (value32 & TYPE_ID) ?VERSION_TEST_CHIP_92C :VERSION_TEST_CHIP_88C;		
 	}
 	else{
-		version = (value32 & TYPE_ID) ?VERSION_NORMAL_CHIP_92C :VERSION_NORMAL_CHIP_88C;
+		// Normal mass production chip.
+		ChipVersion = NORMAL_CHIP;
+		ChipVersion |= ((value32 & TYPE_ID) ? CHIP_92C : 0);
+		ChipVersion |= ((value32 & VENDOR_ID) ? CHIP_VENDOR_UMC : 0);
+		ChipVersion |= ((value32 & BT_FUNC) ? CHIP_8723: 0); // RTL8723 with BT function.
+		if(IS_VENDOR_UMC(ChipVersion))
+			ChipVersion |= ((value32 & CHIP_VER_RTL_MASK) ? CHIP_VENDOR_UMC_B_CUT : 0);
+
+		if(IS_92C_SERIAL(ChipVersion))
+		{
+			value32 = rtw_read32(Adapter, REG_HPON_FSM);
+			ChipVersion |= ((CHIP_BONDING_IDENTIFIER(value32) == CHIP_BONDING_92C_1T2R) ? CHIP_92C_1T2R : 0);			
+		}
+		else if(IS_8723_SERIES(ChipVersion))
+		{
+			value32 = rtw_read32(Adapter, REG_GPIO_OUTSTS);
+			ChipVersion |= ((value32 & RF_RL_ID) ? CHIP_8723_DRV_REV : 0);			
+		}
+		version = (VERSION_8192C)ChipVersion;
 	}
 #endif
 
 	switch(version)
 	{
-		case VERSION_NORMAL_CHIP_92C:
-			MSG_8192C("Chip Version ID: VERSION_NORMAL_CHIP_92C.\n");
+		case VERSION_NORMAL_TSMC_CHIP_92C_1T2R:
+			MSG_8192C("Chip Version ID: VERSION_NORMAL_TSMC_CHIP_92C_1T2R.\n");
 			break;
-		case VERSION_NORMAL_CHIP_88C:
-			MSG_8192C ("Chip Version ID: VERSION_NORMAL_CHIP_88C.\n");
+		case VERSION_NORMAL_TSMC_CHIP_92C:
+			MSG_8192C("Chip Version ID: VERSION_NORMAL_TSMC_CHIP_92C.\n");
+			break;
+		case VERSION_NORMAL_TSMC_CHIP_88C:
+			MSG_8192C("Chip Version ID: VERSION_NORMAL_TSMC_CHIP_88C.\n");
+			break;
+		case VERSION_NORMAL_UMC_CHIP_92C_1T2R_A_CUT:
+			MSG_8192C("Chip Version ID: VERSION_NORMAL_UMC_CHIP_92C_1T2R_A_CUT.\n");
+			break;
+		case VERSION_NORMAL_UMC_CHIP_92C_A_CUT:
+			MSG_8192C("Chip Version ID: VERSION_NORMAL_UMC_CHIP_92C_A_CUT.\n");
+			break;
+		case VERSION_NORMAL_UMC_CHIP_88C_A_CUT:
+			MSG_8192C("Chip Version ID: VERSION_NORMAL_UMC_CHIP_88C_A_CUT.\n");
+			break;			
+		case VERSION_NORMAL_UMC_CHIP_92C_1T2R_B_CUT:
+			MSG_8192C("Chip Version ID: VERSION_NORMAL_UMC_CHIP_92C_1T2R_B_CUT.\n");
+			break;
+		case VERSION_NORMAL_UMC_CHIP_92C_B_CUT:
+			MSG_8192C("Chip Version ID: VERSION_NORMAL_UMC_CHIP_92C_B_CUT.\n");
+			break;
+		case VERSION_NORMAL_UMC_CHIP_88C_B_CUT:
+			MSG_8192C("Chip Version ID: VERSION_NORMAL_UMC_CHIP_88C_B_CUT.\n");
 			break;
 		case VERSION_TEST_CHIP_92C:
 			MSG_8192C("Chip Version ID: VERSION_TEST_CHIP_92C.\n");
 			break;
 		case VERSION_TEST_CHIP_88C:
 			MSG_8192C("Chip Version ID: VERSION_TEST_CHIP_88C.\n");
+			break;
+		case VERSION_NORMA_UMC_CHIP_8723_1T1R_A_CUT:
+			MSG_8192C("Chip Version ID: VERSION_NORMA_UMC_CHIP_8723_1T1R_A_CUT.\n");
+			break;
+		case VERSION_NORMA_UMC_CHIP_8723_1T1R_B_CUT:
+			MSG_8192C("Chip Version ID: VERSION_NORMA_UMC_CHIP_8723_1T1R_B_CUT.\n");
 			break;
 		default:
 			MSG_8192C("Chip Version ID: ???????????????.\n");
@@ -767,11 +852,21 @@ _ReadIDs(
 	EEPROM_EFUSE_PRIV *pEEPROM = GET_EEPROM_EFUSE_PRIV(Adapter);
 	HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(Adapter);
 
-
 	if(_FALSE == AutoloadFail){
 		// VID, PID 
+		#if 1 //for Funai BD's alignment error		
+		u16 tmp = 0;		
+		_rtw_memcpy( &tmp , (void*) &PROMContent[EEPROM_VID], 2 );		
+		tmp = le16_to_cpu( tmp );		
+		pEEPROM->EEPROMVID = tmp;		
+		tmp = 0;		
+		_rtw_memcpy( &tmp , (void*) &PROMContent[EEPROM_PID], 2 );		
+		tmp = le16_to_cpu( tmp );		
+		pEEPROM->EEPROMPID = tmp;	
+		#else
 		pEEPROM->EEPROMVID = le16_to_cpu( *(u16 *)&PROMContent[EEPROM_VID]);
-		pEEPROM->EEPROMPID = le16_to_cpu( *(u16 *)&PROMContent[EEPROM_PID]);
+		pEEPROM->EEPROMPID = le16_to_cpu( *(u16 *)&PROMContent[EEPROM_PID]);		
+		#endif
 		
 		// Customer ID, 0x00 and 0xff are reserved for Realtek. 		
 		pEEPROM->EEPROMCustomerID = *(u8 *)&PROMContent[EEPROM_CUSTOMER_ID];
@@ -858,6 +953,10 @@ _ReadIDs(
 			
 	}
 
+	// For customized behavior.
+	if((pEEPROM->EEPROMVID == 0x103C) && (pEEPROM->EEPROMPID == 0x1629))// HP Lite-On for RTL8188CUS Slim Combo.
+		pHalData->CustomerID = RT_CID_819x_HP;	
+
 	MSG_8192C("EEPROMVID = 0x%04x\n", pEEPROM->EEPROMVID);
 	MSG_8192C("EEPROMPID = 0x%04x\n", pEEPROM->EEPROMPID);
 	MSG_8192C("EEPROMCustomerID : 0x%02x\n", pEEPROM->EEPROMCustomerID);
@@ -895,8 +994,8 @@ _ReadMACAddress(
 #ifdef CONFIG_BT_COEXIST
 static void _update_bt_param(_adapter *padapter)
 {
-	struct btcoexist_priv	 *pbtpriv = &(padapter->bt_coexist);
-	struct registry_priv  *registry_par = &padapter->registrypriv;
+	struct btcoexist_priv	 *pbtpriv = &(padapter->halpriv.bt_coexist);
+	struct registry_priv  	*registry_par = &padapter->registrypriv;
 	if(2 != registry_par->bt_iso)
 		pbtpriv->BT_Ant_isolation = registry_par->bt_iso;// 0:Low, 1:High, 2:From Efuse
 
@@ -914,6 +1013,19 @@ static void _update_bt_param(_adapter *padapter)
 
 	pbtpriv->BT_Ampdu = registry_par->bt_ampdu;
 	pbtpriv->bCOBT = _TRUE;
+
+	pbtpriv->BtEdcaUL = 0;
+	pbtpriv->BtEdcaDL = 0;
+	pbtpriv->BtRssiState = 0xff;
+
+	pbtpriv->bInitSet = _FALSE;
+	pbtpriv->bBTBusyTraffic = _FALSE;
+	pbtpriv->bBTTrafficModeSet = _FALSE;
+	pbtpriv->bBTNonTrafficModeSet = _FALSE;
+	pbtpriv->CurrentState = 0;
+	pbtpriv->PreviousState = 0;
+		
+	
 #if 1
 	printk("BT Coexistance = %s\n", (pbtpriv->BT_Coexist==_TRUE)?"enable":"disable");
 	if(pbtpriv->BT_Coexist)
@@ -937,9 +1049,12 @@ static void _update_bt_param(_adapter *padapter)
 			case BT_Accel:
 				printk("BlueTooth BT_CoexistType = BT_Accel\n");
 				break;
-			case BT_CSR:
-				printk("BlueTooth BT_CoexistType = BT_CSR\n");
+			case BT_CSR_BC4:
+				printk("BlueTooth BT_CoexistType = BT_CSR_BC4\n");
 				break;
+			case BT_CSR_BC8:
+				printk("BlueTooth BT_CoexistType = BT_CSR_BC8\n");
+				break;			
 			case BT_RTL8756:
 				printk("BlueTooth BT_CoexistType = BT_RTL8756\n");
 				break;
@@ -986,8 +1101,10 @@ void _ReadBluetoothCoexistInfo(
 {
 	HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(Adapter);
 	BOOLEAN			isNormal = IS_NORMAL_CHIP(pHalData->VersionID);
-	struct btcoexist_priv	 *pbtpriv = GET_BT_COEXIST(Adapter);
+	struct btcoexist_priv	 *pbtpriv = &pHalData->bt_coexist;
+	
 	u8	rf_opt4;
+	_rtw_memset(pbtpriv, 0,sizeof(struct btcoexist_priv));
 
 	if(AutoloadFail){
 		pbtpriv->BT_Coexist = _FALSE;
@@ -1000,12 +1117,16 @@ void _ReadBluetoothCoexistInfo(
 
 	if(isNormal)
 	{
-		pbtpriv->BT_Coexist = (((PROMContent[EEPROM_RF_OPT1]&BOARD_TYPE_NORMAL_MASK)>>5) == BOARD_USB_COMBO)?_TRUE:_FALSE;	// bit [7:5]
+		if(pHalData->BoardType == BOARD_USB_COMBO)
+			pbtpriv->BT_Coexist = _TRUE;
+		else
+			pbtpriv->BT_Coexist = ((PROMContent[EEPROM_RF_OPT3]&0x20)>>5);	//bit[5]
+		
 		rf_opt4 = PROMContent[EEPROM_RF_OPT4];
-		pbtpriv->BT_CoexistType 		= ((rf_opt4&0xe)>>1);			// bit [3:1]
-		pbtpriv->BT_Ant_Num 		= (rf_opt4&0x1);				// bit [0]
+		pbtpriv->BT_CoexistType 	= ((rf_opt4&0xe)>>1);				// bit [3:1]
+		pbtpriv->BT_Ant_Num 		= (rf_opt4&0x1);					// bit [0]
 		pbtpriv->BT_Ant_isolation 	= ((rf_opt4&0x10)>>4);			// bit [4]
-		pbtpriv->BT_RadioSharedType 	= ((rf_opt4&0x20)>>5);			// bit [5]
+		pbtpriv->BT_RadioSharedType 	= ((rf_opt4&0x20)>>5);		// bit [5]
 	}
 	else
 	{
@@ -1036,9 +1157,7 @@ _ReadBoardType(
 
 	if(isNormal) 
 	{
-		boardType = PROMContent[EEPROM_NORMAL_BoardType];
-		boardType &= BOARD_TYPE_NORMAL_MASK;//bit[7:5]
-		boardType >>= 5;
+		boardType = ((PROMContent[EEPROM_RF_OPT1])&BOARD_TYPE_NORMAL_MASK)>>5 ; //bit[7:5]
 	}
 	else
 	{
@@ -1081,43 +1200,18 @@ _ReadLEDSetting(
 	switch(pHalData->CustomerID)
 	{
 		case RT_CID_DEFAULT:
-		case RT_CID_819x_ALPHA:
-		case RT_CID_819x_CAMEO:
-					pledpriv->LedStrategy = SW_LED_MODE1;
-					pledpriv->bRegUseLed = _TRUE;
-		break;
+			pledpriv->LedStrategy = SW_LED_MODE1;
+			pledpriv->bRegUseLed = _TRUE;			
+			break;
 
-		case RT_CID_819x_Sitecom:
-					pledpriv->LedStrategy = SW_LED_MODE2;
-					pledpriv->bRegUseLed = _TRUE;
-					break;	
-
-		case RT_CID_COREGA:
-		case RT_CID_819x_Senao:
-					pledpriv->LedStrategy = SW_LED_MODE3;
-					pledpriv->bRegUseLed = _TRUE;
-					break;			
-
-		case RT_CID_819x_Edimax_Belkin:
-					pledpriv->LedStrategy = SW_LED_MODE4;
-					pledpriv->bRegUseLed = _TRUE;
-					break;					
-
-		case RT_CID_819x_Sercomm_Belkin:
-					pledpriv->LedStrategy = SW_LED_MODE5;
-					pledpriv->bRegUseLed = _TRUE;
-					break;
-
-		case RT_CID_819x_WNC_COREGA:
-					pledpriv->LedStrategy = SW_LED_MODE6;
-					pledpriv->bRegUseLed = _TRUE;
-					break;
-
+		case RT_CID_819x_HP:
+			pledpriv->LedStrategy = SW_LED_MODE6; // Customize Led mode	
+			pledpriv->bLedOpenDrain = _TRUE;// Support Open-drain arrangement for controlling the LED. Added by Roger, 2009.10.16.
+			break;
+			
 		default:
-					pledpriv->LedStrategy = SW_LED_MODE0;
-					pledpriv->bRegUseLed = _FALSE;
-		break;			
-					
+			pledpriv->LedStrategy = SW_LED_MODE1;
+			break;			
 	}
 
 	if( BOARD_MINICARD == pHalData->BoardType )
@@ -1185,9 +1279,9 @@ _ReadPROMVersion(
 		pEEPROM->EEPROMVersion = *(u8 *)&PROMContent[EEPROM_VERSION];
 	}
 }
-#ifdef CONFIG_AUTOSUSPEND
+
 // Read HW power down mode selection 
-static void _ReadHWPDSelection(IN PADAPTER Adapter,IN u8*PROMContent,IN	bool	AutoloadFail)
+static void _ReadHWPDSelection(IN PADAPTER Adapter,IN u8*PROMContent,IN	u8	AutoloadFail)
 {
 	if(AutoloadFail){
 		Adapter->pwrctrlpriv.bHWPowerdown = _FALSE;
@@ -1197,21 +1291,28 @@ static void _ReadHWPDSelection(IN PADAPTER Adapter,IN u8*PROMContent,IN	bool	Aut
 		if(SUPPORT_HW_RADIO_DETECT(Adapter))
 			Adapter->pwrctrlpriv.bHWPwrPindetect = Adapter->registrypriv.hwpwrp_detect;
 		else
-			Adapter->pwrctrlpriv.bHWPwrPindetect = _FALSE;
+			Adapter->pwrctrlpriv.bHWPwrPindetect = _FALSE;//dongle not support new
+			
 			
 		//hw power down mode selection , 0:rf-off / 1:power down
+
 		if(Adapter->registrypriv.hwpdn_mode==2)
-		Adapter->pwrctrlpriv.bHWPowerdown = (PROMContent[EEPROM_RF_OPT3] & BIT4);
+			Adapter->pwrctrlpriv.bHWPowerdown = (PROMContent[EEPROM_RF_OPT3] & BIT4);
 		else
 			Adapter->pwrctrlpriv.bHWPowerdown = Adapter->registrypriv.hwpdn_mode;
-		
+				
 		// decide hw if support remote wakeup function
 		// if hw supported, 8051 (SIE) will generate WeakUP frame when autoresume
 		Adapter->pwrctrlpriv.bSupportRemoteWakeup = (PROMContent[EEPROM_TEST_USB_OPT] & BIT1)?_TRUE :_FALSE;
+
+		if(SUPPORT_HW_RADIO_DETECT(Adapter))	
+			Adapter->registrypriv.usbss_enable = Adapter->pwrctrlpriv.bSupportRemoteWakeup ;
+		
+		DBG_8192C("%s...bHWPwrPindetect(%d) bSupportRemoteWakeup(%x)\n",__FUNCTION__,Adapter->pwrctrlpriv.bHWPwrPindetect,Adapter->pwrctrlpriv.bSupportRemoteWakeup);
 	}
 	
 }
-#endif
+
 
 static void _InitAdapterVariablesByPROM(IN	PADAPTER Adapter)
 {
@@ -1233,9 +1334,8 @@ static void _InitAdapterVariablesByPROM(IN	PADAPTER Adapter)
 	_ReadThermalMeter(Adapter, PROMContent, !bAutoload);
 	_ReadLEDSetting(Adapter, PROMContent, !bAutoload);	
 	_ReadRFSetting(Adapter, PROMContent, !bAutoload);
-#ifdef CONFIG_AUTOSUSPEND
 	_ReadHWPDSelection(Adapter, PROMContent, !bAutoload);
-#endif
+
 	
 }
 
@@ -1340,7 +1440,7 @@ _InitOtherVariable(
 	// 2009/06/10 MH For 92S 1*1=1R/ 1*2&2*2 use 2R. We default set 1*1 use radio A
 	// So if you want to use radio B. Please modify RF path enable bit for correct signal
 	// strength calculate.
-	if (pHalData->RF_Type == RF_1T1R){
+	if (pHalData->rf_type == RF_1T1R){
 		pHalData->bRFPathRxEnable[0] = TRUE;
 	}
 	else{

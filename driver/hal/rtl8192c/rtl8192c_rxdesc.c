@@ -1,20 +1,22 @@
 /******************************************************************************
-* rtl8192c_recv.c                                                                                                                                 *
-*                                                                                                                                          *
-* Description :                                                                                                                       *
-*                                                                                                                                           *
-* Author :                                                                                                                       *
-*                                                                                                                                         *
-* History :
-*
-*
-*                                                                                                                                       *
-* Copyright 2008, Realtek Corp.                                                                                                  *
-*                                                                                                                                        *
-* The contents of this file is the sole property of Realtek Corp.  It can not be                                     *
-* be used, copied or modified without written permission from Realtek Corp.                                         *
-*                                                                                                                                          *
-*******************************************************************************/
+ *
+ * Copyright(c) 2007 - 2010 Realtek Corporation. All rights reserved.
+ *                                        
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
+ *
+ *
+ ******************************************************************************/
 #define _RTL8192C_RECV_C_
 #include <drv_conf.h>
 #include <osdep_service.h>
@@ -185,7 +187,7 @@ void rtl8192c_query_rx_phy_status(union recv_frame *prframe, struct recv_stat *p
 		}
 
 		pwdb_all= query_rx_pwr_percentage(rx_pwr_all);
-		if(pHalData->CustomerID == RT_CID_819x_Lenovo)
+		//if(pHalData->CustomerID == RT_CID_819x_Lenovo)
 		{
 			// CCK gain is smaller than OFDM/MCS gain,
 			// so we add gain diff by experiences, the val is 6
@@ -514,16 +516,8 @@ static void process_link_qual(_adapter *padapter,union recv_frame *prframe)
 void rtl8192c_process_phy_info(_adapter *padapter, void *prframe)
 {
 	union recv_frame *precvframe = (union recv_frame *)prframe;
-
+	
 #ifdef CONFIG_ANTENNA_DIVERSITY
-	// If we switch to the antenna for testing, the signal strength 
-	// of the packets in this time shall not be counted into total receiving power. 
-	// This prevents error counting Rx signal strength and affecting other dynamic mechanism.
-
-	//for after Linked,Just collect rssi of BCN && Probe_rsp 		
-	SwAntDivRSSICheck(padapter, precvframe->u.hdr.attrib.RxPWDBAll);		
-
-
 	if(GET_HAL_DATA(padapter)->RSSI_test == _TRUE)
 		return;
 #endif

@@ -1,20 +1,22 @@
 /******************************************************************************
-* rtl871x_recv.c                                                                                                                                 *
-*                                                                                                                                          *
-* Description :                                                                                                                       *
-*                                                                                                                                           *
-* Author :                                                                                                                       *
-*                                                                                                                                         *
-* History :
-*
-*
-*                                                                                                                                       *
-* Copyright 2007, Realtek Corp.                                                                                                  *
-*                                                                                                                                        *
-* The contents of this file is the sole property of Realtek Corp.  It can not be                                     *
-* be used, copied or modified without written permission from Realtek Corp.                                         *
-*                                                                                                                                          *
-*******************************************************************************/
+ *
+ * Copyright(c) 2007 - 2010 Realtek Corporation. All rights reserved.
+ *                                        
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
+ *
+ *
+ ******************************************************************************/
 #define _RTL871X_RECV_C_
 #include <drv_conf.h>
 #include <osdep_service.h>
@@ -565,6 +567,7 @@ static union recv_frame * portctrl(_adapter *adapter,union recv_frame * precv_fr
 	struct	sta_priv *pstapriv ;
 	union recv_frame * prtnframe;
 	u16	ether_type=0;
+	u16  eapol_type = 0x888e;//for Funia BD's WPA issue  
 	struct rx_pkt_attrib *pattrib = & precv_frame->u.hdr.attrib;
 
 _func_enter_;
@@ -595,7 +598,7 @@ _func_enter_;
 		_rtw_memcpy(&ether_type,ptr, 2);
 		ether_type= ntohs((unsigned short )ether_type);
 
-		if (ether_type == 0x888e) {
+		if (ether_type == eapol_type) {
 			prtnframe=precv_frame;
 		} else {
 			//free this frame
@@ -617,7 +620,7 @@ _func_enter_;
 
 		prtnframe=precv_frame;
 		//check is the EAPOL frame or not (Rekey)
-		if(ether_type == 0x888e){
+		if(ether_type == eapol_type){
 
 			RT_TRACE(_module_rtl871x_recv_c_,_drv_err_,("########portctrl:ether_type == 0x888e\n"));
 			//check Rekey
@@ -1222,26 +1225,18 @@ static sint validate_recv_frame(_adapter *adapter, union recv_frame *precv_frame
 	u8 type;
 	u8 subtype;
 	sint retval = _SUCCESS;
+	
+	HAL_DATA_TYPE		*pHalData = GET_HAL_DATA(adapter);	
 
 	struct rx_pkt_attrib *pattrib = & precv_frame->u.hdr.attrib;
 
 	u8 *ptr = precv_frame->u.hdr.rx_data;
 	u8  ver =(unsigned char) (*ptr)&0x3 ;
-
+ 
 _func_enter_;
 
 
-#if 0
-DBG_871X("\n");
-{
-	int i;
-	for(i=0; i<64;i=i+8)
-		DBG_871X("%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X:", *(ptr+i),
-		*(ptr+i+1), *(ptr+i+2) ,*(ptr+i+3) ,*(ptr+i+4),*(ptr+i+5), *(ptr+i+6), *(ptr+i+7));
 
-}
-DBG_871X("\n");
-#endif
 
 	//add version chk
 	if(ver!=0){
@@ -1263,7 +1258,41 @@ DBG_871X("\n");
 	pattrib->mdata = GetMData(ptr);
 	pattrib->privacy = GetPrivacy(ptr);
 	pattrib->order = GetOrder(ptr);
+#if 0
 
+if(pHalData->bDumpRxPkt ==1){
+	int i;
+	DBG_871X("############################# \n");
+	
+	for(i=0; i<64;i=i+8)
+		DBG_871X("%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X:\n", *(ptr+i),
+		*(ptr+i+1), *(ptr+i+2) ,*(ptr+i+3) ,*(ptr+i+4),*(ptr+i+5), *(ptr+i+6), *(ptr+i+7));
+	DBG_871X("############################# \n");
+}
+else if(pHalData->bDumpRxPkt ==2){
+	if(type== WIFI_MGT_TYPE){
+		int i;
+		DBG_871X("############################# \n");
+		
+		for(i=0; i<64;i=i+8)
+			DBG_871X("%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X:\n", *(ptr+i),
+			*(ptr+i+1), *(ptr+i+2) ,*(ptr+i+3) ,*(ptr+i+4),*(ptr+i+5), *(ptr+i+6), *(ptr+i+7));
+		DBG_871X("############################# \n");
+	}
+}
+else if(pHalData->bDumpRxPkt ==3){
+	if(type== WIFI_DATA_TYPE){
+		int i;
+		DBG_871X("############################# \n");
+		
+		for(i=0; i<64;i=i+8)
+			DBG_871X("%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X:\n", *(ptr+i),
+			*(ptr+i+1), *(ptr+i+2) ,*(ptr+i+3) ,*(ptr+i+4),*(ptr+i+5), *(ptr+i+6), *(ptr+i+7));
+		DBG_871X("############################# \n");
+	}
+}
+
+#endif
 	switch (type)
 	{
 		case WIFI_MGT_TYPE: //mgnt
@@ -1281,8 +1310,7 @@ DBG_871X("\n");
 				RT_TRACE(_module_rtl871x_recv_c_,_drv_err_,("validate_recv_ctrl_frame fail\n"));
 			}
 			break;
-		case WIFI_DATA_TYPE: //data
-			adapter->ledpriv.LedControlHandler(adapter, LED_CTL_RX);
+		case WIFI_DATA_TYPE: //data			
 			pattrib->qos = (subtype & BIT(7))? 1:0;
 			retval = validate_recv_data_frame(adapter, precv_frame);
 			if (retval == _FAIL)
@@ -1850,7 +1878,7 @@ static int amsdu_to_msdu(_adapter *padapter, union recv_frame *prframe)
 
 		/* Indicat the packets to upper layer */
 		if (sub_skb) {
-			//memset(sub_skb->cb, 0, sizeof(sub_skb->cb));
+			//_rtw_memset(sub_skb->cb, 0, sizeof(sub_skb->cb));
 
 			sub_skb->protocol = eth_type_trans(sub_skb, padapter->pnetdev);
 			sub_skb->dev = padapter->pnetdev;
@@ -2694,8 +2722,10 @@ static int recv_func(_adapter *padapter, void *pcontext)
 		rtw_free_recvframe(orig_prframe, pfree_recv_queue);//free this recv_frame
 		goto _exit_recv_func;
 	}
+	// DATA FRAME
+	padapter->ledpriv.LedControlHandler(padapter, LED_CTL_RX);
 
-	pHalData->hal_ops.process_phy_info(padapter, prframe);
+	//pHalData->hal_ops.process_phy_info(padapter, prframe);
 
 	prframe = decryptor(padapter, prframe);
 	if (prframe == NULL) {

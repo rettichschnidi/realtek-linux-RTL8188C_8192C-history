@@ -1,20 +1,22 @@
 /******************************************************************************
-* rtl871x_pwrctrl.c                                                                                                                                 *
-*                                                                                                                                          *
-* Description :                                                                                                                       *
-*                                                                                                                                           *
-* Author :                                                                                                                       *
-*                                                                                                                                         *
-* History :                                                          
-*
-*                                        
-*                                                                                                                                       *
-* Copyright 2007, Realtek Corp.                                                                                                  *
-*                                                                                                                                        *
-* The contents of this file is the sole property of Realtek Corp.  It can not be                                     *
-* be used, copied or modified without written permission from Realtek Corp.                                         *
-*                                                                                                                                          *
-*******************************************************************************/
+ *
+ * Copyright(c) 2007 - 2010 Realtek Corporation. All rights reserved.
+ *                                        
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
+ *
+ *
+ ******************************************************************************/
 #define _RTL871X_PWRCTRL_C_
 
 #include <drv_conf.h>
@@ -34,11 +36,198 @@ extern int r871xu_ips_pwr_up(_adapter *padapter);
 extern void r871xu_ips_pwr_down(_adapter *padapter);
 #endif
 
+
+#ifdef CONFIG_AUTOSUSPEND
+void autosuspend_enter(_adapter* padapter)	
+{
+	struct pwrctrl_priv *pwrpriv = &padapter->pwrctrlpriv;
+	pwrpriv->bips_processing = _TRUE;	
+	
+	printk("==>autosuspend_enter...........\n");	
+	
+	if(rf_off == pwrpriv->change_rfpwrstate )
+	{	
+		#if (LINUX_VERSION_CODE>=KERNEL_VERSION(2,6,35))
+		usb_enable_autosuspend(padapter->dvobjpriv.pusbdev);
+		#else
+		padapter->dvobjpriv.pusbdev->autosuspend_disabled = 0;//autosuspend disabled by the user	
+		#endif
+		
+		#if (LINUX_VERSION_CODE>=KERNEL_VERSION(2,6,33))
+			usb_autopm_put_interface(padapter->dvobjpriv.pusbintf);	
+		#elif (LINUX_VERSION_CODE>=KERNEL_VERSION(2,6,20))		
+			usb_autopm_enable(padapter->dvobjpriv.pusbintf);
+		#else
+			usb_autosuspend_device(padapter->dvobjpriv.pusbdev, 1);
+		#endif
+	}
+	#if (LINUX_VERSION_CODE>=KERNEL_VERSION(2,6,32))
+	printk("...pm_usage_cnt(%d).....\n",atomic_read(&(padapter->dvobjpriv.pusbintf->pm_usage_cnt)));
+	#else
+	printk("...pm_usage_cnt(%d).....\n",padapter->dvobjpriv.pusbintf->pm_usage_cnt);
+	#endif
+	
+}
+int autoresume_enter(_adapter* padapter)
+{
+	int result = _SUCCESS;
+	struct pwrctrl_priv *pwrpriv = &padapter->pwrctrlpriv;
+	struct security_priv* psecuritypriv=&(padapter->securitypriv);
+	struct mlme_ext_priv	*pmlmeext = &padapter->mlmeextpriv;
+	struct mlme_ext_info	*pmlmeinfo = &(pmlmeext->mlmext_info);
+	
+	
+	printk("====> autoresume_enter \n");
+	
+	if(rf_off == pwrpriv->current_rfpwrstate )
+	{			
+		#if (LINUX_VERSION_CODE>=KERNEL_VERSION(2,6,33))				
+			if (usb_autopm_get_interface( padapter->dvobjpriv.pusbintf) < 0) 
+			{
+				printk( "can't get autopm: %d\n", result);
+				result = _FAIL;
+				goto error_exit;
+			}			
+		#elif (LINUX_VERSION_CODE>=KERNEL_VERSION(2,6,20))				
+			usb_autopm_disable(padapter->dvobjpriv.pusbintf);
+		#else
+			usb_autoresume_device(padapter->dvobjpriv.pusbdev, 1);
+		#endif
+
+		#if (LINUX_VERSION_CODE>=KERNEL_VERSION(2,6,32))
+		printk("...pm_usage_cnt(%d).....\n",atomic_read(&(padapter->dvobjpriv.pusbintf->pm_usage_cnt)));
+		#else
+		printk("...pm_usage_cnt(%d).....\n",padapter->dvobjpriv.pusbintf->pm_usage_cnt);
+		#endif	
+	}
+	printk("<==== autoresume_enter \n");
+error_exit:	
+
+	return result;
+}
+#endif
+#ifdef SUPPORT_HW_RFOFF_DETECTED
+rt_rf_power_state RfOnOffDetect(IN	PADAPTER pAdapter )
+{
+	HAL_DATA_TYPE		*pHalData = GET_HAL_DATA(pAdapter);
+	u8	val8;
+	rt_rf_power_state rfpowerstate = rf_off;
+
+	if(pAdapter->pwrctrlpriv.bHWPowerdown)
+	{
+		val8 = rtw_read8(pAdapter, REG_HSISR);
+		printk("pwrdown, 0x5c(BIT7)=%02x\n", val8);
+		rfpowerstate = (val8 & BIT7) ? rf_off: rf_on;				
+	}
+	else
+	{
+		rtw_write8(	pAdapter, REG_MAC_PINMUX_CFG,rtw_read8(pAdapter, REG_MAC_PINMUX_CFG)&~(BIT3));
+		val8 = rtw_read8(pAdapter, REG_GPIO_IO_SEL);
+		printk("GPIO_IN=%02x\n", val8);
+		rfpowerstate = (val8 & BIT3) ? rf_on : rf_off;	
+	}
+	return rfpowerstate;
+}	// HalDetectPwrDownMode
+#endif
+
+
+#ifdef CONFIG_IPS
+
+void ips_enter(_adapter * padapter)
+{
+	struct pwrctrl_priv *pwrpriv = &padapter->pwrctrlpriv;	
+	struct mlme_priv *pmlmepriv = &(padapter->mlmepriv);
+
+	_enter_pwrlock(&pwrpriv->lock);
+	pwrpriv->ips_enter_cnts++;	
+	printk("==>ips_enter cnts:%d\n",pwrpriv->ips_enter_cnts);
+	
+	pwrpriv->bips_processing = _TRUE;	
+
+	if(rf_off == pwrpriv->change_rfpwrstate )
+	{	
+		printk("==>before_assoc_ps_ctrl_wk_hdl change rf to OFF...LED(0x%08x).... \n\n",rtw_read32(padapter,0x4c));
+		r871xu_ips_pwr_down(padapter);
+		pwrpriv->current_rfpwrstate = rf_off;
+	}	
+	pwrpriv->bips_processing = _FALSE;	
+	_exit_pwrlock(&pwrpriv->lock);
+	
+}
+
+int ips_leave(_adapter * padapter)
+{
+	struct pwrctrl_priv *pwrpriv = &padapter->pwrctrlpriv;
+	struct security_priv* psecuritypriv=&(padapter->securitypriv);
+	struct mlme_ext_priv	*pmlmeext = &padapter->mlmeextpriv;
+	struct mlme_ext_info	*pmlmeinfo = &(pmlmeext->mlmext_info);
+	int result = _SUCCESS;
+	sint keyid;
+	_enter_pwrlock(&pwrpriv->lock);
+	if((pwrpriv->current_rfpwrstate == rf_off) &&(!pwrpriv->bips_processing))
+	{
+		pwrpriv->change_rfpwrstate = rf_on;
+		pwrpriv->ips_leave_cnts++;
+		printk("==>ips_leave cnts:%d\n",pwrpriv->ips_leave_cnts);
+
+		result = r871xu_ips_pwr_up(padapter);		
+		pwrpriv->bips_processing = _TRUE;
+		pwrpriv->current_rfpwrstate = rf_on;
+
+		if((_WEP40_ == psecuritypriv->dot11PrivacyAlgrthm) ||(_WEP104_ == psecuritypriv->dot11PrivacyAlgrthm))
+		{
+			printk("==>%s,channel(%d),processing(%x)\n",__FUNCTION__,pmlmeext->cur_channel,pwrpriv->bips_processing);
+			set_channel_bwmode(padapter, pmlmeext->cur_channel, HAL_PRIME_CHNL_OFFSET_DONT_CARE, HT_CHANNEL_WIDTH_20);			
+			for(keyid=0;keyid<4;keyid++){
+				if(pmlmeinfo->key_mask & BIT(keyid)){
+					result=rtw_set_key(padapter,psecuritypriv, keyid);	
+				}
+			}
+		}
+		
+		printk("==> ips_leave.....LED(0x%08x)...\n",rtw_read32(padapter,0x4c));
+		pwrpriv->bips_processing = _FALSE;
+
+	}
+	_exit_pwrlock(&pwrpriv->lock);
+	return result;
+}
+#endif
+
 void before_assoc_ps_ctrl_wk_hdl(_adapter *padapter, u8 *pbuf, int sz)
 {
 	struct pwrctrl_priv *pwrpriv = &padapter->pwrctrlpriv;	
 	struct mlme_priv *pmlmepriv = &(padapter->mlmepriv);
 	int res;
+	rt_rf_power_state rfpwrstate;
+#if 0
+
+#ifdef SUPPORT_HW_RFOFF_DETECTED
+	if(padapter->pwrctrlpriv.bHWPwrPindetect)
+	{
+		rfpwrstate = RfOnOffDetect(padapter);
+		printk("@@@@  %s==> rfstate:%s \n",__FUNCTION__,(rfpwrstate==rf_on)?"rf_on":"rf_off");
+
+		if(rfpwrstate!= pwrpriv->current_rfpwrstate)
+		{
+			pwrpriv->bkeepfwalive = _TRUE;
+			if(rfpwrstate == rf_off)
+			{		
+				pwrpriv->change_rfpwrstate = rf_off;
+				ips_enter(padapter);						
+			}
+			else
+			{
+				pwrpriv->change_rfpwrstate = rf_on;
+				ips_leave(padapter);	
+			}
+			pwrpriv->bkeepfwalive = _FALSE;
+		}
+	}
+	
+#endif
+
+#else
 	if (	(check_fwstate(pmlmepriv, _FW_LINKED|_FW_UNDER_SURVEY|_FW_UNDER_LINKING) == _TRUE) ||
 		(check_fwstate(pmlmepriv, WIFI_AP_STATE) == _TRUE) ||
 		(check_fwstate(pmlmepriv, WIFI_ADHOC_MASTER_STATE) == _TRUE) ||
@@ -48,45 +237,21 @@ void before_assoc_ps_ctrl_wk_hdl(_adapter *padapter, u8 *pbuf, int sz)
 	{
 		return;
 	}
-	
-#ifdef CONFIG_IPS
-	_enter_pwrlock(&pwrpriv->lock);
-	pwrpriv->ips_enter_cnts++;	
-	printk("==>ips_enter cnts:%d\n",pwrpriv->ips_enter_cnts);
-	
-	pwrpriv->bips_processing = _TRUE;	
-
-	if(rf_off == pwrpriv->change_pwrstate )
-	{	
-		printk("==>before_assoc_ps_ctrl_wk_hdl change rf to OFF...LED(0x%08x).... \n\n",rtw_read32(padapter,0x4c));
-		r871xu_ips_pwr_down(padapter);
-		pwrpriv->inactive_pwrstate = rf_off;
-	}	
-	pwrpriv->bips_processing = _FALSE;	
-	_exit_pwrlock(&pwrpriv->lock);
-#endif
-#ifdef CONFIG_AUTOSUSPEND
-	pwrpriv->bAutoSuspend = _TRUE;	
-
+#if (DEV_BUS_TYPE==DEV_BUS_USB_INTERFACE)		
+#ifdef CONFIG_AUTOSUSPEND		
 	if(padapter->registrypriv.usbss_enable)
 	{
-		printk("==>Auto Suspend call usb_autopm_put_interface...........\n");	
-		
-		if(rf_on == pwrpriv->bfassoc_pwrstate )
-		{	
-			//padapter->dvobjpriv.pusbdev->autosuspend_disabled = 0;//autosuspend disabled by the user
-			usb_autopm_put_interface(padapter->dvobjpriv.pusbintf);	
-			pwrpriv->bfassoc_pwrstate = rf_off;
-		}
-		#if (LINUX_VERSION_CODE>=KERNEL_VERSION(2,6,32))
-		printk("...pm_usage_cnt(%d).....\n",atomic_read(&(padapter->dvobjpriv.pusbintf->pm_usage_cnt)));
-		#else
-		printk("...pm_usage_cnt(%d).....\n",padapter->dvobjpriv.pusbintf->pm_usage_cnt);
-		#endif
+		autosuspend_enter(padapter);	
+	}
+	else
+#endif	
+#endif
+	{
+#ifdef CONFIG_IPS			
+		ips_enter(padapter);					
+#endif
 	}
 #endif
-	
-
 }
 
 
@@ -113,8 +278,7 @@ _func_enter_;
 		goto exit;
 	}
 
-	pdrvextra_cmd_parm->ec_id = BEFORE_ASSOC_PS_CTRL_WK_CID;
-	//pdrvextra_cmd_parm->sz = antenna;
+	pdrvextra_cmd_parm->ec_id = BEFORE_ASSOC_PS_CTRL_WK_CID;	
 	pdrvextra_cmd_parm->pbuf = NULL;
 	printk("==> %s  , enqueue CMD \n",__FUNCTION__);	
 	init_h2fwcmd_w_parm_no_rsp(ph2c, pdrvextra_cmd_parm, GEN_CMD_CODE(_Set_Drv_Extra));
@@ -129,175 +293,112 @@ _func_exit_;
 
 }
 
-#ifdef CONFIG_AUTOSUSPEND
-void autosuspend_enter(_adapter* padapter)	
-{
-	printk("==>pwr_state_check_handler .Auto-Suspend fw_state(%x)\n",padapter->mlmepriv.fw_state);
-	before_assoc_ps_cmd(padapter);
-}
-int autoresume_enter(_adapter* padapter)
-{
-	int result = _SUCCESS;
-	struct pwrctrl_priv *pwrpriv = &padapter->pwrctrlpriv;
-	struct security_priv* psecuritypriv=&(padapter->securitypriv);
-	struct mlme_ext_priv	*pmlmeext = &padapter->mlmeextpriv;
-	struct mlme_ext_info	*pmlmeinfo = &(pmlmeext->mlmext_info);
-	
-	sint keyid;
-	printk("====> autoresume_enter \n");
-	
-	if(rf_off == pwrpriv->bfassoc_pwrstate )
-	{		
-		if (usb_autopm_get_interface( padapter->dvobjpriv.pusbintf) < 0) {
-			printk( "can't get autopm: %d\n", result);
-			result = _FAIL;
-			goto error_exit;
-		}
-		#if (LINUX_VERSION_CODE>=KERNEL_VERSION(2,6,32))
-		printk("...pm_usage_cnt(%d).....\n",atomic_read(&(padapter->dvobjpriv.pusbintf->pm_usage_cnt)));
-		#else
-		printk("...pm_usage_cnt(%d).....\n",padapter->dvobjpriv.pusbintf->pm_usage_cnt);
-		#endif
-
-		printk("enc_algorithm(%x),wepkeymask(%x)\n",psecuritypriv->dot11PrivacyAlgrthm,pwrpriv->wepkeymask);
-		if((_WEP40_ == psecuritypriv->dot11PrivacyAlgrthm) ||(_WEP104_ == psecuritypriv->dot11PrivacyAlgrthm))
-		{
-			
-			for(keyid=0;keyid<4;keyid++)
-			{
-				//if(pmlmeinfo->key_mask & BIT(keyid))
-				if(pwrpriv->wepkeymask & BIT(keyid))
-				{
-					result=rtw_set_key(padapter,psecuritypriv, keyid);	
-				}
-			}
-		}
-
-		pwrpriv->bfassoc_pwrstate = rf_on;
-		pwrpriv->bAutoSuspend = _FALSE;
-	}
-	printk("<==== autoresume_enter \n");
-error_exit:	
-
-	return result;
-}
-
 #ifdef SUPPORT_HW_RFOFF_DETECTED
-u8 RfOnOffDetect(IN	PADAPTER pAdapter )
-{
-	HAL_DATA_TYPE		*pHalData = GET_HAL_DATA(pAdapter);
-	u8	val8,rfpowerstate = rf_off;
-
-	if(pAdapter->pwrctrlpriv.bHWPowerdown)
-	{
-		val8 = rtw_read8(pAdapter, REG_HSISR);
-		printk("pwrdown, 0x5c(BIT6)=%02x\n", val8);
-		rfpowerstate = (val8 & BIT7) ? rf_off: rf_on;				
-	}
-	else
-	{
-		rtw_write8(	pAdapter, REG_MAC_PINMUX_CFG,rtw_read8(pAdapter, REG_MAC_PINMUX_CFG)&~(BIT3));
-		val8 = rtw_read8(pAdapter, REG_GPIO_IO_SEL);
-		printk("GPIO_IN=%02x\n", val8);
-		rfpowerstate = (val8 & BIT3) ? rf_on : rf_off;	
-	}
-	return rfpowerstate;
-}	// HalDetectPwrDownMode
+extern int rtw_suspend(struct usb_interface *intf, pm_message_t message);
+extern int rtw_resume(struct usb_interface *intf);
 #endif
-
-#endif
-#ifdef CONFIG_IPS
 void InactivePSWorkItemCallback(struct work_struct *work)
 {
 	struct pwrctrl_priv *pwrpriv = container_of(work, struct pwrctrl_priv, InactivePSWorkItem);
 	_adapter *padapter = container_of(pwrpriv, _adapter, pwrctrlpriv);
 	struct mlme_priv *pmlmepriv = &(padapter->mlmepriv);
-	if (	(check_fwstate(pmlmepriv, _FW_LINKED|_FW_UNDER_SURVEY|_FW_UNDER_LINKING) == _TRUE) ||
-		(check_fwstate(pmlmepriv, WIFI_AP_STATE) == _TRUE) ||
-		(check_fwstate(pmlmepriv, WIFI_ADHOC_MASTER_STATE) == _TRUE) ||
-		(check_fwstate(pmlmepriv, WIFI_ADHOC_STATE) == _TRUE) ||
-		(padapter->net_closed == _TRUE)|| (padapter->bup == _FALSE)	
-	)
-	{
-		return;
-	}
-_enter_pwrlock(&pwrpriv->lock);
-	pwrpriv->ips_enter_cnts++;
-	printk("==>ips_enter cnts:%d\n",pwrpriv->ips_enter_cnts);
-	pwrpriv->bips_processing = _TRUE;
+	int res;
+	rt_rf_power_state rfpwrstate;
+
+#ifdef SUPPORT_HW_RFOFF_DETECTED
+	pm_message_t message;
+	//printk("==> fw report state(0x%x)\n",rtw_read8(padapter,0x1ca));
+	if(pwrpriv->bips_processing == _TRUE)	return;
+	if(padapter->net_closed == _TRUE)		return;
 		
-	if(rf_off == pwrpriv->change_pwrstate )
-	{	
-		printk("==>InactivePSWorkItemCallback change rf to OFF...LED(0x%08x).... \n\n",rtw_read32(padapter,0x4c));
-		r871xu_ips_pwr_down(padapter);
-		pwrpriv->inactive_pwrstate = rf_off;
-	}
-	
-	pwrpriv->bips_processing = _FALSE;
-_exit_pwrlock(&pwrpriv->lock);
-}
-
-void ips_enter(_adapter * padapter)
-{
-	struct pwrctrl_priv *pwrpriv = &padapter->pwrctrlpriv;
-	
-	struct mlme_priv *pmlmepriv = &(padapter->mlmepriv);
-
-	printk("==>pwr_state_check_handler .ips_enter fw_state(%x)\n",pmlmepriv->fw_state);
-	printk("IPS......rf_state(%x),processing(%x)\n",pwrpriv->inactive_pwrstate,pwrpriv->bips_processing);
-		
-	if((pwrpriv->inactive_pwrstate == rf_on) &&(_FALSE == pwrpriv->bips_processing)){
-		pwrpriv->change_pwrstate = rf_off;		
-	#if 0
-		_set_workitem(&(pwrpriv->InactivePSWorkItem));	
-	#else
-		before_assoc_ps_cmd(padapter);
-	#endif
-	}
-	
-}
-
-int ips_leave(_adapter * padapter)
-{
-	struct pwrctrl_priv *pwrpriv = &padapter->pwrctrlpriv;
-	struct security_priv* psecuritypriv=&(padapter->securitypriv);
-	struct mlme_ext_priv	*pmlmeext = &padapter->mlmeextpriv;
-	struct mlme_ext_info	*pmlmeinfo = &(pmlmeext->mlmext_info);
-	int result = _SUCCESS;
-	sint keyid;
-	_enter_pwrlock(&pwrpriv->lock);
-	if((pwrpriv->inactive_pwrstate == rf_off) &&(!pwrpriv->bips_processing))
+	if(padapter->pwrctrlpriv.bHWPwrPindetect) 
 	{
-		pwrpriv->change_pwrstate = rf_on;
-		pwrpriv->ips_leave_cnts++;
-		printk("==>ips_leave cnts:%d\n",pwrpriv->ips_leave_cnts);
-#if 0
-		//_set_workitem(&(pwrpriv->InactivePSWorkItem));
-#else	
-
-		result = r871xu_ips_pwr_up(padapter);		
-		pwrpriv->bips_processing = _TRUE;
-		pwrpriv->inactive_pwrstate = rf_on;
-
-		if((_WEP40_ == psecuritypriv->dot11PrivacyAlgrthm) ||(_WEP104_ == psecuritypriv->dot11PrivacyAlgrthm))
+	#ifdef CONFIG_AUTOSUSPEND
+		if(padapter->registrypriv.usbss_enable)
 		{
-			printk("==>%s,channel(%d),processing(%x)\n",__FUNCTION__,pmlmeext->cur_channel,pwrpriv->bips_processing);
-			set_channel_bwmode(padapter, pmlmeext->cur_channel, HAL_PRIME_CHNL_OFFSET_DONT_CARE, HT_CHANNEL_WIDTH_20);			
-			for(keyid=0;keyid<4;keyid++){
-				if(pmlmeinfo->key_mask & BIT(keyid)){
-					result=rtw_set_key(padapter,psecuritypriv, keyid);	
+			if(pwrpriv->current_rfpwrstate == rf_on)
+			{
+				rfpwrstate = RfOnOffDetect(padapter);
+				printk("@@@@- #1  %s==> rfstate:%s \n",__FUNCTION__,(rfpwrstate==rf_on)?"rf_on":"rf_off");
+				if(rfpwrstate!= pwrpriv->current_rfpwrstate)
+				{
+					if(rfpwrstate == rf_off)
+					{
+						pwrpriv->bkeepfwalive = _TRUE;	
+						pwrpriv->brfoffbyhw = _TRUE;
+						pwrpriv->change_rfpwrstate = rf_off;
+						pwrpriv->bInternalAutoSuspend = _TRUE;
+						autosuspend_enter(padapter);							
+					}
 				}
+			}			
+		}
+		else
+		#endif
+		{
+			rfpwrstate = RfOnOffDetect(padapter);
+			printk("@@@@- #2  %s==> rfstate:%s \n",__FUNCTION__,(rfpwrstate==rf_on)?"rf_on":"rf_off");
+
+			if(rfpwrstate!= pwrpriv->current_rfpwrstate)
+			{
+				if(rfpwrstate == rf_off)
+				{					
+					pwrpriv->change_rfpwrstate = rf_off;
+					pwrpriv->brfoffbyhw = _TRUE;
+					pwrpriv->bInternalAutoSuspend = _TRUE;
+					rtw_suspend( padapter->dvobjpriv.pusbintf,message );	
+				}
+				else
+				{
+					pwrpriv->change_rfpwrstate = rf_on;
+					rtw_resume(padapter->dvobjpriv.pusbintf);			
+				}
+				printk("current_rfpwrstate(%s)\n",(pwrpriv->current_rfpwrstate == rf_off)?"rf_off":"rf_on");
 			}
 		}
-		
-		printk("==> ips_leave.....LED(0x%08x)...\n",rtw_read32(padapter,0x4c));
-		pwrpriv->bips_processing = _FALSE;
-#endif
+		pwrpriv->pwr_state_check_cnts ++;	
 	}
-	_exit_pwrlock(&pwrpriv->lock);
-	return result;
-}
+	
 #endif
+
+	if((pwrpriv->current_rfpwrstate == rf_on) && ((pwrpriv->pwr_state_check_cnts%4)==0))
+	{
+		if (	(check_fwstate(pmlmepriv, _FW_LINKED|_FW_UNDER_SURVEY|_FW_UNDER_LINKING) == _TRUE) ||
+			(check_fwstate(pmlmepriv, WIFI_AP_STATE) == _TRUE) ||
+			(check_fwstate(pmlmepriv, WIFI_ADHOC_MASTER_STATE) == _TRUE) ||
+			(check_fwstate(pmlmepriv, WIFI_ADHOC_STATE) == _TRUE) ||
+			(padapter->net_closed == _TRUE)|| (padapter->bup == _FALSE)	
+		)
+		{
+			return;
+		}
+		printk("==>%s .fw_state(%x)\n",__FUNCTION__,padapter->mlmepriv.fw_state);
+		pwrpriv->change_rfpwrstate = rf_off;
+#if (DEV_BUS_TYPE==DEV_BUS_USB_INTERFACE)	
+#ifdef CONFIG_AUTOSUSPEND
+		if(padapter->registrypriv.usbss_enable)
+		{		
+			if(padapter->pwrctrlpriv.bHWPwrPindetect) 
+				pwrpriv->bkeepfwalive = _TRUE;	
+			
+			pwrpriv->bInternalAutoSuspend = _TRUE;
+			autosuspend_enter(padapter);
+		}
+		else if(padapter->pwrctrlpriv.bHWPwrPindetect)
+		{
+		}
+		else
+#endif
+#endif	
+		{
+#ifdef CONFIG_IPS	
+			ips_enter(padapter);			
+#endif
+		}
+
+	}
+
+}
 
 void pwr_state_check_handler(void *FunctionContext)
 {
@@ -308,37 +409,51 @@ void pwr_state_check_handler(void *FunctionContext)
 	
 	
 	if( pwrctrlpriv->power_mgnt == PS_MODE_ACTIVE )
-		return;
-	
-	if(padapter->net_closed == _TRUE)
-			return;
-	
-	//printk("%s\n",__FUNCTION__);
-	if (	(check_fwstate(pmlmepriv, WIFI_AP_STATE) == _TRUE) ||
-		(check_fwstate(pmlmepriv, WIFI_ADHOC_MASTER_STATE) == _TRUE) ||
-		(check_fwstate(pmlmepriv, WIFI_ADHOC_STATE) == _TRUE) ||	
-		(check_fwstate(pmlmepriv, _FW_LINKED|_FW_UNDER_SURVEY|_FW_UNDER_LINKING) == _TRUE)  ||
-		(padapter->net_closed == _TRUE)|| (padapter->bup == _FALSE)		
-		)
-	{	
-		//other pwr ctrl....	
-		_set_timer(&padapter->pwrctrlpriv.pwr_state_check_timer, padapter->pwrctrlpriv.pwr_state_check_inverval);
-	}
-	else
+		return;	
+
+#ifdef SUPPORT_HW_RFOFF_DETECTED
+	//printk("%s...bHWPwrPindetect(%d)\n",__FUNCTION__,padapter->pwrctrlpriv.bHWPwrPindetect);
+	if(padapter->pwrctrlpriv.bHWPwrPindetect)
 	{
-
-#if (DEV_BUS_TYPE==DEV_BUS_USB_INTERFACE)		
-#ifdef CONFIG_AUTOSUSPEND			
-		autosuspend_enter(padapter);	
+	#if 0
+		before_assoc_ps_cmd(padapter);		
+	#else
+		_set_workitem(&(pwrpriv->InactivePSWorkItem));	
+	#endif
+		_set_timer(&padapter->pwrctrlpriv.pwr_state_check_timer, padapter->pwrctrlpriv.pwr_state_check_inverval);
+	}	
+	else	
 #endif
-#endif
+	{
+		if(padapter->net_closed == _TRUE)		return;
+		//printk("%s\n",__FUNCTION__);
+		if (	(check_fwstate(pmlmepriv, WIFI_AP_STATE) == _TRUE) ||
+			(check_fwstate(pmlmepriv, WIFI_ADHOC_MASTER_STATE) == _TRUE) ||
+			(check_fwstate(pmlmepriv, WIFI_ADHOC_STATE) == _TRUE) ||	
+			(check_fwstate(pmlmepriv, _FW_LINKED|_FW_UNDER_SURVEY|_FW_UNDER_LINKING) == _TRUE)  ||
+			(padapter->net_closed == _TRUE)|| (padapter->bup == _FALSE)		
+			)
+		{	
+			//other pwr ctrl....	
+			_set_timer(&padapter->pwrctrlpriv.pwr_state_check_timer, padapter->pwrctrlpriv.pwr_state_check_inverval);
+		}
+		else
+		{	
+			if((pwrpriv->current_rfpwrstate == rf_on) &&(_FALSE == pwrpriv->bips_processing))
+			{	
+				pwrpriv->change_rfpwrstate = rf_off;
+				pwrctrlpriv->pwr_state_check_cnts = 0;
+				printk("==>pwr_state_check_handler .fw_state(%x)\n",padapter->mlmepriv.fw_state);
+				#if 0
+				before_assoc_ps_cmd(padapter);
+				#else
+				_set_workitem(&(pwrpriv->InactivePSWorkItem));	
+				#endif
+			}
 
-#ifdef CONFIG_IPS	
-		ips_enter(padapter);				
-#endif	
+		}
 	}
 	
-
 }
 
 
@@ -524,7 +639,7 @@ u8 FWLPS_RF_ON(PADAPTER padapter)
 
 _func_enter_;
 
-	if(padapter->pwrctrlpriv.inactive_pwrstate == rf_off)
+	if(padapter->pwrctrlpriv.current_rfpwrstate == rf_off)
 	{
 		// If it is in HW/SW Radio OFF or IPS state, we do not check Fw LPS Leave,
 		// because Fw is unload.
@@ -553,10 +668,14 @@ _func_exit_;
 void LeaveAllPowerSaveMode(IN PADAPTER Adapter)
 {
 	struct mlme_priv	*pmlmepriv = &(Adapter->mlmepriv);
+	HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(Adapter);
 	u32 LPSLeaveTimeOut = 10000;
 	//u32 IPSLeaveTimeOut = 10000;
 
 _func_enter_;
+	if(Adapter->bSurpriseRemoved == _TRUE)
+		return;
+	
 	printk("%s.....\n",__FUNCTION__);
 	if (check_fwstate(pmlmepriv, _FW_LINKED) == _TRUE)
 	{ //connect
@@ -580,12 +699,28 @@ _func_enter_;
 	{
 #ifdef CONFIG_IPS
 		printk("==> leave IPS.......\n");
-		if(Adapter->pwrctrlpriv.inactive_pwrstate== rf_off)
+		if(Adapter->pwrctrlpriv.current_rfpwrstate== rf_off)
 		{				
-			if(_FALSE == ips_leave(Adapter))
+			#ifdef CONFIG_AUTOSUSPEND
+			if(Adapter->registrypriv.usbss_enable)
 			{
-				printk("======> ips_leave fail.............\n");			
+				#if (LINUX_VERSION_CODE>=KERNEL_VERSION(2,6,35))
+				//usb_disable_autosuspend(padapter->dvobjpriv.pusbdev);
+				//#else
+				#endif
+				#if (LINUX_VERSION_CODE>=KERNEL_VERSION(2,6,22) && LINUX_VERSION_CODE<=KERNEL_VERSION(2,6,34))
+				Adapter->dvobjpriv.pusbdev->autosuspend_disabled = pHalData->autosuspend_disabled;//autosuspend disabled by the user
+				#endif
 			}
+			else
+			#endif
+			{
+				if(_FALSE == ips_leave(Adapter))
+				{
+					printk("======> ips_leave fail.............\n");			
+				}
+			}
+				
 		}	
 		
 #endif
@@ -672,20 +807,19 @@ _func_enter_;
 #endif
 
 	_init_pwrlock(&pwrctrlpriv->lock);
-	//pwrctrlpriv->ips_enable = pregistrypriv->ips_enable;	
-	//pwrctrlpriv->lps_enable = pregistrypriv->lps_enable;	
-
-	pwrctrlpriv->inactive_pwrstate = rf_on;	
+	pwrctrlpriv->current_rfpwrstate = rf_on;	
 	pwrctrlpriv->ips_enter_cnts=0;
 	pwrctrlpriv->ips_leave_cnts=0;
 
 	pwrctrlpriv->pwr_state_check_inverval = 2000;
-	
+	pwrctrlpriv->pwr_state_check_cnts = 0;
+	pwrctrlpriv->bInternalAutoSuspend = _FALSE;
 #ifdef CONFIG_AUTOSUSPEND	
-	pwrctrlpriv->bAutoSuspend = _FALSE;
-	pwrctrlpriv->bfassoc_pwrstate = rf_on;
 	pwrctrlpriv->pwr_state_check_inverval = (pwrctrlpriv->bHWPwrPindetect) ?1000:2000;	
 #endif	
+#ifdef SUPPORT_HW_RFOFF_DETECTED
+	pwrctrlpriv->bkeepfwalive = _FALSE;
+#endif
 	
 	pwrctrlpriv->LpsIdleCount = 0;
 	//pwrctrlpriv->FWCtrlPSMode =padapter->registrypriv.power_mgnt;// PS_MODE_MIN;
@@ -703,9 +837,7 @@ _func_enter_;
 
 	pwrctrlpriv->tog = 0x80;
 
-#ifdef CONFIG_IPS
 	_init_workitem(&(pwrctrlpriv->InactivePSWorkItem), InactivePSWorkItemCallback, padapter);
-#endif
 
 #ifdef PLATFORM_LINUX		
 	_init_timer(&(pwrctrlpriv->pwr_state_check_timer), padapter->pnetdev, pwr_state_check_handler, (u8 *)padapter);

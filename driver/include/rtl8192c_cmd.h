@@ -1,3 +1,22 @@
+/******************************************************************************
+ *
+ * Copyright(c) 2007 - 2010 Realtek Corporation. All rights reserved.
+ *                                        
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
+ *
+ *
+ ******************************************************************************/
 #ifndef __RTL8192C_CMD_H_
 #define __RTL8192C_CMD_H_
 
@@ -37,7 +56,7 @@ enum LPS_CTRL_TYPE
 typedef struct _SETPWRMODE_PARM{
 	u8 	Mode;
 	u8 	SmartPS;
-	u8	BcnPassTime;	// unit: 100ms
+	unsigned char  AwakeInterval; //Unit: beacon interval, this field is only valid in PS_DTIM mode
 }SETPWRMODE_PARM, *PSETPWRMODE_PARM;
 
 typedef struct JOINBSSRPT_PARM{
@@ -57,12 +76,12 @@ void set_FwJoinBssReport_cmd(_adapter* padapter, u8 mstatus);
 #endif
 
 #ifdef CONFIG_AUTOSUSPEND
-typedef struct _H2C_SS_RFOFF_PARAM{
+#ifdef SUPPORT_HW_RFOFF_DETECTED
+struct H2C_SS_RFOFF_PARAM{
 	u8 	ROFOn; // 1: on, 0:off
 	u16	gpio_period; // unit: 1024 us
-}H2C_SS_RFOFF_PARAM, *PH2C_SS_RFOFF_PARAM;
-#ifdef  SUPPORT_HW_RFOFF_DETECTED
-u8 set_FWSelectSuspend_cmd(_adapter*padapter,u8 bRFon, u16 polling_period);
+}__attribute__ ((packed));
+u8 set_FWSelectSuspend_cmd(_adapter*padapter,u8 bfwpoll, u16 period);
 #endif
 #endif
 

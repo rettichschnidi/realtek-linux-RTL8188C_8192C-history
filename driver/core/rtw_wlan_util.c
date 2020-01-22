@@ -1,20 +1,22 @@
 /******************************************************************************
-* rtl871x_wlan_util.c                                                                                                                                 *
-*                                                                                                                                          *
-* Description :                                                                                                                       *
-*                                                                                                                                           *
-* Author :                                                                                                                       *
-*                                                                                                                                         *
-* History :                                                          
-*
-*                                        
-*                                                                                                                                       *
-* Copyright 2008, Realtek Corp.                                                                                                  *
-*                                                                                                                                        *
-* The contents of this file is the sole property of Realtek Corp.  It can not be                                     *
-* be used, copied or modified without written permission from Realtek Corp.                                         *
-*                                                                                                                                          *
-*******************************************************************************/
+ *
+ * Copyright(c) 2007 - 2010 Realtek Corporation. All rights reserved.
+ *                                        
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
+ *
+ *
+ ******************************************************************************/
 #define _RTL871X_WLAN_UTIL_C_
 
 #include <drv_conf.h>
@@ -596,6 +598,34 @@ void write_cam(_adapter *padapter, u8 entry, u16 ctrl, u8 *mac, u8 *key)
 
 }
 
+
+static u32 _ReadCAM(_adapter *padapter ,u32 addr)
+{
+	u32 count = 0, cmd;
+	cmd = CAM_POLLINIG |addr ;
+	rtw_write32(padapter, RWCAM, cmd);
+
+	do{
+		if(0 == (rtw_read32(padapter,REG_CAMCMD) & CAM_POLLINIG)){
+			break;
+		}
+	}while(count++ < 100);		
+
+	return rtw_read32(padapter,REG_CAMREAD);	
+}
+void read_cam(_adapter *padapter ,u8 entry)
+{
+	u32	j,count = 0, addr, cmd;
+	addr = entry << 3;
+
+	printk("********* DUMP CAM Entry_#%02d***************\n",entry);
+	for (j = 0; j < 6; j++)
+	{	
+		cmd = _ReadCAM(padapter ,addr+j);
+		printk("offset:0x%02x => 0x%08x \n",addr+j,cmd);
+	}
+	printk("*********************************\n");
+}
 int allocate_cam_entry(_adapter *padapter)
 {
 	unsigned int cam_idx;
@@ -810,9 +840,9 @@ void _update_ampdu_factor(_adapter *padapter,unsigned char max_AMPDU_len)
 	u8	*pRegToSet;
 	u8	index = 0;
 #ifdef CONFIG_BT_COEXIST
-	struct btcoexist_priv	 *pbtpriv = &(padapter->bt_coexist);
+	struct btcoexist_priv	 *pbtpriv = &(padapter->halpriv.bt_coexist);
 			
-	if((pbtpriv->BT_Coexist) &&(pbtpriv->BT_CoexistType == BT_CSR) )
+	if((pbtpriv->BT_Coexist) &&(pbtpriv->BT_CoexistType == BT_CSR_BC4) )
 		pRegToSet = RegToSet_BT; // 0x97427431;
 	else
 #endif
@@ -922,6 +952,12 @@ void HTOnAssocRsp(_adapter *padapter)
 		//SelectChannel(padapter, pmlmeext->cur_channel, pmlmeext->cur_ch_offset);
 		set_channel_bwmode(padapter, pmlmeext->cur_channel, pmlmeext->cur_ch_offset, pmlmeext->cur_bwmode);
 	}
+	
+
+	//
+	// Config current HT Protection mode.
+	//
+	pmlmeinfo->HT_protection = pmlmeinfo->HT_info.infos[1] & 0x3;
 	
 }
 
@@ -1228,13 +1264,13 @@ unsigned char get_highest_mcs_rate(struct HT_caps_element *pHT_caps)
 unsigned int  _update_92cu_basic_rate(_adapter *padapter, unsigned int mask)
 {
 #ifdef CONFIG_BT_COEXIST
-	struct btcoexist_priv	 *pbtpriv = &(padapter->bt_coexist);
+	struct btcoexist_priv	 *pbtpriv = &(padapter->halpriv.bt_coexist);
 #endif
 	HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(padapter);	
 
 	unsigned int BrateCfg = 0;
 #ifdef CONFIG_BT_COEXIST
-	if(	(pbtpriv->BT_Coexist) &&	(pbtpriv->BT_CoexistType == BT_CSR)	)
+	if(	(pbtpriv->BT_Coexist) &&	(pbtpriv->BT_CoexistType == BT_CSR_BC4)	)
 	{
 		BrateCfg = mask  & 0x151;
 		//printk("BT temp disable cck 2/5.5/11M, (0x%x = 0x%x)\n", REG_RRSR, BrateCfg & 0x151);
@@ -1268,7 +1304,7 @@ void _update_response_rate(_adapter *padapter,unsigned int mask)
 	}
 	rtw_write8(padapter, REG_INIRTS_RATE_SEL, RateIndex);
 }
-void Update_RA_Entry(_adapter *padapter, unsigned int cam_idx)
+void Update_RA_Entry(_adapter *padapter, unsigned int mac_id)
 {
 	//volatile unsigned int result;
 	u32 init_rate=0;
@@ -1282,15 +1318,15 @@ void Update_RA_Entry(_adapter *padapter, unsigned int cam_idx)
 	struct mlme_ext_info	*pmlmeinfo = &(pmlmeext->mlmext_info);
 	WLAN_BSSID_EX 		*cur_network = &(pmlmeinfo->network);
 #ifdef CONFIG_BT_COEXIST
-	struct btcoexist_priv	 *pbtpriv = &(padapter->bt_coexist);
+	struct btcoexist_priv	 *pbtpriv = &(padapter->halpriv.bt_coexist);
 #endif
 	
-	if (cam_idx >= NUM_STA) //CAM_SIZE
+	if (mac_id >= NUM_STA) // 
 	{
 		return;
 	}
 		
-	switch (cam_idx)
+	switch (mac_id)
 	{
 		case 4: //for broadcast/multicast
 			supportRateNum = rtw_get_rateset_len(cur_network->SupportedRates);
@@ -1306,7 +1342,7 @@ void Update_RA_Entry(_adapter *padapter, unsigned int cam_idx)
 			
 			break;
 			
-		case 5: //for AP 
+		case 0: //for sta mode
 			supportRateNum = rtw_get_rateset_len(cur_network->SupportedRates);
 			networkType = judge_network_type(padapter, cur_network->SupportedRates, supportRateNum) & 0xf;
 			pmlmeext->cur_wireless_mode = networkType;
@@ -1324,8 +1360,8 @@ void Update_RA_Entry(_adapter *padapter, unsigned int cam_idx)
 			break;
 			
 		default: //for each sta in IBSS
-			supportRateNum = rtw_get_rateset_len(pmlmeinfo->FW_sta_info[cam_idx].SupportedRates);
-			networkType = judge_network_type(padapter, pmlmeinfo->FW_sta_info[cam_idx].SupportedRates, supportRateNum) & 0xf;
+			supportRateNum = rtw_get_rateset_len(pmlmeinfo->FW_sta_info[mac_id].SupportedRates);
+			networkType = judge_network_type(padapter, pmlmeinfo->FW_sta_info[mac_id].SupportedRates, supportRateNum) & 0xf;
 			pmlmeext->cur_wireless_mode = networkType;
 			raid = networktype_to_raid(networkType);
 			
@@ -1339,7 +1375,7 @@ void Update_RA_Entry(_adapter *padapter, unsigned int cam_idx)
 	
 #ifdef CONFIG_BT_COEXIST
 	if( (pbtpriv->BT_Coexist) &&
-		(pbtpriv->BT_CoexistType == BT_CSR) &&
+		(pbtpriv->BT_CoexistType == BT_CSR_BC4) &&
 		(pbtpriv->BT_CUR_State) &&
 		(pbtpriv->BT_Ant_isolation) &&
 		((pbtpriv->BT_Service==BT_SCO)||
@@ -1359,26 +1395,27 @@ void Update_RA_Entry(_adapter *padapter, unsigned int cam_idx)
 	{
 		u8 arg = 0;
 
-		arg = (cam_idx-4)&0x1f;//MACID
+		arg = (mac_id)&0x1f;
 		
 		arg |= BIT(7);
 		
 		if (shortGIrate==_TRUE)
 			arg |= BIT(5);
 
-		DBG_871X("update raid entry, mask=0x%x, arg=0x%x\n", mask, arg);
+		DBG_871X("update raid entry, init_rate=0x%x, mask=0x%x, arg=0x%x\n", init_rate, mask, arg);
 
 		set_raid_cmd(padapter, mask, arg);	
 		
+		rtw_write8(padapter, (REG_INIDATA_RATE_SEL+mac_id), (u8)init_rate);	
 	}
 	else
 	{
-		rtw_write8(padapter, (REG_INIDATA_RATE_SEL+(cam_idx-4)), (u8)init_rate);		
+		rtw_write8(padapter, (REG_INIDATA_RATE_SEL+(mac_id)), (u8)init_rate);		
 	}
 
 
 	//set ra_id
-	psta = pmlmeinfo->FW_sta_info[cam_idx].psta;
+	psta = pmlmeinfo->FW_sta_info[mac_id].psta;
 	if(psta)
 	{
 		psta->raid = raid;
@@ -1389,8 +1426,8 @@ void Update_RA_Entry(_adapter *padapter, unsigned int cam_idx)
 
 void enable_rate_adaptive(_adapter *padapter)
 {
-	Update_RA_Entry(padapter, 4);
-	Update_RA_Entry(padapter, 5);
+	Update_RA_Entry(padapter, 4);//for bmc sta_info
+	Update_RA_Entry(padapter, 0);//for sta mode
 	
 	return;
 }
@@ -1538,7 +1575,7 @@ void update_EDCA_param(_adapter *padapter)
 	struct mlme_ext_info	*pmlmeinfo = &(pmlmeext->mlmext_info);
 	
 #ifdef CONFIG_BT_COEXIST
-	struct btcoexist_priv	 	*pbtpriv = &(padapter->bt_coexist);	
+	struct btcoexist_priv	 	*pbtpriv = &(padapter->halpriv.bt_coexist);	
 	unsigned char 			bbtchange = _FALSE;
 #endif
 	

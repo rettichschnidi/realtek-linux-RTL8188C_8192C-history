@@ -1,3 +1,23 @@
+/******************************************************************************
+ *
+ * Copyright(c) 2007 - 2010 Realtek Corporation. All rights reserved.
+ *                                        
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
+ *
+ *
+ ******************************************************************************/
+
 //============================================================
 // Description:
 //
@@ -945,10 +965,11 @@ VOID PWDB_Monitor(
 #else
 
 	if(pHalData->fw_ractrl == _TRUE)
-	{
+	{		
 		u32 param = (u32)(pdmpriv->UndecoratedSmoothedPWDB<<16);
-		
-		param |= 1;//macid=1 for sta mode;
+
+		//printk("######## RSSI(%d) ##############\n",pdmpriv->UndecoratedSmoothedPWDB);
+		param |= 0;//macid=0 for sta mode;
 		set_rssi_cmd(Adapter, (u8*)&param);
 	}
 #endif
@@ -1214,7 +1235,7 @@ dm_CheckEdcaTurbo_EXIT:
 #endif	
 }	// dm_CheckEdcaTurbo
 
-
+#define		index_mapping_HP_NUM	15	
 //091212 chiyokolin
 static	VOID
 dm_TXPowerTrackingCallback_ThermalMeter_92C(
@@ -1725,7 +1746,7 @@ dm_CheckTXPowerTracking(
 BOOLEAN BT_BTStateChange(PADAPTER Adapter)
 {
 	PHAL_DATA_TYPE	pHalData = GET_HAL_DATA(Adapter);
-	struct btcoexist_priv	 *pbtpriv = &(Adapter->bt_coexist);
+	struct btcoexist_priv	 *pbtpriv = &(Adapter->halpriv.bt_coexist);
 	struct registry_priv  *registry_par = &Adapter->registrypriv;
 	struct dm_priv *pdmpriv = &Adapter->dmpriv;
 	
@@ -1982,7 +2003,7 @@ BT_RssiStateChange(
 {
 	PHAL_DATA_TYPE	pHalData = GET_HAL_DATA(Adapter);
 	struct mlme_priv	 *pmlmepriv = &(Adapter->mlmepriv);
-	struct btcoexist_priv	 *pbtpriv = &(Adapter->bt_coexist);
+	struct btcoexist_priv	 *pbtpriv = &(Adapter->halpriv.bt_coexist);
 	struct dm_priv *pdmpriv = &Adapter->dmpriv;
 	//PMGNT_INFO		pMgntInfo = &Adapter->MgntInfo;
 	s32			UndecoratedSmoothedPWDB;
@@ -2043,7 +2064,7 @@ void dm_BTCoexist(PADAPTER Adapter )
 	struct mlme_ext_info		*pmlmeinfo = &Adapter->mlmeextpriv.mlmext_info;
 	struct mlme_ext_priv		*pmlmeext = &Adapter->mlmeextpriv;
 
-	struct btcoexist_priv	 		*pbtpriv = &(Adapter->bt_coexist);
+	struct btcoexist_priv	 		*pbtpriv = &(Adapter->halpriv.bt_coexist);
 	//PMGNT_INFO				pMgntInfo = &Adapter->MgntInfo;
 	//PRT_HIGH_THROUGHPUT		pHTInfo = GET_HT_INFO(pMgntInfo);
 	
@@ -2053,7 +2074,7 @@ void dm_BTCoexist(PADAPTER Adapter )
 	BOOLEAN		bWifiConnectChange, bBtStateChange,bRssiStateChange;
 
 	if(pbtpriv->bCOBT == _FALSE)		return;
-	if( (pbtpriv->BT_Coexist) &&(pbtpriv->BT_CoexistType == BT_CSR) && (check_fwstate(pmlmepriv, WIFI_AP_STATE) == _FALSE)	)
+	if( (pbtpriv->BT_Coexist) &&((pbtpriv->BT_CoexistType == BT_CSR_BC4) ||(pbtpriv->BT_CoexistType == BT_CSR_BC8)) && (check_fwstate(pmlmepriv, WIFI_AP_STATE) == _FALSE)	)
 	{
 		bWifiConnectChange = BT_WifiConnectChange(Adapter);
 		bBtStateChange	= BT_BTStateChange(Adapter);
@@ -2384,7 +2405,7 @@ void dm_BTCoexist(PADAPTER Adapter )
 void dm_InitBtCoexistDM(	PADAPTER	Adapter)
 {
 	//HAL_DATA_TYPE* pHalData = GET_HAL_DATA(Adapter);
-	struct btcoexist_priv	 *pbtpriv = &(Adapter->bt_coexist);
+	struct btcoexist_priv	 *pbtpriv = &(Adapter->halpriv.bt_coexist);
 
 	if( !pbtpriv->BT_Coexist ) return;
 	
@@ -2395,7 +2416,7 @@ void dm_InitBtCoexistDM(	PADAPTER	Adapter)
 void set_dm_bt_coexist(_adapter *padapter, u8 bStart)
 {
 	struct mlme_ext_info	*pmlmeinfo = &padapter->mlmeextpriv.mlmext_info;
-	struct btcoexist_priv	 *pbtpriv = &(padapter->bt_coexist);
+	struct btcoexist_priv	 *pbtpriv = &(padapter->halpriv.bt_coexist);
 	pbtpriv->bCOBT = bStart;
 	send_delba(padapter,0, get_my_bssid(&(pmlmeinfo->network)));
 	send_delba(padapter,1, get_my_bssid(&(pmlmeinfo->network)));
@@ -3224,7 +3245,7 @@ void dm_CheckPbcGPIO(_adapter *padapter)
 
 #ifdef CONFIG_ANTENNA_DIVERSITY
 // Add new function to reset the state of antenna diversity before link.
-bool SwAntDivBeforeLink8192C(IN PADAPTER Adapter)
+u8 SwAntDivBeforeLink8192C(IN PADAPTER Adapter)
 {
 	struct dm_priv *pdmpriv = &Adapter->dmpriv;
 	SWAT_T *pDM_SWAT_Table = &pdmpriv->DM_SWAT_Table;
@@ -3368,7 +3389,7 @@ dm_SW_AntennaSwitch(
 		return;
 	}
 #endif
-	printk("\n............................ %s.........................\n",__FUNCTION__);
+	//printk("\n............................ %s.........................\n",__FUNCTION__);
 	// Handling step mismatch condition.
 	// Peak step is not finished at last time. Recover the variable and check again.
 	if( Step != pDM_SWAT_Table->try_flag	)
@@ -3436,14 +3457,14 @@ dm_SW_AntennaSwitch(
 		pHalData->RSSI_cnt_A= 0;
 		pHalData->RSSI_cnt_B= 0;
 		pDM_SWAT_Table->try_flag = 0;
-		printk("dm_SW_AntennaSwitch(): Set try_flag to 0 prepare for peak!\n");
+		//printk("dm_SW_AntennaSwitch(): Set try_flag to 0 prepare for peak!\n");
 		return;
 	}
 	else
 	{		
 		curTxOkCnt = Adapter->xmitpriv.tx_bytes - pdmpriv->lastTxOkCnt;
 		curRxOkCnt = Adapter->recvpriv.rx_bytes - pdmpriv->lastRxOkCnt;
-		printk("#####  curTxOkCnt(%lld) , curRxOkCnt(%lld) ####\n",curTxOkCnt,curRxOkCnt);
+	
 		pdmpriv->lastTxOkCnt = Adapter->xmitpriv.tx_bytes ;
 		pdmpriv->lastRxOkCnt = Adapter->recvpriv.rx_bytes ;
 	
@@ -3453,26 +3474,26 @@ dm_SW_AntennaSwitch(
 			{
 				pdmpriv->TXByteCnt_A += curTxOkCnt;
 				pdmpriv->RXByteCnt_A += curRxOkCnt;
-				printk("#####  TXByteCnt_A(%lld) , RXByteCnt_A(%lld) ####\n",pdmpriv->TXByteCnt_A,pdmpriv->RXByteCnt_A);
+				//printk("#####  TXByteCnt_A(%lld) , RXByteCnt_A(%lld) ####\n",pdmpriv->TXByteCnt_A,pdmpriv->RXByteCnt_A);
 			}
 			else
 			{
 				pdmpriv->TXByteCnt_B += curTxOkCnt;
 				pdmpriv->RXByteCnt_B += curRxOkCnt;
-				printk("#####  TXByteCnt_B(%lld) , RXByteCnt_B(%lld) ####\n",pdmpriv->TXByteCnt_B,pdmpriv->RXByteCnt_B);
+				//printk("#####  TXByteCnt_B(%lld) , RXByteCnt_B(%lld) ####\n",pdmpriv->TXByteCnt_B,pdmpriv->RXByteCnt_B);
 			}
 		
 			nextAntenna = (pDM_SWAT_Table->CurAntenna == Antenna_A)? Antenna_B : Antenna_A;
 			pDM_SWAT_Table->RSSI_Trying--;
-			printk("RSSI_Trying = %d\n",pDM_SWAT_Table->RSSI_Trying);
+			//printk("RSSI_Trying = %d\n",pDM_SWAT_Table->RSSI_Trying);
 			
 			if(pDM_SWAT_Table->RSSI_Trying == 0)
 			{
 				CurByteCnt = (pDM_SWAT_Table->CurAntenna == Antenna_A)? (pdmpriv->TXByteCnt_A+pdmpriv->RXByteCnt_A) : (pdmpriv->TXByteCnt_B+pdmpriv->RXByteCnt_B);
 				PreByteCnt = (pDM_SWAT_Table->CurAntenna == Antenna_A)? (pdmpriv->TXByteCnt_B+pdmpriv->RXByteCnt_B) : (pdmpriv->TXByteCnt_A+pdmpriv->RXByteCnt_A);
 
-				printk("CurByteCnt = %lld\n", CurByteCnt);
-				printk("PreByteCnt = %lld\n",PreByteCnt);		
+				//printk("CurByteCnt = %lld\n", CurByteCnt);
+				//printk("PreByteCnt = %lld\n",PreByteCnt);		
 				
 				if(pdmpriv->TrafficLoad == TRAFFIC_HIGH)
 				{
@@ -3484,8 +3505,9 @@ dm_SW_AntennaSwitch(
 					CurByteCnt = CurByteCnt>>1;//normalize:100ms:50ms					
 				}
 
-				printk("After DIV=>CurByteCnt = %lld\n", CurByteCnt);
-				printk("PreByteCnt = %lld\n",PreByteCnt);		
+
+				//printk("After DIV=>CurByteCnt = %lld\n", CurByteCnt);
+				//printk("PreByteCnt = %lld\n",PreByteCnt);		
 
 				if(pHalData->RSSI_cnt_A > 0)
 					RSSI_A = pHalData->RSSI_sum_A/pHalData->RSSI_cnt_A; 
@@ -3498,11 +3520,11 @@ dm_SW_AntennaSwitch(
 				
 				curRSSI = (pDM_SWAT_Table->CurAntenna == Antenna_A)? RSSI_A : RSSI_B;
 				pDM_SWAT_Table->PreRSSI =  (pDM_SWAT_Table->CurAntenna == Antenna_A)? RSSI_B : RSSI_A;
-				printk("Luke:PreRSSI = %d, CurRSSI = %d\n",pDM_SWAT_Table->PreRSSI, curRSSI);
-				printk("SWAS: preAntenna= %s, curAntenna= %s \n", 
-				(pDM_SWAT_Table->PreAntenna == Antenna_A?"A":"B"), (pDM_SWAT_Table->CurAntenna == Antenna_A?"A":"B"));
-				printk("Luke:RSSI_A= %d, RSSI_cnt_A = %d, RSSI_B= %d, RSSI_cnt_B = %d\n",
-					RSSI_A, pHalData->RSSI_cnt_A, RSSI_B, pHalData->RSSI_cnt_B);
+				//printk("Luke:PreRSSI = %d, CurRSSI = %d\n",pDM_SWAT_Table->PreRSSI, curRSSI);
+				//printk("SWAS: preAntenna= %s, curAntenna= %s \n", 
+				//(pDM_SWAT_Table->PreAntenna == Antenna_A?"A":"B"), (pDM_SWAT_Table->CurAntenna == Antenna_A?"A":"B"));
+				//printk("Luke:RSSI_A= %d, RSSI_cnt_A = %d, RSSI_B= %d, RSSI_cnt_B = %d\n",
+					//RSSI_A, pHalData->RSSI_cnt_A, RSSI_B, pHalData->RSSI_cnt_B);
 			}
 
 		}
@@ -3519,12 +3541,12 @@ dm_SW_AntennaSwitch(
 				RSSI_B = 0;
 			curRSSI = (pDM_SWAT_Table->CurAntenna == Antenna_A)? RSSI_A : RSSI_B;
 			pDM_SWAT_Table->PreRSSI =  (pDM_SWAT_Table->PreAntenna == Antenna_A)? RSSI_A : RSSI_B;
-			printk("Ekul:PreRSSI = %d, CurRSSI = %d\n", pDM_SWAT_Table->PreRSSI, curRSSI);
-			printk("SWAS: preAntenna= %s, curAntenna= %s \n", 
-			(pDM_SWAT_Table->PreAntenna == Antenna_A?"A":"B"), (pDM_SWAT_Table->CurAntenna == Antenna_A?"A":"B"));
+			//printk("Ekul:PreRSSI = %d, CurRSSI = %d\n", pDM_SWAT_Table->PreRSSI, curRSSI);
+			//printk("SWAS: preAntenna= %s, curAntenna= %s \n", 
+			//(pDM_SWAT_Table->PreAntenna == Antenna_A?"A":"B"), (pDM_SWAT_Table->CurAntenna == Antenna_A?"A":"B"));
 
-			printk("Ekul:RSSI_A= %d, RSSI_cnt_A = %d, RSSI_B= %d, RSSI_cnt_B = %d\n",
-				RSSI_A, pHalData->RSSI_cnt_A, RSSI_B, pHalData->RSSI_cnt_B);
+			//printk("Ekul:RSSI_A= %d, RSSI_cnt_A = %d, RSSI_B= %d, RSSI_cnt_B = %d\n",
+			//	RSSI_A, pHalData->RSSI_cnt_A, RSSI_B, pHalData->RSSI_cnt_B);
 			//RT_TRACE(COMP_SWAS, DBG_LOUD, ("Ekul:curTxOkCnt = %d\n", curTxOkCnt));
 			//RT_TRACE(COMP_SWAS, DBG_LOUD, ("Ekul:curRxOkCnt = %d\n", curRxOkCnt));
 		}
@@ -3536,8 +3558,8 @@ dm_SW_AntennaSwitch(
 			if(pDM_SWAT_Table->TestMode == TP_MODE)
 			{
 				printk("SWAS: TestMode = TP_MODE\n");
-				printk("TRY:CurByteCnt = %lld\n", CurByteCnt);
-				printk("TRY:PreByteCnt = %lld\n",PreByteCnt);		
+				//printk("TRY:CurByteCnt = %lld\n", CurByteCnt);
+				//printk("TRY:PreByteCnt = %lld\n",PreByteCnt);		
 				if(CurByteCnt < PreByteCnt)
 				{
 					if(pDM_SWAT_Table->CurAntenna == Antenna_A)
@@ -3559,8 +3581,8 @@ dm_SW_AntennaSwitch(
 					else
 						Score_B++;
 				}
-				printk("SelectAntennaMap=%x\n ",pDM_SWAT_Table->SelectAntennaMap);
-				printk("Score_A=%d, Score_B=%d\n", Score_A, Score_B);
+				//printk("SelectAntennaMap=%x\n ",pDM_SWAT_Table->SelectAntennaMap);
+				//printk("Score_A=%d, Score_B=%d\n", Score_A, Score_B);
 				
 				if(pDM_SWAT_Table->CurAntenna == Antenna_A)
 				{
@@ -3631,7 +3653,7 @@ dm_SW_AntennaSwitch(
 			}
 			if(pdmpriv->TrafficLoad == TRAFFIC_HIGH)
 				pDM_SWAT_Table->bTriggerAntennaSwitch = 0;
-			printk("Normal:TrafficLoad = %lld\n", curTxOkCnt+curRxOkCnt);
+			//printk("Normal:TrafficLoad = %lld\n", curTxOkCnt+curRxOkCnt);
 
 			//Prepare To Try Antenna		
 			nextAntenna = (pDM_SWAT_Table->CurAntenna == Antenna_A)? Antenna_B : Antenna_A;
@@ -3648,7 +3670,7 @@ dm_SW_AntennaSwitch(
 				pDM_SWAT_Table->TestMode = RSSI_MODE;
 
 			}
-			printk("SWAS: Normal State -> Begin Trying! TestMode=%s\n",(pDM_SWAT_Table->TestMode == TP_MODE)?"TP":"RSSI");
+			//printk("SWAS: Normal State -> Begin Trying! TestMode=%s\n",(pDM_SWAT_Table->TestMode == TP_MODE)?"TP":"RSSI");
 			
 			
 			pHalData->RSSI_sum_A = 0;
@@ -3662,7 +3684,6 @@ dm_SW_AntennaSwitch(
 	if(nextAntenna != pDM_SWAT_Table->CurAntenna)
 	{
 		printk("@@@@@@@@ SWAS: Change TX Antenna!\n ");		
-		//PHY_SetRFPath(Adapter,nextAntenna);
 		antenna_select_cmd(Adapter, nextAntenna, 1);
 	}
 
@@ -3684,18 +3705,18 @@ dm_SW_AntennaSwitch(
 			if(pdmpriv->TrafficLoad == TRAFFIC_HIGH)
 			{
 				_set_timer(&pdmpriv->SwAntennaSwitchTimer,10 ); //ms
-				printk("dm_SW_AntennaSwitch(): Test another antenna for 10 ms\n");
+				//printk("dm_SW_AntennaSwitch(): Test another antenna for 10 ms\n");
 			}
 			else if(pdmpriv->TrafficLoad == TRAFFIC_LOW)
 			{
 				_set_timer(&pdmpriv->SwAntennaSwitchTimer, 50 ); //ms
-				printk("dm_SW_AntennaSwitch(): Test another antenna for 50 ms\n");
+				//printk("dm_SW_AntennaSwitch(): Test another antenna for 50 ms\n");
 			}
 		}
 		else
 		{
 			_set_timer(&pdmpriv->SwAntennaSwitchTimer, 500 ); //ms
-			printk("dm_SW_AntennaSwitch(): Test another antenna for 500 ms\n");
+			//printk("dm_SW_AntennaSwitch(): Test another antenna for 500 ms\n");
 		}
 	}
 	else
@@ -3710,7 +3731,7 @@ dm_SW_AntennaSwitch(
 		else
 		{
 			_set_timer(&pdmpriv->SwAntennaSwitchTimer,500 ); //ms
-			printk("dm_SW_AntennaSwitch(): Test another antenna for 500 ms\n");
+			//printk("dm_SW_AntennaSwitch(): Test another antenna for 500 ms\n");
 		}
 	}
 
@@ -3879,7 +3900,7 @@ rtl8192c_HalDmWatchDog(
 	if( (Adapter->hw_init_completed == _TRUE) 
 		&& ((!bFwCurrentInPSMode) && bFwPSAwake)
 #ifdef CONFIG_IPS
-		&& (rf_on == Adapter->pwrctrlpriv.inactive_pwrstate)
+		&& (rf_on == Adapter->pwrctrlpriv.current_rfpwrstate)
 #endif
 	)
 	{

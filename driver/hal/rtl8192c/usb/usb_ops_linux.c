@@ -1,20 +1,22 @@
 /******************************************************************************
-* usb_ops_linux.c                                                                                                                                 *
-*                                                                                                                                          *
-* Description :                                                                                                                       *
-*                                                                                                                                           *
-* Author :                                                                                                                       *
-*                                                                                                                                         *
-* History :                                                          
-*
-*                                        
-*                                                                                                                                       *
-* Copyright 2007, Realtek Corp.                                                                                                  *
-*                                                                                                                                        *
-* The contents of this file is the sole property of Realtek Corp.  It can not be                                     *
-* be used, copied or modified without written permission from Realtek Corp.                                         *
-*                                                                                                                                          *
-*******************************************************************************/
+ *
+ * Copyright(c) 2007 - 2010 Realtek Corporation. All rights reserved.
+ *                                        
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
+ *
+ *
+ ******************************************************************************/
 #define _HCI_OPS_OS_C_
 
 #include <drv_conf.h>
@@ -90,7 +92,7 @@ static int usbctrl_vendorreq(struct dvobj_priv  *pdvobjpriv, u8 request, u16 val
 	
 	if (status < 0)
        {
-		printk("reg 0x%x, usb read/write TimeOut! status:%d value=0x%x\n", value, status, *(u32*)pdata);
+		printk("reg 0x%x, usb %s TimeOut! status:%d value=0x%x\n", value,(requesttype == 0x01)?"read":"write" , status, *(u32*)pdata);		
 		RT_TRACE(_module_hci_ops_os_c_,_drv_err_,("reg 0x%x, usb_read8 TimeOut! status:0x%x value=0x%x\n", value, status, *(u32*)pdata));
        }
 	else if ( status > 0 )   // Success this control transfer.
@@ -200,6 +202,7 @@ static u8 usb_read8(struct intf_hdl *pintfhdl, u32 addr)
 	u16 index;
 	u16 len;
 	u32 data=0;	
+	int result;
 	struct dvobj_priv  *pdvobjpriv = (struct dvobj_priv  *)pintfhdl->pintf_dev;   
 	
 	_func_enter_;
@@ -211,8 +214,11 @@ static u8 usb_read8(struct intf_hdl *pintfhdl, u32 addr)
 	wvalue = (u16)(addr&0x0000ffff);
 	len = 1;	
 	
-	usbctrl_vendorreq(pdvobjpriv, request, wvalue, index, &data, len, requesttype);
-
+	result = usbctrl_vendorreq(pdvobjpriv, request, wvalue, index, &data, len, requesttype);
+	if(result<0)//for catc trigger
+	{
+		//printk("%s...error(%d)\n",__FUNCTION__,result);		
+	}
 	_func_exit_;
 
 	return (u8)(le32_to_cpu(data)&0x0ff);
@@ -227,6 +233,7 @@ static u16 usb_read16(struct intf_hdl *pintfhdl, u32 addr)
 	u16 index;
 	u16 len;
 	u32 data=0;
+	int result;
 	struct dvobj_priv  *pdvobjpriv = (struct dvobj_priv  *)pintfhdl->pintf_dev;   
 	
 	_func_enter_;
@@ -238,7 +245,15 @@ static u16 usb_read16(struct intf_hdl *pintfhdl, u32 addr)
 	wvalue = (u16)(addr&0x0000ffff);
 	len = 2;	
 	
-	usbctrl_vendorreq(pdvobjpriv, request, wvalue, index, &data, len, requesttype);
+	result = usbctrl_vendorreq(pdvobjpriv, request, wvalue, index, &data, len, requesttype) ;
+	if(result<0)
+	{
+		printk("%s...error(%d)\n",__FUNCTION__,result);
+		wvalue = 0xf0;
+		requesttype = 0x01;//read_in
+		len = 1;
+	        usbctrl_vendorreq(pdvobjpriv, request, wvalue, index, &data, len, requesttype);
+	}
 
 	_func_exit_;
 
@@ -254,6 +269,7 @@ static u32 usb_read32(struct intf_hdl *pintfhdl, u32 addr)
 	u16 index;
 	u16 len;
 	u32 data=0;
+	int result;
 	struct dvobj_priv  *pdvobjpriv = (struct dvobj_priv  *)pintfhdl->pintf_dev;  
 	
 	_func_enter_;
@@ -265,8 +281,15 @@ static u32 usb_read32(struct intf_hdl *pintfhdl, u32 addr)
 	wvalue = (u16)(addr&0x0000ffff);
 	len = 4;	
 	
-	usbctrl_vendorreq(pdvobjpriv, request, wvalue, index, &data, len, requesttype);
-
+	result = usbctrl_vendorreq(pdvobjpriv, request, wvalue, index, &data, len, requesttype);
+	if(result<0)
+	{
+		printk("%s...error(%d)\n",__FUNCTION__,result);
+		wvalue = 0xf0;
+		requesttype = 0x01;//read_in
+		len = 1;
+	        usbctrl_vendorreq(pdvobjpriv, request, wvalue, index, &data, len, requesttype);
+	}
 	_func_exit_;
 
 	return le32_to_cpu(data);
@@ -281,6 +304,7 @@ static void usb_write8(struct intf_hdl *pintfhdl, u32 addr, u8 val)
 	u16 index;
 	u16 len;
 	u32 data;
+	int result;
 	struct dvobj_priv  *pdvobjpriv = (struct dvobj_priv  *)pintfhdl->pintf_dev;   
 	
 	_func_enter_;
@@ -295,8 +319,15 @@ static void usb_write8(struct intf_hdl *pintfhdl, u32 addr, u8 val)
 	data = val;
 	data = cpu_to_le32(data&0x000000ff);
 	
-	usbctrl_vendorreq(pdvobjpriv, request, wvalue, index, &data, len, requesttype);
-	
+	result = usbctrl_vendorreq(pdvobjpriv, request, wvalue, index, &data, len, requesttype);
+	if(result<0)
+	{
+		printk("%s...error(%d)\n",__FUNCTION__,result);
+		wvalue = 0xf0;
+		requesttype = 0x01;//read_in
+		len = 1;
+	        usbctrl_vendorreq(pdvobjpriv, request, wvalue, index, &data, len, requesttype);
+	}
 	_func_exit_;
 	
 }
@@ -309,6 +340,7 @@ static void usb_write16(struct intf_hdl *pintfhdl, u32 addr, u16 val)
 	u16 index;
 	u16 len;
 	u32 data;
+	int result;
 	struct dvobj_priv  *pdvobjpriv = (struct dvobj_priv  *)pintfhdl->pintf_dev;   
 	
 	_func_enter_;
@@ -323,7 +355,11 @@ static void usb_write16(struct intf_hdl *pintfhdl, u32 addr, u16 val)
 	data = val;
 	data = cpu_to_le32(data&0x0000ffff);
 	
-	usbctrl_vendorreq(pdvobjpriv, request, wvalue, index, &data, len, requesttype);
+	result = usbctrl_vendorreq(pdvobjpriv, request, wvalue, index, &data, len, requesttype);
+	if(result<0)//for catc trigger
+	{
+		//printk("%s...error(%d)\n",__FUNCTION__,result);		
+	}
 	
 	_func_exit_;
 	
@@ -337,6 +373,7 @@ static void usb_write32(struct intf_hdl *pintfhdl, u32 addr, u32 val)
 	u16 index;
 	u16 len;
 	u32 data;
+	int result;
 	struct dvobj_priv  *pdvobjpriv = (struct dvobj_priv  *)pintfhdl->pintf_dev;   
 	
 	_func_enter_;
@@ -349,8 +386,11 @@ static void usb_write32(struct intf_hdl *pintfhdl, u32 addr, u32 val)
 	len = 4;
 	data = cpu_to_le32(val);	
 	
-	usbctrl_vendorreq(pdvobjpriv, request, wvalue, index, &data, len, requesttype);
-	
+	result = usbctrl_vendorreq(pdvobjpriv, request, wvalue, index, &data, len, requesttype);
+	if(result<0)//for catc trigger
+	{
+		//printk("%s...error(%d)\n",__FUNCTION__,result);		
+	}
 	_func_exit_;
 	
 }
