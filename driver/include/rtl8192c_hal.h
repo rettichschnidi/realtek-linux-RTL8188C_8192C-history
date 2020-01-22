@@ -530,9 +530,7 @@ struct hal_priv
 #ifdef CONFIG_BT_COEXIST
 	struct btcoexist_priv		bt_coexist;	
 #endif
-#ifdef CONFIG_AUTOSUSPEND
-	u8		bDisableAutosuspend;
-#endif
+
 
 };
 

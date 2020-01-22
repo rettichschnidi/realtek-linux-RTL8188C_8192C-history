@@ -715,7 +715,6 @@ static int rtw_drv_init(struct usb_interface *pusb_intf, const struct usb_device
 	_adapter *padapter = NULL;
 	struct dvobj_priv *pdvobjpriv;
 	struct net_device *pnetdev;
-	HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(padapter);
 	//struct device *dev = &pusb_intf->dev;
 	
 	RT_TRACE(_module_hci_intfs_c_, _drv_err_, ("+rtw_drv_init\n"));
@@ -761,7 +760,7 @@ static int rtw_drv_init(struct usb_interface *pusb_intf, const struct usb_device
 			device_init_wakeup(&pusb_intf->dev, 1);
 		}
 		
-		{ 	/* autosuspend (2s delay) */
+		if(padapter->registrypriv.usbss_enable ){ 	/* autosuspend (2s delay) */
 			pdvobjpriv->pusbdev->autosuspend_delay = 0 * HZ;//15 * HZ; idle-delay time		 	
 
 			#if (LINUX_VERSION_CODE>=KERNEL_VERSION(2,6,35))
@@ -769,7 +768,7 @@ static int rtw_drv_init(struct usb_interface *pusb_intf, const struct usb_device
 			#endif
 
 			#if (LINUX_VERSION_CODE>=KERNEL_VERSION(2,6,22) && LINUX_VERSION_CODE<=KERNEL_VERSION(2,6,34))
-			pHalData->bDisableAutosuspend = padapter->dvobjpriv.pusbdev->autosuspend_disabled ;
+			padapter->bDisableAutosuspend = padapter->dvobjpriv.pusbdev->autosuspend_disabled ;
 			padapter->dvobjpriv.pusbdev->autosuspend_disabled = 0;//autosuspend disabled by the user
 			#endif
 
@@ -971,7 +970,7 @@ _func_exit_;
 			#if (LINUX_VERSION_CODE>=KERNEL_VERSION(2,6,35))
 			usb_disable_autosuspend(padapter->dvobjpriv.pusbdev);
 			#else
-			padapter->dvobjpriv.pusbdev->autosuspend_disabled =  pHalData->bDisableAutosuspend;// 1;//autosuspend disabled by the user
+			padapter->dvobjpriv.pusbdev->autosuspend_disabled =  padapter->bDisableAutosuspend;// 1;//autosuspend disabled by the user
 			#endif
 		}
 		#endif

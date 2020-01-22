@@ -306,16 +306,18 @@ void InactivePSWorkItemCallback(struct work_struct *work)
 	rt_rf_power_state rfpwrstate;
 
 #ifdef SUPPORT_HW_RFOFF_DETECTED
-	pm_message_t message;
-	//printk("==> fw report state(0x%x)\n",rtw_read8(padapter,0x1ca));
-	if(pwrpriv->bips_processing == _TRUE)	return;
-	if(padapter->net_closed == _TRUE)		return;
-		
+	pm_message_t message;	
+
+	if(pwrpriv->bips_processing == _TRUE)	return;		
+	
+	//printk("==> fw report state(0x%x)\n",rtw_read8(padapter,0x1ca));	
 	if(padapter->pwrctrlpriv.bHWPwrPindetect) 
 	{
 	#ifdef CONFIG_AUTOSUSPEND
 		if(padapter->registrypriv.usbss_enable)
 		{
+			if(padapter->net_closed == _TRUE)	return;
+			
 			if(pwrpriv->current_rfpwrstate == rf_on)
 			{
 				rfpwrstate = RfOnOffDetect(padapter);
@@ -334,7 +336,7 @@ void InactivePSWorkItemCallback(struct work_struct *work)
 			}			
 		}
 		else
-		#endif
+	#endif
 		{
 			rfpwrstate = RfOnOffDetect(padapter);
 			printk("@@@@- #2  %s==> rfstate:%s \n",__FUNCTION__,(rfpwrstate==rf_on)?"rf_on":"rf_off");
@@ -343,6 +345,7 @@ void InactivePSWorkItemCallback(struct work_struct *work)
 			{
 				if(rfpwrstate == rf_off)
 				{					
+					pwrpriv->bkeepfwalive = _TRUE;	
 					pwrpriv->change_rfpwrstate = rf_off;
 					pwrpriv->brfoffbyhw = _TRUE;
 					pwrpriv->bInternalAutoSuspend = _TRUE;
@@ -360,6 +363,7 @@ void InactivePSWorkItemCallback(struct work_struct *work)
 	}
 	
 #endif
+	if(padapter->net_closed == _TRUE)	return;
 
 	if((pwrpriv->current_rfpwrstate == rf_on) && ((pwrpriv->pwr_state_check_cnts%4)==0))
 	{
@@ -709,7 +713,7 @@ _func_enter_;
 				//#else
 				#endif
 				#if (LINUX_VERSION_CODE>=KERNEL_VERSION(2,6,22) && LINUX_VERSION_CODE<=KERNEL_VERSION(2,6,34))
-				Adapter->dvobjpriv.pusbdev->autosuspend_disabled = pHalData->autosuspend_disabled;//autosuspend disabled by the user
+				Adapter->dvobjpriv.pusbdev->autosuspend_disabled = Adapter->bDisableAutosuspend;//autosuspend disabled by the user
 				#endif
 			}
 			else
