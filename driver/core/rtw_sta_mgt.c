@@ -1,20 +1,23 @@
 /******************************************************************************
-* rtw_sta_mgt.c                                                                                                                                 *
-*                                                                                                                                          *
-* Description :                                                                                                                       *
-*                                                                                                                                           *
-* Author :                                                                                                                       *
-*                                                                                                                                         *
-* History :                                                          
-*
-*                                        
-*                                                                                                                                       *
-* Copyright 2007, Realtek Corp.                                                                                                  *
-*                                                                                                                                        *
-* The contents of this file is the sole property of Realtek Corp.  It can not be                                     *
-* be used, copied or modified without written permission from Realtek Corp.                                         *
-*                                                                                                                                          *
-*******************************************************************************/
+ *
+ * Copyright(c) 2007 - 2011 Realtek Corporation. All rights reserved.
+ *                                        
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
+ *
+ *
+ 
+******************************************************************************/
 #define _RTW_STA_MGT_C_
 
 #include <drv_conf.h>
@@ -89,7 +92,12 @@ u32	_init_sta_priv(struct	sta_priv *pstapriv)
 	
 _func_enter_;	
 
-	pstapriv->pallocated_stainfo_buf = _zmalloc (sizeof(struct sta_info) * NUM_STA+ 4);
+	#ifdef MEM_ALLOC_REFINE
+	pstapriv->pallocated_stainfo_buf = rtw_zvmalloc (sizeof(struct sta_info) * NUM_STA+ 4);
+	#else
+	pstapriv->pallocated_stainfo_buf = rtw_zmalloc (sizeof(struct sta_info) * NUM_STA+ 4);
+	#endif
+	
 	if(!pstapriv->pallocated_stainfo_buf)
 		return _FAIL;
 
@@ -226,7 +234,13 @@ _func_enter_;
 	if(pstapriv){
 		mfree_sta_priv_lock(pstapriv);
 
-		_mfree(pstapriv->pallocated_stainfo_buf, sizeof(struct sta_info)*NUM_STA+4);		
+		if(pstapriv->pallocated_stainfo_buf) {
+			#ifdef MEM_ALLOC_REFINE
+			rtw_vmfree(pstapriv->pallocated_stainfo_buf, sizeof(struct sta_info)*NUM_STA+4);
+			#else
+			rtw_mfree(pstapriv->pallocated_stainfo_buf, sizeof(struct sta_info)*NUM_STA+4);
+			#endif
+		}
 	}
 	
 _func_exit_;
@@ -428,33 +442,33 @@ _func_enter_;
 	
 	psta->sleepq_ac_len = 0;
 	psta->qos_info = 0;
-	
+
 	psta->max_sp_len = 0;
 	psta->uapsd_bk = 0;
 	psta->uapsd_be = 0;
 	psta->uapsd_vi = 0;
 	psta->uapsd_vo = 0;
 
-	psta->has_legacy_ac = 0;		
+	psta->has_legacy_ac = 0;
 
 #ifdef CONFIG_NATIVEAP_MLME
-
+	
 	pstapriv->sta_dz_bitmap &=~BIT(psta->aid);
 	pstapriv->tim_bitmap &=~BIT(psta->aid);	
 
 	indicate_sta_disassoc_event(padapter, psta);
-	
+
 	if (pstapriv->sta_aid[psta->aid - 1] == psta)
 	{
 		pstapriv->sta_aid[psta->aid - 1] = NULL;
 		psta->aid = 0;
-	}
-	
-#endif
+	}	
 
 #endif	
 
-	_enter_critical_bh(&(pfree_sta_queue->lock), &irqL0);	
+#endif	
+
+	_enter_critical_bh(&(pfree_sta_queue->lock), &irqL0);
 	list_insert_tail(&psta->list, get_list_head(pfree_sta_queue));
 	_exit_critical_bh(&(pfree_sta_queue->lock), &irqL0);
 
@@ -520,13 +534,25 @@ struct sta_info *get_stainfo(struct sta_priv *pstapriv, u8 *hwaddr)
 	
 	u32	index;
 
+	u8 *addr;
+
+	u8 bc_addr[ETH_ALEN] = {0xff,0xff,0xff,0xff,0xff,0xff};
+
 _func_enter_;
 
 	if(hwaddr==NULL)
 		return NULL;
 		
+	if(IS_MCAST(hwaddr))
+	{
+		addr = bc_addr;
+	}
+	else
+	{
+		addr = hwaddr;
+	}
 
-	index = wifi_mac_hash(hwaddr);
+	index = wifi_mac_hash(addr);
 
 	_enter_critical_bh(&pstapriv->sta_hash_lock, &irqL);
 	
@@ -539,7 +565,7 @@ _func_enter_;
 	
 		psta = LIST_CONTAINOR(plist, struct sta_info, hash_list);
 		
-		if ((_memcmp(psta->hwaddr,hwaddr, ETH_ALEN))== _TRUE) 
+		if ((_memcmp(psta->hwaddr, addr, ETH_ALEN))== _TRUE) 
 		{ // if found the matched address
 			break;
 		}
@@ -573,7 +599,10 @@ _func_enter_;
 		RT_TRACE(_module_rtl871x_sta_mgt_c_,_drv_err_,("alloc_stainfo fail"));
 		goto exit;
 	}
-	
+
+	// default broadcast & multicast use macid 1
+	psta->mac_id = 1;
+
 	ptxservq= &(psta->sta_xmitpriv.be_q);
 
 /*

@@ -1,3 +1,23 @@
+/******************************************************************************
+ *
+ * Copyright(c) 2007 - 2011 Realtek Corporation. All rights reserved.
+ *                                        
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
+ *
+ *
+ 
+******************************************************************************/
 #ifndef _RTL8192D_XMIT_H_
 #define _RTL8192D_XMIT_H_
 
@@ -40,7 +60,7 @@
 
 #ifdef CONFIG_USB_HCI
 
-#ifdef USB_TX_AGGREGATION_92C
+#ifdef USB_TX_AGGREGATION
 #define MAX_TX_AGG_PACKET_NUMBER 0xFF
 #endif
 
@@ -55,7 +75,32 @@ s32 rtl8192du_xmitframe_complete(_adapter *padapter, struct xmit_priv *pxmitpriv
 void rtl8192du_mgnt_xmit(_adapter *padapter, struct xmit_frame *pmgntframe);
 
 s32 rtl8192du_hal_xmit(_adapter *padapter, struct xmit_frame *pxmitframe);
+
+#ifdef CONFIG_HOSTAPD_MLME
+s32	rtl8192du_hostap_mgnt_xmit_entry(_adapter *padapter, _pkt *pkt);
 #endif
+
+#endif
+
+#ifdef CONFIG_PCI_HCI
+s32	rtl8192de_init_xmit_priv(_adapter * padapter);
+void	rtl8192de_free_xmit_priv(_adapter * padapter);
+
+s32	rtl8192de_enqueue_xmitbuf(struct rtw_tx_ring *ring, struct xmit_buf *pxmitbuf);
+struct xmit_buf *rtl8192de_dequeue_xmitbuf(struct rtw_tx_ring *ring);
+
+void	rtl8192de_xmitframe_resume(_adapter *padapter);
+
+void	rtl8192de_mgnt_xmit(_adapter *padapter, struct xmit_frame *pmgntframe);
+
+s32	rtl8192de_hal_xmit(_adapter *padapter, struct xmit_frame *pxmitframe);
+
+#ifdef CONFIG_HOSTAPD_MLME
+s32	rtl8192de_hostap_mgnt_xmit_entry(_adapter *padapter, _pkt *pkt);
+#endif
+
+#endif
+
 
 #endif
 

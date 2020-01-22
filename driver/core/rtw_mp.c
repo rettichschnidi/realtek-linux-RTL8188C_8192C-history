@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2007 - 2010 Realtek Corporation. All rights reserved.
+ * Copyright(c) 2007 - 2011 Realtek Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -218,7 +218,7 @@ static int init_mp_priv_by_os(struct mp_priv *pmp_priv)
 	_init_queue(&pmp_priv->free_mp_xmitqueue);
 
 	pmp_priv->pallocated_mp_xmitframe_buf = NULL;
-	pmp_priv->pallocated_mp_xmitframe_buf = _malloc(NR_MP_XMITFRAME * sizeof(struct mp_xmit_frame) + 4);
+	pmp_priv->pallocated_mp_xmitframe_buf = rtw_zmalloc(NR_MP_XMITFRAME * sizeof(struct mp_xmit_frame) + 4);
 	if (pmp_priv->pallocated_mp_xmitframe_buf == NULL) {
 		res = _FAIL;
 		goto _exit_init_mp_priv;
@@ -276,7 +276,7 @@ static void mp_init_xmit_frame(struct xmit_frame *frame, PADAPTER padapter)
 	pattrib->encrypt = 0;
 	pattrib->bswenc = _FALSE;
 
-#ifdef USB_TX_AGGREGATION_92C
+#ifdef USB_TX_AGGREGATION
 	frame->agg_num = 1;
 	frame->pkt_offset = 1;
 #endif
@@ -321,7 +321,7 @@ s32 init_mp_priv(PADAPTER padapter)
 void free_mp_priv(struct mp_priv *pmp_priv)
 {
 	if (pmp_priv->pallocated_mp_xmitframe_buf) {
-		_mfree(pmp_priv->pallocated_mp_xmitframe_buf, 0);
+		rtw_mfree(pmp_priv->pallocated_mp_xmitframe_buf, 0);
 		pmp_priv->pallocated_mp_xmitframe_buf = NULL;
 	}
 	pmp_priv->pmp_xmtframe_buf = NULL;
@@ -332,6 +332,13 @@ void free_mp_priv(struct mp_priv *pmp_priv)
 #define PHY_LCCalibrate(a)	rtl8192c_PHY_LCCalibrate(a)
 #define dm_CheckTXPowerTracking(a)	rtl8192c_dm_CheckTXPowerTracking(a)
 #define PHY_SetRFPathSwitch(a,b)	rtl8192c_PHY_SetRFPathSwitch(a,b)
+#endif
+
+#ifdef CONFIG_RTL8192D
+#define PHY_IQCalibrate(a)	rtl8192d_PHY_IQCalibrate(a)
+#define PHY_LCCalibrate(a)	rtl8192d_PHY_LCCalibrate(a)
+#define dm_CheckTXPowerTracking(a)	rtl8192d_dm_CheckTXPowerTracking(a)
+#define PHY_SetRFPathSwitch(a,b)	rtl8192d_PHY_SetRFPathSwitch(a,b)
 #endif
 
 s32
@@ -391,13 +398,23 @@ MPT_InitializeAdapter(
 	ledsetting = read32(pAdapter, REG_LEDCFG0);
 	write32(pAdapter, REG_LEDCFG0, ledsetting & ~LED0DIS);
 
+#ifdef CONFIG_RTL8192C
 	PHY_IQCalibrate(pAdapter, _FALSE);
 	dm_CheckTXPowerTracking(pAdapter);	//trigger thermal meter
 	PHY_LCCalibrate(pAdapter);
+#endif
+
+#ifdef CONFIG_RTL8192D
+	PHY_IQCalibrate(pAdapter);
+	dm_CheckTXPowerTracking(pAdapter);	//trigger thermal meter
+	PHY_LCCalibrate(pAdapter);
+#endif
 
 #if DEV_BUS_TYPE==DEV_BUS_PCI_INTERFACE
 	PHY_SetRFPathSwitch(pAdapter, 1/*pHalData->bDefaultAntenna*/);	//Wifi default use Main
 #else
+
+#ifdef CONFIG_RTL8192C
 #if 1
 	if (pHalData->BoardType == BOARD_MINICARD)
 		PHY_SetRFPathSwitch(pAdapter, 1/*pHalData->bDefaultAntenna*/); //default use Main
@@ -405,6 +422,9 @@ MPT_InitializeAdapter(
 	if(pAdapter->HalFunc.GetInterfaceSelectionHandler(pAdapter) == INTF_SEL2_MINICARD )
 		PHY_SetRFPathSwitch(Adapter, pAdapter->MgntInfo.bDefaultAntenna); //default use Main
 #endif
+
+#endif
+
 #endif
 
 	pMptCtx->backup0xc50 = (u1Byte)PHY_QueryBBReg(pAdapter, rOFDM0_XAAGCCore1, bMaskByte0);
@@ -548,7 +568,7 @@ s32 mp_start_test(PADAPTER padapter)
 	disable_dm(padapter);
 
 	//3 0. update mp_priv
-#ifdef CONFIG_RTL8192C
+#if  defined (CONFIG_RTL8192C)  ||  defined (CONFIG_RTL8192D)
 	if (padapter->registrypriv.rf_config == RF_819X_MAX_TYPE) {
 //		HAL_DATA_TYPE *phal = GET_HAL_DATA(padapter);
 //		switch (phal->rf_type) {
@@ -579,7 +599,7 @@ s32 mp_start_test(PADAPTER padapter)
 	//3 1. initialize a new WLAN_BSSID_EX
 //	_memset(&bssid, 0, sizeof(WLAN_BSSID_EX));
 	_memcpy(bssid.MacAddress, pmppriv->network_macaddr, ETH_ALEN);
-	bssid.Ssid.SsidLength = sizeof("mp_pseudo_adhoc");
+	bssid.Ssid.SsidLength = strlen("mp_pseudo_adhoc");
 	_memcpy(bssid.Ssid.Ssid, (u8*)"mp_pseudo_adhoc", bssid.Ssid.SsidLength);
 	bssid.InfrastructureMode = Ndis802_11IBSS;
 	bssid.NetworkTypeInUse = Ndis802_11DS;
@@ -642,13 +662,13 @@ end_of_mp_start_test:
 	if (res == _SUCCESS)
 	{
 		// set MSR to WIFI_FW_ADHOC_STATE
-#ifdef CONFIG_RTL8192C
+#if  defined (CONFIG_RTL8192C)  ||  defined (CONFIG_RTL8192D)
 		val8 = read8(padapter, MSR) & 0xFC; // 0x0102
 		val8 |= WIFI_FW_ADHOC_STATE;
 		write8(padapter, MSR, val8); // Link in ad hoc network
 #endif
 
-#ifndef CONFIG_RTL8192C
+#if  !defined (CONFIG_RTL8192C)  &&  !defined (CONFIG_RTL8192D)
 		write8(padapter, MSR, 1); // Link in ad hoc network
 		write8(padapter, RCR, 0); // RCR : disable all pkt, 0x10250048
 		write8(padapter, RCR+2, 0x57); // RCR disable Check BSSID, 0x1025004a
@@ -1180,6 +1200,45 @@ static void SetOFDMTxPower(PADAPTER pAdapter, u8 *TxPower)
 		  TxPower[RF_PATH_A], TxPower[RF_PATH_B]));
 }
 
+void	SetAntennaPathPower(PADAPTER pAdapter)
+{
+	HAL_DATA_TYPE *pHalData = GET_HAL_DATA(pAdapter);
+	u8 TxPowerLevel[MAX_RF_PATH_NUMS];
+	u8 rfPath;
+	
+	TxPowerLevel[RF_PATH_A] = pAdapter->mppriv.txpoweridx;
+	TxPowerLevel[RF_PATH_B] = pAdapter->mppriv.txpoweridx_b;
+	
+	switch (pAdapter->mppriv.antenna_tx)
+	{
+		case ANTENNA_A:
+		default:
+			rfPath = RF_PATH_A;
+			break;
+		case ANTENNA_B:
+			rfPath = RF_PATH_B;
+			break;
+		case ANTENNA_C:
+			rfPath = RF_PATH_C;
+			break;
+	}
+		
+	switch (pHalData->rf_chip)
+	{
+		case RF_8225:
+		case RF_8256:
+		case RF_6052:
+			SetCCKTxPower(pAdapter, TxPowerLevel);
+			if (pAdapter->mppriv.rateidx < MPT_RATE_6M)	// CCK rate
+				MPT_CCKTxPowerAdjustbyIndex(pAdapter, TxPowerLevel[rfPath]%2 == 0);
+			SetOFDMTxPower(pAdapter, TxPowerLevel);
+			break;
+
+		default:
+			break;
+	}
+}
+	
 void SetTxPower(PADAPTER pAdapter)
 {
 	HAL_DATA_TYPE *pHalData = GET_HAL_DATA(pAdapter);
@@ -1244,7 +1303,7 @@ void SetDataRate(PADAPTER pAdapter)
 	mpt_SwitchRfSetting(pAdapter);
 }
 
-#ifndef CONFIG_RTL8192C
+#if  !defined (CONFIG_RTL8192C)  &&  !defined (CONFIG_RTL8192D)
 /*------------------------------Define structure----------------------------*/
 typedef struct _R_ANTENNA_SELECT_OFDM {
 	u32	r_tx_antenna:4;
@@ -1878,6 +1937,7 @@ void mp_xmit_packet_workitem(void *data)
 		write_port(padapter, ff_hwaddr, pmptx->write_size, (u8*)pxmitbuf);
 //		count_tx_stats(padapter, pxmitframe, pmptx->write_size);
 		pmptx->sended++;
+		pmp_priv->tx_pktcount++;
 
 		if (pmptx->stop ||
 		    padapter->bSurpriseRemoved ||
@@ -1890,7 +1950,7 @@ void mp_xmit_packet_workitem(void *data)
 
 exit:
 	pxmitframe->buf_addr = NULL;
-	_mfree(pmptx->buf, pmptx->buf_size);
+	rtw_mfree(pmptx->buf, pmptx->buf_size);
 	pmptx->buf = NULL;
 	pmptx->stop = 1;
 }
@@ -1901,6 +1961,13 @@ extern int urb_zero_packet_chk(_adapter *padapter, int sz);
 #ifdef CONFIG_RTL8192C
 #ifdef CONFIG_USB_HCI
 #define cal_txdesc_chksum	rtl8192cu_cal_txdesc_chksum
+#else
+#define cal_txdesc_chksum(a)	 do{}while(0)
+#endif
+#endif
+#ifdef CONFIG_RTL8192D
+#ifdef CONFIG_USB_HCI
+#define cal_txdesc_chksum	rtl8192du_cal_txdesc_chksum
 #else
 #define cal_txdesc_chksum(a)	 do{}while(0)
 #endif
@@ -1921,6 +1988,7 @@ void SetPacketTx(PADAPTER padapter)
 	if (pmp_priv->tx.stop) return;
 	pmp_priv->tx.sended = 0;
 	pmp_priv->tx.stop = 0;
+	pmp_priv->tx_pktcount = 0;
 
 	//3 1. update_attrib()
 	pattrib = &pmp_priv->tx.xmitframe.attrib;
@@ -1929,10 +1997,10 @@ void SetPacketTx(PADAPTER padapter)
 	_memcpy(pattrib->ra, pattrib->dst, ETH_ALEN);
 	bmcast = IS_MCAST(pattrib->ra);
 	if (bmcast) {
-		pattrib->mac_id = 4;
+		pattrib->mac_id = 1;
 		pattrib->psta = get_bcmc_stainfo(padapter);
 	} else {
-		pattrib->mac_id = 5;
+		pattrib->mac_id = 0;
 		pattrib->psta = get_stainfo(&padapter->stapriv, get_bssid(&padapter->mlmepriv));
 	}
 
@@ -1947,10 +2015,10 @@ void SetPacketTx(PADAPTER padapter)
 	}
 #endif
 	if (pmp_priv->tx.buf)
-		_mfree(pmp_priv->tx.buf, pmp_priv->tx.buf_size);
+		rtw_mfree(pmp_priv->tx.buf, pmp_priv->tx.buf_size);
 	pmp_priv->tx.write_size = tx_size;
 	pmp_priv->tx.buf_size = tx_size + XMITBUF_ALIGN_SZ;
-	pmp_priv->tx.buf = _malloc(pmp_priv->tx.buf_size);
+	pmp_priv->tx.buf = rtw_zmalloc(pmp_priv->tx.buf_size);
 	if (pmp_priv->tx.buf == NULL) {
 		printk("%s: malloc(%d) fail!!\n", __func__, pmp_priv->tx.buf_size);
 		return;
@@ -1974,7 +2042,7 @@ void SetPacketTx(PADAPTER padapter)
 	desc->txdw1 |= cpu_to_le32(BK); // don't aggregate(AMPDU)
 	if (padding)
 		desc->txdw1 |= cpu_to_le32((1 << PKT_OFFSET_SHT) & 0xFF000000); //pkt_offset, unit:8 bytes padding
-	desc->txdw1 |= cpu_to_le32((pattrib->mac_id - 4) & 0x1F); //CAM_ID(MAC_ID)
+	desc->txdw1 |= cpu_to_le32((pattrib->mac_id) & 0x1F); //CAM_ID(MAC_ID)
 	desc->txdw1 |= cpu_to_le32((pattrib->qsel << QSEL_SHT) & 0x00001F00); // Queue Select, TID
 	desc->txdw1 |= cpu_to_le32((pattrib->raid << Rate_ID_SHT) & 0x000F0000); // Rate Adaptive ID
 
@@ -1987,13 +2055,21 @@ void SetPacketTx(PADAPTER padapter)
 	desc->txdw4 |= cpu_to_le32(HW_SEQ_EN);
 	desc->txdw4 |= cpu_to_le32(USERATE);
 	desc->txdw4 |= cpu_to_le32(DISDATAFB);
-//	desc->txdw4 |= cpu_to_le32(DATA_SHORT); // CCK Short Preamble
+
+	if( pmp_priv->preamble ){
+		if (pmp_priv->rateidx <=  MPT_RATE_54M)
+			desc->txdw4 |= cpu_to_le32(DATA_SHORT); // CCK Short Preamble
+	}
 	if (pmp_priv->bandwidth == HT_CHANNEL_WIDTH_40)
 		desc->txdw4 |= cpu_to_le32(DATA_BW);
 
 	// offset 20
 	desc->txdw5 |= cpu_to_le32(pmp_priv->rateidx & 0x0000001F);
-//	desc->txdw5 |= cpu_to_le32(SGI); // MCS Short Guard Interval
+
+	if( pmp_priv->preamble ){
+		if (pmp_priv->rateidx > MPT_RATE_54M)
+			desc->txdw5 |= cpu_to_le32(SGI); // MCS Short Guard Interval
+	}
 	desc->txdw5 |= cpu_to_le32(0x0001FF00); // DATA/RTS Rate Fallback Limit
 
 	//offset 24

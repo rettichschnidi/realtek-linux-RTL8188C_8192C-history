@@ -1,20 +1,23 @@
 /******************************************************************************
-* rtl8192c_hal_init.c                                                                                                                                 *
-*                                                                                                                                          *
-* Description :                                                                                                                       *
-*                                                                                                                                           *
-* Author :                                                                                                                       *
-*                                                                                                                                         *
-* History :                                                          
-*
-*                                        
-*                                                                                                                                       *
-* Copyright 2007, Realtek Corp.                                                                                                  *
-*                                                                                                                                        *
-* The contents of this file is the sole property of Realtek Corp.  It can not be                                     *
-* be used, copied or modified without written permission from Realtek Corp.                                         *
-*                                                                                                                                          *
-*******************************************************************************/
+ *
+ * Copyright(c) 2007 - 2011 Realtek Corporation. All rights reserved.
+ *                                        
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
+ *
+ *
+ 
+******************************************************************************/
 
 #define _RTL8192C_HAL_INIT_C_
 #include <drv_conf.h>
@@ -354,7 +357,8 @@ int FirmwareDownload92C(
 	HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(Adapter);
 	s8 			R92CFwImageFileName_TSMC[] ={RTL8192C_FW_TSMC_IMG};
 	s8 			R92CFwImageFileName_UMC[] ={RTL8192C_FW_UMC_IMG};
-	s8 			R8723FwImageFileName_UMC[] ={RTL8723_FW_UMC_IMG};
+	s8 			R92CFwImageFileName_UMC_B[] ={RTL8192C_FW_UMC_B_IMG};
+	//s8 			R8723FwImageFileName_UMC[] ={RTL8723_FW_UMC_IMG};
 	u8*			FwImage;
 	u32			FwImageLen;
 	char*		pFwImageFileName;	
@@ -368,7 +372,12 @@ int FirmwareDownload92C(
 	u8		*pFirmwareBuf;
 	u32		FirmwareLen;
 
-	pFirmware = (PRT_FIRMWARE_92C)_malloc(sizeof(RT_FIRMWARE_92C));
+	#ifdef MEM_ALLOC_REFINE
+	pFirmware = (PRT_FIRMWARE_92C)rtw_zvmalloc(sizeof(RT_FIRMWARE_92C));
+	#else
+	pFirmware = (PRT_FIRMWARE_92C)rtw_zmalloc(sizeof(RT_FIRMWARE_92C));
+	#endif
+	
 	if(!pFirmware)
 	{
 		rtStatus = _FAIL;
@@ -377,12 +386,20 @@ int FirmwareDownload92C(
 
 	if(IS_NORMAL_CHIP(pHalData->VersionID))
 	{
-		if(IS_VENDOR_UMC_A_CUT(pHalData->VersionID) && !IS_92C_SERIAL(pHalData->VersionID))// UMC , 8188
+		if(IS_VENDOR_UMC_A_CUT(pHalData->VersionID) && !IS_92C_SERIAL(pHalData->VersionID))
 		{
 			pFwImageFileName = R92CFwImageFileName_UMC;
-			FwImage = Rtl819XFwUMCImageArray;
-			FwImageLen = UMCImgArrayLength;
+			FwImage = Rtl819XFwUMCACutImageArray;
+			FwImageLen = UMCACutImgArrayLength;
 			DBG_8192C(" ===> FirmwareDownload91C() fw:Rtl819XFwImageArray_UMC\n");
+		}
+		else if(IS_81xxC_VENDOR_UMC_B_CUT(pHalData->VersionID))
+		{
+			// The ROM code of UMC B-cut Fw is the same as TSMC. by tynli. 2011.01.14.
+			pFwImageFileName = R92CFwImageFileName_UMC_B;
+			FwImage = Rtl819XFwUMCBCutImageArray;
+			FwImageLen = UMCBCutImgArrayLength;
+			DBG_8192C(" ===> FirmwareDownload91C() fw:Rtl819XFwImageArray_UMC_B\n");
 		}
 		else
 		{
@@ -423,7 +440,12 @@ int FirmwareDownload92C(
 				goto Exit;
 			}
 
+			#ifdef CONFIG_EMBEDDED_FWIMG
+			pFirmware->szFwBuffer=FwImage;
+			#else
 			_memcpy(pFirmware->szFwBuffer, FwImage, FwImageLen);
+			#endif
+
 			pFirmware->ulFwLength = FwImageLen;
 			break;
 	}
@@ -472,8 +494,13 @@ int FirmwareDownload92C(
 
 Exit:
 
-	if(pFirmware)
-		_mfree((u8*)pFirmware, sizeof(RT_FIRMWARE_92C));
+	if(pFirmware) {
+		#ifdef MEM_ALLOC_REFINE
+		rtw_vmfree((u8*)pFirmware, sizeof(RT_FIRMWARE_92C));
+		#else
+		rtw_mfree((u8*)pFirmware, sizeof(RT_FIRMWARE_92C));
+		#endif
+	}
 
 	//RT_TRACE(COMP_INIT, DBG_LOUD, (" <=== FirmwareDownload91C()\n"));
 	return rtStatus;
@@ -625,47 +652,107 @@ rtl8192c_ReadChipVersion(
 	)
 {
 	u32			value32;
-	VERSION_8192C	version;
-	u8			ChipVersion=0;
+	//VERSION_8192C	version;
+	u32			ChipVersion=0;
 	HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(Adapter);
 
 	value32 = read32(Adapter, REG_SYS_CFG);
 
 	if (value32 & TRP_VAUX_EN)
 	{
+#if 0
 		// Test chip.
 		if(IS_HARDWARE_TYPE_8723(Adapter)) {
 			ChipVersion |= ((value32 & VENDOR_ID) ? CHIP_VENDOR_UMC : 0);
 			ChipVersion |= ((value32 & BT_FUNC) ? CHIP_8723: 0); // RTL8723 with BT function.			
 		}
 		else	 {
-			version = (value32 & TYPE_ID) ? VERSION_TEST_CHIP_92C : VERSION_TEST_CHIP_88C;						
+		version = (value32 & TYPE_ID) ?VERSION_TEST_CHIP_92C :VERSION_TEST_CHIP_88C;		
+	}
+#else
+		// tynli_test. 2011.01.10.
+		if(IS_HARDWARE_TYPE_8192C(Adapter))
+		{
+			ChipVersion = (value32 & TYPE_ID) ? VERSION_TEST_CHIP_92C : VERSION_TEST_CHIP_88C;						
 		}
+		else
+		{
+			ChipVersion |= ((value32 & VENDOR_ID) ? CHIP_VENDOR_UMC : 0);
+			ChipVersion |= ((value32 & BT_FUNC) ? CHIP_8723: 0); // RTL8723 with BT function.			
+		}
+#endif
 	}
 	else
 	{
+#if 0
 		// Normal mass production chip.
 		ChipVersion = NORMAL_CHIP;
+#if !RTL8723_FPGA_TRUE_PHY_VERIFICATION
 		ChipVersion |= ((value32 & TYPE_ID) ? CHIP_92C : 0);
+#endif
 		ChipVersion |= ((value32 & VENDOR_ID) ? CHIP_VENDOR_UMC : 0);
 		ChipVersion |= ((value32 & BT_FUNC) ? CHIP_8723: 0); // RTL8723 with BT function.
-		if(IS_VENDOR_UMC(ChipVersion))
-			ChipVersion |= ((value32 & CHIP_VER_RTL_MASK) ? CHIP_VENDOR_UMC_B_CUT : 0);
+		if(IS_8723_SERIES(ChipVersion))
+		{
+			if(IS_VENDOR_UMC(ChipVersion))
+				ChipVersion |= ((value32 & CHIP_VER_RTL_MASK) ? CHIP_VENDOR_UMC_B_CUT : 0);
+		}
+		else
+		{
+			// Mark out by tynli. UMC B-cut IC will not set the SYS_CFG[19] to UMC
+			// because we do not want the custmor to know. 2011.01.11.
+			//if(IS_VENDOR_UMC(ChipVersion))
+			{
+				// To check the value of B-cut. by tynli. 2011.01.11.
+				u1bTmp = (u1Byte)((value32 & CHIP_VER_RTL_MASK)>>12);
+				if(u1bTmp == 1)
+				{	// B-cut
+					ChipVersion |= CHIP_VENDOR_UMC_B_CUT;
+				}
+			}
+		}
+#else
+		// Normal mass production chip.
+		ChipVersion = NORMAL_CHIP;
+//#if !RTL8723_FPGA_TRUE_PHY_VERIFICATION
+		ChipVersion |= ((value32 & TYPE_ID) ? RF_TYPE_2T2R : 0); //92c
+//#endif
+		ChipVersion |= ((value32 & VENDOR_ID) ? CHIP_VENDOR_UMC : 0);
+		ChipVersion |= ((value32 & BT_FUNC) ? CHIP_8723: 0); // RTL8723 with BT function.
+		if(IS_HARDWARE_TYPE_8192C(Adapter))
+		{
+			// 88/92C UMC B-cut IC will not set the SYS_CFG[19] to UMC
+			// because we do not want the custmor to know. by tynli. 2011.01.17.
+			//MSG_8192C("mask result = 0x%x is_UMC %d chipversion 0x%x\n", (value32 & CHIP_VER_RTL_MASK), IS_CHIP_VENDOR_UMC(ChipVersion), ChipVersion);
+			if((!IS_CHIP_VENDOR_UMC(ChipVersion) )&& (value32 & CHIP_VER_RTL_MASK))
+			{
+				//MSG_8192C("chip mask result = 0x%x\n", ((value32 & CHIP_VER_RTL_MASK) | CHIP_VENDOR_UMC));
+				ChipVersion |= ((value32 & CHIP_VER_RTL_MASK) | CHIP_VENDOR_UMC); // IC version (CUT)
+				//MSG_8192C("chip version = 0x%x\n", ChipVersion);
+			}
+		}
+		else
+		{
+			if(IS_CHIP_VENDOR_UMC(ChipVersion))
+				ChipVersion |= ((value32 & CHIP_VER_RTL_MASK)); // IC version (CUT)
+		}
 
 		if(IS_92C_SERIAL(ChipVersion))
 		{
 			value32 = read32(Adapter, REG_HPON_FSM);
-			ChipVersion |= ((CHIP_BONDING_IDENTIFIER(value32) == CHIP_BONDING_92C_1T2R) ? CHIP_92C_1T2R : 0);			
+			ChipVersion |= ((CHIP_BONDING_IDENTIFIER(value32) == CHIP_BONDING_92C_1T2R) ? RF_TYPE_1T2R : 0);			
 		}
 		else if(IS_8723_SERIES(ChipVersion))
 		{
 			//RT_ASSERT(IS_HARDWARE_TYPE_8723(Adapter), ("Incorrect chip version!!\n"));
 			value32 = read32(Adapter, REG_GPIO_OUTSTS);
-			ChipVersion |= ((value32 & RF_RL_ID) ? CHIP_8723_DRV_REV : 0);			
+			ChipVersion |= ((value32 & RF_RL_ID)>>20);	 //ROM code version.	
 		}
+#endif
+
 	}
 
-	version = (VERSION_8192C)ChipVersion;
+	//version = (VERSION_8192C)ChipVersion;
 
 	// For multi-function consideration. Added by Roger, 2010.10.06.
 	if(IS_8723_SERIES(ChipVersion))
@@ -676,12 +763,16 @@ rtl8192c_ReadChipVersion(
 		pHalData->MultiFunc =(RT_MULTI_FUNC) (pHalData->MultiFunc| ((value32 & BT_FUNC_EN) ?  RT_MULTI_FUNC_BT : 0) );
 		pHalData->MultiFunc =(RT_MULTI_FUNC) (pHalData->MultiFunc| ((value32 & GPS_FUNC_EN) ?  RT_MULTI_FUNC_GPS : 0) );
 		pHalData->PolarityCtl = ((value32 & WL_HWPDN_SL) ?  RT_POLARITY_HIGH_ACT : RT_POLARITY_LOW_ACT);
-		//RT_TRACE(COMP_INIT, DBG_LOUD, ("ReadChipVersion(): MultiFunc(%x), PolarityCtl(%x) \n", pHalData->MultiFunc, pHalData->PolarityCtl));		
+		//MSG_8192C("ReadChipVersion(): MultiFunc(%x), PolarityCtl(%x) \n", pHalData->MultiFunc, pHalData->PolarityCtl);
+
+		//For regulator mode. by tynli. 2011.01.14
+		pHalData->RegulatorMode = ((value32 & TRP_BT_EN) ? RT_LDO_REGULATOR : RT_SWITCHING_REGULATOR);
+		//MSG_8192C("ReadChipVersion(): RegulatorMode(%x) \n", pHalData->RegulatorMode);
 	}
 
-#if DBG
-//#if 1
-	switch(version)
+//#if DBG
+#if 1
+	switch(ChipVersion)
 	{
 		case VERSION_NORMAL_TSMC_CHIP_92C_1T2R:
 			MSG_8192C("Chip Version ID: VERSION_NORMAL_TSMC_CHIP_92C_1T2R.\n");
@@ -719,10 +810,10 @@ rtl8192c_ReadChipVersion(
 		case VERSION_TEST_UMC_CHIP_8723:
 			MSG_8192C("Chip Version ID: VERSION_TEST_UMC_CHIP_8723.\n");
 			break;
-		case VERSION_NORMA_UMC_CHIP_8723_1T1R_A_CUT:
+		case VERSION_NORMAL_UMC_CHIP_8723_1T1R_A_CUT:
 			MSG_8192C("Chip Version ID: VERSION_NORMA_UMC_CHIP_8723_1T1R_A_CUT.\n");
 			break;
-		case VERSION_NORMA_UMC_CHIP_8723_1T1R_B_CUT:
+		case VERSION_NORMAL_UMC_CHIP_8723_1T1R_B_CUT:
 			MSG_8192C("Chip Version ID: VERSION_NORMA_UMC_CHIP_8723_1T1R_B_CUT.\n");
 			break;			
 		default:
@@ -731,20 +822,20 @@ rtl8192c_ReadChipVersion(
 	}
 #endif
 
-	pHalData->VersionID = version;
+	pHalData->VersionID = ChipVersion;
 
-	if(IS_92C_1T2R(version))
+	if(IS_1T2R(ChipVersion))
 		pHalData->rf_type = RF_1T2R;
-	else if(IS_92C_SERIAL(version))
+	else if(IS_2T2R(ChipVersion))
 		pHalData->rf_type = RF_2T2R;
-	else if(IS_8723_SERIES(version))
+	else if(IS_8723_SERIES(ChipVersion))
 		pHalData->rf_type = RF_1T1R;
 	else
 		pHalData->rf_type = RF_1T1R;
 
 	MSG_8192C("RF_Type is %x!!\n", pHalData->rf_type);
 
-	return version;
+	return ChipVersion;
 }
 
 
@@ -758,12 +849,14 @@ _HalMapChannelPlan8192C(
 
 	switch(HalChannelPlan)
 	{
+#if 0 /* Not using EEPROM_CHANNEL_PLAN directly */
 		case EEPROM_CHANNEL_PLAN_GLOBAL_DOMAIN:
 			rtChannelDomain = RT_CHANNEL_DOMAIN_GLOBAL_DOAMIN;
 			break;
 		case EEPROM_CHANNEL_PLAN_WORLD_WIDE_13:
 			rtChannelDomain = RT_CHANNEL_DOMAIN_WORLD_WIDE_13;
 			break;			
+#endif /* Not using EEPROM_CHANNEL_PLAN directly */
 		default:
 			rtChannelDomain = (RT_CHANNEL_DOMAIN)HalChannelPlan;
 			break;
@@ -829,7 +922,7 @@ _func_enter_;
 	DBG_8192C("===== rtl8192c_free_hal_data =====\n");
 
 	if(padapter->HalData)
-		_mfree(padapter->HalData, sizeof(HAL_DATA_TYPE));
+		rtw_mfree(padapter->HalData, sizeof(HAL_DATA_TYPE));
 
 _func_exit_;
 }
@@ -1320,20 +1413,20 @@ ReadEFuse_BT(
 	u8	bank=0;
 	BOOLEAN	bCheckNextBank=_FALSE;
 
-	efuseTbl = _malloc(EFUSE_BT_MAP_LEN);
+	efuseTbl = rtw_malloc(EFUSE_BT_MAP_LEN);
 	if(efuseTbl == NULL){
 		DBG_8192C("efuseTbl malloc fail !\n");
 		return;
 	}
 
-	eFuseWord = (u16 **)_malloc(sizeof(u16 *)*EFUSE_BT_MAX_SECTION);
+	eFuseWord = (u16 **)rtw_zmalloc(sizeof(u16 *)*EFUSE_BT_MAX_SECTION);
 	if(eFuseWord == NULL){
 		DBG_8192C("eFuseWord malloc fail !\n");
 		return;
 	}
 	else{
 		for(i=0;i<EFUSE_BT_MAX_SECTION;i++){
-			eFuseWord[i]= (u16 *)_malloc(sizeof(u16)*EFUSE_MAX_WORD_UNIT);
+			eFuseWord[i]= (u16 *)rtw_zmalloc(sizeof(u16)*EFUSE_MAX_WORD_UNIT);
 			if(eFuseWord[i]==NULL){
 				DBG_8192C("eFuseWord[] malloc fail !\n");
 				return;
@@ -1512,9 +1605,9 @@ ReadEFuse_BT(
 	}
 
 	for(i=0;i<EFUSE_BT_MAX_SECTION;i++)
-		_mfree((u8 *)eFuseWord[i], sizeof(u16)*EFUSE_MAX_WORD_UNIT);
-	_mfree((u8 *)eFuseWord, sizeof(u16 *)*EFUSE_BT_MAX_SECTION);
-	_mfree(efuseTbl, EFUSE_BT_MAP_LEN);
+		rtw_mfree((u8 *)eFuseWord[i], sizeof(u16)*EFUSE_MAX_WORD_UNIT);
+	rtw_mfree((u8 *)eFuseWord, sizeof(u16 *)*EFUSE_BT_MAX_SECTION);
+	rtw_mfree(efuseTbl, EFUSE_BT_MAP_LEN);
 }
 
 
@@ -3292,12 +3385,19 @@ rtl8192c_EfuseParseIDCode(
 	//RT_TRACE(COMP_INIT, DBG_LOUD, ("EEPROM ID = 0x%4x\n", EEPROMId));
 }
 
+void rtl8192c_read_chip_version(PADAPTER	pAdapter)
+{
+	HAL_DATA_TYPE	*pHalData	= GET_HAL_DATA(pAdapter);
+	pHalData->VersionID = rtl8192c_ReadChipVersion(pAdapter);
+}
+	
 void rtl8192c_set_hal_ops(struct hal_ops *pHalFunc)
 {
 	pHalFunc->free_hal_data = &rtl8192c_free_hal_data;
 
 	pHalFunc->dm_init = &rtl8192c_init_dm_priv;
 	pHalFunc->dm_deinit = &rtl8192c_deinit_dm_priv;
+	pHalFunc->read_chip_version = &rtl8192c_read_chip_version;
 
 	pHalFunc->set_bwmode_handler = &PHY_SetBWMode8192C;
 	pHalFunc->set_channel_handler = &PHY_SwChnl8192C;
@@ -3324,6 +3424,15 @@ void rtl8192c_set_hal_ops(struct hal_ops *pHalFunc)
 	pHalFunc->Efuse_PgPacketRead = &rtl8192c_Efuse_PgPacketRead;
 	pHalFunc->Efuse_PgPacketWrite = &rtl8192c_Efuse_PgPacketWrite;
 	pHalFunc->Efuse_WordEnableDataWrite = &rtl8192c_Efuse_WordEnableDataWrite;
+
+#ifdef SILENT_RESET_FOR_SPECIFIC_PLATFOM
+	pHalFunc->sreset_init_value = &rtl8192c_sreset_init_value;
+	pHalFunc->sreset_reset_value = &rtl8192c_sreset_reset_value;	
+	pHalFunc->silentreset = &rtl8192c_silentreset_for_specific_platform;
+	pHalFunc->sreset_xmit_status_check = &rtl8192c_sreset_xmit_status_check;
+	pHalFunc->sreset_linked_status_check  = &rtl8192c_sreset_linked_status_check;
+	pHalFunc->sreset_get_wifi_status  = &rtl8192c_sreset_get_wifi_status;
+#endif
 
 }
 

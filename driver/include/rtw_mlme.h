@@ -1,3 +1,23 @@
+/******************************************************************************
+ *
+ * Copyright(c) 2007 - 2011 Realtek Corporation. All rights reserved.
+ *                                        
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
+ *
+ *
+ 
+******************************************************************************/
 #ifndef __RTW_MLME_H_
 #define __RTW_MLME_H_
 
@@ -139,19 +159,19 @@ struct wifidirect_info{
 	_adapter*				padapter;
 	u8 device_addr[ETH_ALEN];
 	u8 interface_addr[ETH_ALEN];
-	u8	social_chan[3];
-	u8	listen_channel;
+	u8						social_chan[3];
+	u8						listen_channel;
 	u8 	operating_channel;
 	u8						listen_dwell;		//	This value should be between 1 and 3
-	enum P2P_ROLE		role;
-	u8	support_rate[7];
+	enum P2P_ROLE			role;
+	u8						support_rate[7];
 	u8						p2p_wildcard_ssid[P2P_WILDCARD_SSID_LEN];
-	u8					intent;		//	should only include the intent value.
-	enum P2P_STATE		p2p_state;
-	u8					p2p_peer_interface_addr[ ETH_ALEN ];
-	u8					peer_intent;	//	Included the intent value and tie breaker value.
-	u8					device_name[ WPS_MAX_DEVICE_NAME_LEN ];	//	Device name for displaying on searching device screen
-	u8					device_name_len;
+	u8						intent;		//	should only include the intent value.
+	enum P2P_STATE			p2p_state;
+	u8						p2p_peer_interface_addr[ ETH_ALEN ];
+	u8						peer_intent;	//	Included the intent value and tie breaker value.
+	u8						device_name[ WPS_MAX_DEVICE_NAME_LEN ];	//	Device name for displaying on searching device screen
+	u8						device_name_len;
 	struct tx_invite_req_info	invitereq_info;
 	struct tx_invite_resp_info	inviteresp_info;
 	u8						profileindex;	//	Used to point to the index of profileinfo array
@@ -167,7 +187,20 @@ struct wifidirect_info{
 	u8						negotiation_dialog_token;
 	u8						nego_ssid[ WLAN_SSID_MAXLEN ];	//	SSID information for group negotitation
 	u8						nego_ssidlen;
-	u8 p2p_group_ssid[P2P_WILDCARD_SSID_LEN+2];		
+	u8 						p2p_group_ssid[P2P_WILDCARD_SSID_LEN+2];
+
+	u8						p2p_ps_enable;
+	enum P2P_PS				p2p_ps; // indicate p2p ps state
+	u8						noa_index; // Identifies and instance of Notice of Absence timing.
+	u8						ctwindow; // Client traffic window. A period of time in TU after TBTT.
+	u8						opp_ps; // opportunistic power save.
+	u8						noa_num; // number of NoA descriptor in P2P IE.
+	u8						noa_count[P2P_MAX_NOA_NUM]; // Count for owner, Type of client.
+	u32						noa_duration[P2P_MAX_NOA_NUM]; // Max duration for owner, preferred or min acceptable duration for client.
+	u32						noa_interval[P2P_MAX_NOA_NUM]; // Length of interval for owner, preferred or max acceptable interval of client.
+	u32						noa_start_time[P2P_MAX_NOA_NUM]; // schedule expressed in terms of the lower 4 bytes of the TSF timer.
+	u32						tsf_low;
+	u32						tsf_high;
 };
 
 
@@ -176,13 +209,13 @@ struct mlme_priv {
 	_lock	lock;
 	sint	fw_state;	//shall we protect this variable? maybe not necessarily...
 
-	u8 to_join; //flag
-	u8 *nic_hdl;
+	u8	to_join; //flag
+	u8	*nic_hdl;
 
 	_list		*pscanned;
 	_queue	free_bss_pool;
 	_queue	scanned_queue;
-	u8	*free_bss_buf;
+	u8		*free_bss_buf;
 	u32	num_of_scanned;
 
 	NDIS_802_11_SSID	assoc_ssid;
@@ -192,7 +225,7 @@ struct mlme_priv {
 
 	//uint wireless_mode; no used, remove it
 
-	u32 scan_interval;
+	u32	scan_interval;
 
 	_timer assoc_timer;
 
@@ -220,7 +253,7 @@ struct mlme_priv {
 
 	RT_LINK_DETECT_T	LinkDetectInfo;
 	_timer	dynamic_chk_timer; //dynamic/periodic check timer
- 
+
  	u8 	key_mask; //use for ips to set wep key after ips_leave
 	u8	ChannelPlan;
 	u8 	scan_mode; // active: 1, passive: 0
@@ -256,10 +289,16 @@ struct mlme_priv {
 
 	u8 *wps_beacon_ie;	
 	u8 *wps_probe_resp_ie;
-
+	u32 wps_beacon_ie_len;
+	u32 wps_probe_resp_ie_len;
+	
+	_lock	bcn_update_lock;
+	u8		update_bcn;
+	
+	
 #endif	
 
- #ifdef RTK_DMP_PLATFORM
+#ifdef RTK_DMP_PLATFORM
 	// DMP kobject_hotplug function  signal need in passive level
 	_workitem	Linkup_workitem;
 	_workitem	Linkdown_workitem;

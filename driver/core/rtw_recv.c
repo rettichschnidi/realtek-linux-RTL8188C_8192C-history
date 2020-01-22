@@ -1,20 +1,23 @@
 /******************************************************************************
-* rtw_recv.c                                                                                                                                 *
-*                                                                                                                                          *
-* Description :                                                                                                                       *
-*                                                                                                                                           *
-* Author :                                                                                                                       *
-*                                                                                                                                         *
-* History :
-*
-*
-*                                                                                                                                       *
-* Copyright 2007, Realtek Corp.                                                                                                  *
-*                                                                                                                                        *
-* The contents of this file is the sole property of Realtek Corp.  It can not be                                     *
-* be used, copied or modified without written permission from Realtek Corp.                                         *
-*                                                                                                                                          *
-*******************************************************************************/
+ *
+ * Copyright(c) 2007 - 2011 Realtek Corporation. All rights reserved.
+ *                                        
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
+ *
+ *
+ 
+******************************************************************************/
 #define _RTW_RECV_C_
 #include <drv_conf.h>
 #include <osdep_service.h>
@@ -81,7 +84,12 @@ _func_enter_;
 
 	os_recv_resource_init(precvpriv, padapter);
 
-	precvpriv->pallocated_frame_buf = _zmalloc(NR_RECVFRAME * sizeof(union recv_frame) + RXFRAME_ALIGN_SZ);
+	#ifdef MEM_ALLOC_REFINE
+	precvpriv->pallocated_frame_buf = rtw_zvmalloc(NR_RECVFRAME * sizeof(union recv_frame) + RXFRAME_ALIGN_SZ);
+	#else
+	precvpriv->pallocated_frame_buf = rtw_zmalloc(NR_RECVFRAME * sizeof(union recv_frame) + RXFRAME_ALIGN_SZ);
+	#endif
+	
 	if(precvpriv->pallocated_frame_buf==NULL){
 		res= _FAIL;
 		goto exit;
@@ -139,6 +147,9 @@ void mfree_recv_priv_lock(struct recv_priv *precvpriv)
 
 	_spinlock_free(&precvpriv->free_recv_buf_queue.lock);
 
+#ifdef CONFIG_USE_USB_BUFFER_ALLOC
+	_spinlock_free(&precvpriv->recv_buf_pending_queue.lock);
+#endif
 }
 
 void _free_recv_priv (struct recv_priv *precvpriv)
@@ -151,8 +162,13 @@ _func_enter_;
 
 	os_recv_resource_free(precvpriv);
 
-	if(precvpriv->pallocated_frame_buf)
-		_mfree(precvpriv->pallocated_frame_buf, NR_RECVFRAME * sizeof(union recv_frame) + RXFRAME_ALIGN_SZ);
+	if(precvpriv->pallocated_frame_buf) {
+		#ifdef MEM_ALLOC_REFINE
+		rtw_vmfree(precvpriv->pallocated_frame_buf, NR_RECVFRAME * sizeof(union recv_frame) + RXFRAME_ALIGN_SZ);
+		#else
+		rtw_mfree(precvpriv->pallocated_frame_buf, NR_RECVFRAME * sizeof(union recv_frame) + RXFRAME_ALIGN_SZ);
+		#endif
+	}
 
 	padapter->HalFunc.free_recv_priv(padapter);
 
@@ -362,6 +378,53 @@ _func_exit_;
 
 }
 
+sint enqueue_recvbuf(struct recv_buf *precvbuf, _queue *queue)
+{
+	_irqL irqL;	
+
+	_enter_critical(&queue->lock, &irqL);
+
+	list_delete(&precvbuf->list);
+
+	list_insert_tail(&precvbuf->list, get_list_head(queue));
+	
+	_exit_critical(&queue->lock, &irqL);
+
+
+	return _SUCCESS;
+	
+}
+
+struct recv_buf *dequeue_recvbuf (_queue *queue)
+{
+	_irqL irqL;
+	struct recv_buf *precvbuf;
+	_list	*plist, *phead;	
+
+	_enter_critical(&queue->lock, &irqL);
+
+	if(_queue_empty(queue) == _TRUE)
+	{
+		precvbuf = NULL;
+	}
+	else
+	{
+		phead = get_list_head(queue);
+
+		plist = get_next(phead);
+
+		precvbuf = LIST_CONTAINOR(plist, struct recv_buf, list);
+
+		list_delete(&precvbuf->list);
+		
+	}
+
+	_exit_critical(&queue->lock, &irqL);
+
+
+	return precvbuf;
+
+}
 
 static sint recvframe_chkmic(_adapter *adapter,  union recv_frame *precvframe){
 
@@ -507,12 +570,11 @@ _func_enter_;
 	{
 		psecuritypriv->hw_decrypted=_FALSE;
 
-		RT_TRACE(_module_rtl871x_recv_c_,_drv_err_,("prxstat->decrypted==0 psecuritypriv->hw_decrypted=_FALSE\n"));
+		#ifdef DBG_RX_DECRYPTOR
+		DBG_871X("prxstat->bdecrypted:%d,  prxattrib->encrypt:%d,  Setting psecuritypriv->hw_decrypted = %d\n"
+			, prxattrib->bdecrypted ,prxattrib->encrypt, psecuritypriv->hw_decrypted);
+		#endif
 
-		RT_TRACE(_module_rtl871x_recv_c_,_drv_err_,("perfrom software decryption! \n"));
-
-		//printk("perfrom software decryption!\n");
-		RT_TRACE(_module_rtl871x_recv_c_,_drv_notice_,("###  software decryption!\n"));
 		switch(prxattrib->encrypt){
 		case _WEP40_:
 		case _WEP104_:
@@ -528,7 +590,10 @@ _func_enter_;
 				break;
 		}
 	}
-	else if(prxattrib->bdecrypted==1)
+	else if(prxattrib->bdecrypted==1
+		&& prxattrib->encrypt >0
+		&& (psecuritypriv->busetkipkey==1 || prxattrib->encrypt !=_TKIP_ )
+		)
 	{
 #if 0
 		if((prxstat->icv==1)&&(prxattrib->encrypt!=_AES_))
@@ -546,9 +611,18 @@ _func_enter_;
 #endif
 		{
 			psecuritypriv->hw_decrypted=_TRUE;
-			RT_TRACE(_module_rtl871x_recv_c_,_drv_info_,("### psecuritypriv->hw_decrypted=_TRUE\n"));
+			#ifdef DBG_RX_DECRYPTOR
+			DBG_871X("prxstat->bdecrypted:%d,  prxattrib->encrypt:%d,  Setting psecuritypriv->hw_decrypted = %d\n"
+			, prxattrib->bdecrypted ,prxattrib->encrypt, psecuritypriv->hw_decrypted);
+			#endif
 
 		}
+	}
+	else {
+		#ifdef DBG_RX_DECRYPTOR
+		DBG_871X("prxstat->bdecrypted:%d,  prxattrib->encrypt:%d,  psecuritypriv->hw_decrypted:%d\n"
+		, prxattrib->bdecrypted ,prxattrib->encrypt, psecuritypriv->hw_decrypted);
+		#endif
 	}
 
 	//recvframe_chkmic(adapter, precv_frame);   //move to recvframme_defrag function
@@ -731,8 +805,8 @@ static void process_wmmps_data(_adapter *padapter, union recv_frame *precv_frame
 		return;
 
 	if(!(psta->qos_info&0xf))
-		return;		
-
+		return;
+		
 
 	if(psta->state&WIFI_SLEEP_STATE)
 	{
@@ -1072,10 +1146,7 @@ _func_enter_;
 			}
 
 
-			//if(pmlmepriv->LinkDetectInfo.bBusyTraffic == _FALSE)
-			{
-				process_pwrbit_data(adapter, precv_frame);
-			}	
+			process_pwrbit_data(adapter, precv_frame);
 			
 
 			// if NULL-frame, drop packet
@@ -1104,7 +1175,7 @@ _func_enter_;
 					ret= _FAIL;
 					goto exit;
 				}
-
+			
 				process_wmmps_data(adapter, precv_frame);
 			
 			/*
@@ -1464,9 +1535,18 @@ static sint validate_recv_frame(_adapter *adapter, union recv_frame *precv_frame
 
 	u8 *ptr = precv_frame->u.hdr.rx_data;
 	u8  ver =(unsigned char) (*ptr)&0x3 ;
+#ifdef CONFIG_FIND_BEST_CHANNEL
+	struct mlme_ext_priv *pmlmeext = &adapter->mlmeextpriv;
+#endif
 
 _func_enter_;
 
+
+#ifdef CONFIG_FIND_BEST_CHANNEL
+	if (pmlmeext->sitesurvey_res.state == SCAN_PROCESS) {
+		pmlmeext->channel_set[pmlmeext->sitesurvey_res.channel_idx].rx_count++;
+	}
+#endif
 
 #if 0
 DBG_871X("\n");
@@ -1500,7 +1580,41 @@ DBG_871X("\n");
 	pattrib->mdata = GetMData(ptr);
 	pattrib->privacy = GetPrivacy(ptr);
 	pattrib->order = GetOrder(ptr);
+#if 0 //for debug
 
+if(pHalData->bDumpRxPkt ==1){
+	int i;
+	DBG_871X("############################# \n");
+	
+	for(i=0; i<64;i=i+8)
+		DBG_871X("%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X:\n", *(ptr+i),
+		*(ptr+i+1), *(ptr+i+2) ,*(ptr+i+3) ,*(ptr+i+4),*(ptr+i+5), *(ptr+i+6), *(ptr+i+7));
+	DBG_871X("############################# \n");
+}
+else if(pHalData->bDumpRxPkt ==2){
+	if(type== WIFI_MGT_TYPE){
+		int i;
+		DBG_871X("############################# \n");
+
+		for(i=0; i<64;i=i+8)
+			DBG_871X("%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X:\n", *(ptr+i),
+			*(ptr+i+1), *(ptr+i+2) ,*(ptr+i+3) ,*(ptr+i+4),*(ptr+i+5), *(ptr+i+6), *(ptr+i+7));
+		DBG_871X("############################# \n");
+	}
+}
+else if(pHalData->bDumpRxPkt ==3){
+	if(type== WIFI_DATA_TYPE){
+		int i;
+		DBG_871X("############################# \n");
+		
+		for(i=0; i<64;i=i+8)
+			DBG_871X("%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X:\n", *(ptr+i),
+			*(ptr+i+1), *(ptr+i+2) ,*(ptr+i+3) ,*(ptr+i+4),*(ptr+i+5), *(ptr+i+6), *(ptr+i+7));
+		DBG_871X("############################# \n");
+	}
+}
+
+#endif
 	switch (type)
 	{
 		case WIFI_MGT_TYPE: //mgnt
@@ -2830,7 +2944,10 @@ void reordering_ctrl_timeout_handler(void *pcontext)
 
 	_enter_critical_bh(&ppending_recvframe_queue->lock, &irql);
 
-	recv_indicatepkts_in_order(padapter, preorder_ctrl, _TRUE);
+	if(recv_indicatepkts_in_order(padapter, preorder_ctrl, _TRUE)==_TRUE)
+	{
+		_set_timer(&preorder_ctrl->reordering_ctrl_timer, REORDER_WAIT_TIME);		
+	}
 
 	_exit_critical_bh(&ppending_recvframe_queue->lock, &irql);
 
@@ -2935,6 +3052,8 @@ static int recv_func(_adapter *padapter, void *pcontext)
 		free_recvframe(orig_prframe, pfree_recv_queue);//free this recv_frame
 		goto _exit_recv_func;
 	}
+	// DATA FRAME
+	padapter->ledpriv.LedControlHandler(padapter, LED_CTL_RX);
 
 	prframe = decryptor(padapter, prframe);
 	if (prframe == NULL) {
@@ -2943,17 +3062,17 @@ static int recv_func(_adapter *padapter, void *pcontext)
 		goto _exit_recv_func;
 	}
 
-       	prframe = recvframe_chk_defrag(padapter, prframe);
-	if (prframe == NULL) {
+	prframe = recvframe_chk_defrag(padapter, prframe);
+	if(prframe==NULL)	{
 		RT_TRACE(_module_rtl871x_recv_c_,_drv_err_,("recvframe_chk_defrag: drop pkt\n"));
-		goto _exit_recv_func;
+		goto _exit_recv_func;		
 	}
 
 	prframe=portctrl(padapter, prframe);
-	if(prframe==NULL)	{
+	if (prframe == NULL) {
 		RT_TRACE(_module_rtl871x_recv_c_,_drv_err_,("portctrl: drop pkt \n"));
 		retval = _FAIL;
-		goto _exit_recv_func;		
+		goto _exit_recv_func;
 	}
 
 	count_rx_stats(padapter, prframe);

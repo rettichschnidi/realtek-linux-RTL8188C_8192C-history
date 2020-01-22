@@ -1,5 +1,23 @@
+/******************************************************************************
+ *
+ * Copyright(c) 2007 - 2011 Realtek Corporation. All rights reserved.
+ *                                        
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
+ *
+ *
+ ******************************************************************************/
 /*****************************************************************************
- *	Copyright(c) 2008,  RealTEK Technology Inc. All Right Reserved.
  *
  * Module:	__INC_HAL8192DPHYCFG_H
  *
@@ -96,10 +114,10 @@ typedef enum _HW90_BLOCK{
 
 //vivi added this for read parameter from header, 20100908
 typedef enum _RF_CONTENT{
-	radioa_txt = 0,
-	radiob_txt = 1,
-	radioc_txt = 2,
-	radiod_txt = 3
+	radioa_txt = 0x1000,
+	radiob_txt = 0x1001,
+	radioc_txt = 0x1002,
+	radiod_txt = 0x1003
 } RF_CONTENT;
 
 typedef enum _RF90_RADIO_PATH{
@@ -260,6 +278,7 @@ typedef struct _BB_REGISTER_DEFINITION{
 
 }BB_REGISTER_DEFINITION_T, *PBB_REGISTER_DEFINITION_T;
 
+#ifdef CONFIG_MP_INCLUDED
 typedef enum _ANTENNA_PATH{
         ANTENNA_NONE 	= 0x00,
 		ANTENNA_D		,
@@ -278,6 +297,7 @@ typedef enum _ANTENNA_PATH{
 		ANTENNA_ABC		,
 		ANTENNA_ABCD	
 } ANTENNA_PATH;
+#endif
 
 typedef struct _R_ANTENNA_SELECT_OFDM{	
 	u32			r_tx_antenna:4;	
@@ -315,6 +335,10 @@ u8 rtl8192d_getChnlGroupfromArray(u8 chnl);
 //
 // BB and RF register read/write
 //
+void	rtl8192d_PHY_SetBBReg1Byte(	IN	PADAPTER	Adapter,
+								IN	u32		RegAddr,
+								IN	u32		BitMask,
+								IN	u32		Data	);
 u32	rtl8192d_PHY_QueryBBReg(	IN	PADAPTER	Adapter,
 								IN	u32		RegAddr,
 								IN	u32		BitMask	);
@@ -470,6 +494,23 @@ PHY_UpdateBBRFConfiguration8192D(
 	IN BOOLEAN bisBandSwitch
 );
 
+VOID PHY_ReadMacPhyMode92D(
+	IN PADAPTER	Adapter,
+	IN BOOLEAN 	AutoloadFail	
+);
+
+VOID PHY_ConfigMacPhyMode92D(
+	IN PADAPTER	Adapter
+);
+
+VOID PHY_ConfigMacPhyModeInfo92D(
+	IN PADAPTER	Adapter
+);
+
+VOID PHY_ConfigMacCoexist_RFPage92D(
+	IN PADAPTER	Adapter
+);
+
 VOID
 rtl8192d_PHY_InitRxSetting(
 	IN	PADAPTER Adapter
@@ -480,8 +521,13 @@ rtl8192d_PHY_ResetIQKResult(
 	IN	PADAPTER Adapter
 );
 
+
+VOID 
+rtl8192d_PHY_SetRFPathSwitch(IN	PADAPTER	pAdapter, IN	BOOLEAN		bMain);
+
 /*--------------------------Exported Function prototype---------------------*/
 
+#define PHY_SetBBReg1Byte(Adapter, RegAddr, BitMask, Data) rtl8192d_PHY_SetBBReg1Byte(Adapter, RegAddr, BitMask, Data)
 #define PHY_QueryBBReg(Adapter, RegAddr, BitMask) rtl8192d_PHY_QueryBBReg(Adapter, RegAddr, BitMask)
 #define PHY_SetBBReg(Adapter, RegAddr, BitMask, Data) rtl8192d_PHY_SetBBReg(Adapter, RegAddr, BitMask, Data)
 #define PHY_QueryRFReg(Adapter, eRFPath, RegAddr, BitMask) rtl8192d_PHY_QueryRFReg(Adapter, eRFPath, RegAddr, BitMask)

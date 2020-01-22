@@ -1,3 +1,23 @@
+/******************************************************************************
+ *
+ * Copyright(c) 2007 - 2011 Realtek Corporation. All rights reserved.
+ *                                        
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
+ *
+ *
+ 
+******************************************************************************/
 #ifndef _WIFI_H_
 #define _WIFI_H_
 
@@ -77,7 +97,7 @@ enum WIFI_FRAME_SUBTYPE {
     WIFI_CF_ACK         = (BIT(6) | BIT(4) | WIFI_DATA_TYPE),
     WIFI_CF_POLL        = (BIT(6) | BIT(5) | WIFI_DATA_TYPE),
     WIFI_CF_ACKPOLL     = (BIT(6) | BIT(5) | BIT(4) | WIFI_DATA_TYPE),
-    WIFI_QOS_DATA_NULL = (BIT(6) | WIFI_QOS_DATA_TYPE),
+    WIFI_QOS_DATA_NULL	= (BIT(6) | WIFI_QOS_DATA_TYPE),
 };
 
 enum WIFI_REASON_CODE	{
@@ -1047,6 +1067,8 @@ struct ADDBA_request
 
 #define	P2P_MAX_INTENT						15
 
+#define	P2P_MAX_NOA_NUM						2
+
 //	WPS Configuration Method
 #define	WPS_CM_NONE							0x0000
 #define	WPS_CM_LABEL							0x0004
@@ -1085,5 +1107,15 @@ enum P2P_STATE {
 	P2P_STATE_PROVISIONING_ING = 13,		//	Doing the P2P WPS
 	P2P_STATE_PROVISIONING_DONE = 14,	//	Finish the P2P WPS
 };
+
+enum P2P_PS
+{
+	P2P_PS_DISABLE=0,
+	P2P_PS_ENABLE=1,
+	P2P_PS_SCAN=2,
+	P2P_PS_SCAN_DONE=3,
+	P2P_PS_ALLSTASLEEP=4, // for owner
+};
+
 #endif // _WIFI_H_
 

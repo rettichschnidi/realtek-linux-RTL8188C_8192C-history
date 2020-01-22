@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2007 - 2010 Realtek Corporation. All rights reserved.
+ * Copyright(c) 2007 - 2011 Realtek Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -56,7 +56,7 @@
 			_module_rtl8712_recv_c_ |
 			_module_mp_ |
 			_module_efuse_;
-	
+
 #endif
 
 #ifdef CONFIG_PROC_DEBUG
@@ -438,6 +438,87 @@ int proc_get_all_sta_info(char *page, char **start,
 	
 #endif		
 
+#ifdef MEMORY_LEAK_DEBUG
+#include <asm/atomic.h>
+extern atomic_t _malloc_cnt;;
+extern atomic_t _malloc_size;;
+
+int proc_get_malloc_cnt(char *page, char **start,
+			  off_t offset, int count,
+			  int *eof, void *data)
+{
+	
+	int len = 0;
+
+	len += snprintf(page + len, count - len, "_malloc_cnt=%d\n", atomic_read(&_malloc_cnt));
+	len += snprintf(page + len, count - len, "_malloc_size=%d\n", atomic_read(&_malloc_size));
+				
+	*eof = 1;
+	return len;
+}
+#endif /* MEMORY_LEAK_DEBUG */
+
+#ifdef CONFIG_FIND_BEST_CHANNEL
+int proc_get_best_channel(char *page, char **start,
+			  off_t offset, int count,
+			  int *eof, void *data)
+{
+	struct net_device *dev = data;
+	_adapter *padapter = (_adapter *)netdev_priv(dev);
+	struct mlme_ext_priv *pmlmeext = &padapter->mlmeextpriv;
+	int len = 0;
+	u32 i, best_channel_24G = 1, best_channel_5G = 36, index_24G = 0, index_5G = 0;
+
+	for (i=0; pmlmeext->channel_set[i].ChannelNum !=0; i++) {
+		if ( pmlmeext->channel_set[i].ChannelNum == 1)
+			index_24G = i;
+		if ( pmlmeext->channel_set[i].ChannelNum == 36)
+			index_5G = i;
+	}	
+	
+	for (i=0; pmlmeext->channel_set[i].ChannelNum !=0; i++) {
+		// 2.4G
+		if ( pmlmeext->channel_set[i].ChannelNum == 6 ) {
+			if ( pmlmeext->channel_set[i].rx_count < pmlmeext->channel_set[index_24G].rx_count ) {
+				index_24G = i;
+				best_channel_24G = pmlmeext->channel_set[i].ChannelNum;
+			}
+		}
+
+		// 5G
+		if ( pmlmeext->channel_set[i].ChannelNum >= 36
+			&& pmlmeext->channel_set[i].ChannelNum < 140 ) {
+			 // Find primary channel
+			if ( (( pmlmeext->channel_set[i].ChannelNum - 36) % 8 == 0)
+				&& (pmlmeext->channel_set[i].rx_count < pmlmeext->channel_set[index_5G].rx_count) ) {
+				index_5G = i;
+				best_channel_5G = pmlmeext->channel_set[i].ChannelNum;
+			}
+		}
+
+		if ( pmlmeext->channel_set[i].ChannelNum >= 149
+			&& pmlmeext->channel_set[i].ChannelNum < 165) {
+			 // find primary channel
+			if ( (( pmlmeext->channel_set[i].ChannelNum - 149) % 8 == 0)
+				&& (pmlmeext->channel_set[i].rx_count < pmlmeext->channel_set[index_5G].rx_count) ) {
+				index_5G = i;
+				best_channel_5G = pmlmeext->channel_set[i].ChannelNum;
+			}
+		}
+#if 0 // debug
+		len += snprintf(page + len, count - len, "The rx cnt of channel %3d = %d\n", 
+					pmlmeext->channel_set[i].ChannelNum, pmlmeext->channel_set[i].rx_count);
+#endif
+	}
+	
+	len += snprintf(page + len, count - len, "best_channel_5G = %d\n", best_channel_5G);
+	len += snprintf(page + len, count - len, "best_channel_24G = %d\n", best_channel_24G);
+
+	*eof = 1;
+	return len;
+
+}
+#endif /* CONFIG_FIND_BEST_CHANNEL */
 	
 #endif
 

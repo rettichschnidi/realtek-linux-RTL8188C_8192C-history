@@ -1,12 +1,32 @@
+/******************************************************************************
+ *
+ * Copyright(c) 2007 - 2011 Realtek Corporation. All rights reserved.
+ *                                        
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
+ *
+ *
+ 
+******************************************************************************/
 #ifndef _RTL8192C_XMIT_H_
 #define _RTL8192C_XMIT_H_
 
-#define VO_QUEUE_INX	0
-#define VI_QUEUE_INX	1
-#define BE_QUEUE_INX	2
-#define BK_QUEUE_INX	3
+#define VO_QUEUE_INX		0
+#define VI_QUEUE_INX		1
+#define BE_QUEUE_INX		2
+#define BK_QUEUE_INX		3
 #define BCN_QUEUE_INX		4
-#define MGT_QUEUE_INX	5
+#define MGT_QUEUE_INX		5
 #define HIGH_QUEUE_INX		6
 #define TXCMD_QUEUE_INX	7
 
@@ -24,15 +44,9 @@
 #define QSLT_MGNT						0x12
 #define QSLT_CMD						0x13
 
-#ifdef CONFIG_PCI_HCI
-#define TXDESC_NUM						64
-//#define TXDESC_NUM						128
-#define TXDESC_NUM_BE_QUEUE			256
-#endif
-
 #ifdef CONFIG_USB_HCI
 
-#ifdef USB_TX_AGGREGATION_92C
+#ifdef USB_TX_AGGREGATION
 #define MAX_TX_AGG_PACKET_NUMBER 0xFF
 #endif
 
@@ -63,12 +77,12 @@ struct xmit_buf *rtl8192ce_dequeue_xmitbuf(struct rtw_tx_ring *ring);
 
 void	rtl8192ce_xmitframe_resume(_adapter *padapter);
 
-void rtl8192ce_mgnt_xmit(_adapter *padapter, struct xmit_frame *pmgntframe);
+void	rtl8192ce_mgnt_xmit(_adapter *padapter, struct xmit_frame *pmgntframe);
 
-s32 rtl8192ce_hal_xmit(_adapter *padapter, struct xmit_frame *pxmitframe);
+s32	rtl8192ce_hal_xmit(_adapter *padapter, struct xmit_frame *pxmitframe);
 
 #ifdef CONFIG_HOSTAPD_MLME
-s32 rtl8192ce_hostap_mgnt_xmit_entry(_adapter *padapter, _pkt *pkt);
+s32	rtl8192ce_hostap_mgnt_xmit_entry(_adapter *padapter, _pkt *pkt);
 #endif
 
 #endif

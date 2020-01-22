@@ -1,3 +1,23 @@
+/******************************************************************************
+ *
+ * Copyright(c) 2007 - 2011 Realtek Corporation. All rights reserved.
+ *                                        
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
+ *
+ *
+ 
+******************************************************************************/
 #ifndef _RTW_RECV_H_
 #define _RTW_RECV_H_
 
@@ -83,12 +103,12 @@ struct rx_pkt_attrib	{
 	u8 	to_fr_ds;
 	u16	seq_num;
 	u8	frag_num;
-	u8   pw_save;
-	u8    mfrag;
-	u8    mdata;	
+	u8	pw_save;
+	u8	mfrag;
+	u8	mdata;	
 	u8	privacy; //in frame_ctrl field
 	u8	bdecrypted;
-	int	hdrlen;		//the WLAN Header Len	
+	int	hdrlen;		//the WLAN Header Len
 	int	iv_len;
 	int	icv_len;
 	u8	encrypt;		//when 0 indicate no encrypt. when non-zero, indicate the encrypt algorith
@@ -113,8 +133,8 @@ struct rx_pkt_attrib	{
 	s8	rx_mimo_signal_qual[2];	
 	u8	signal_strength;
 
-	u32 RxPWDBAll;
-	s32	RecvSignalPower;	
+	u32	RxPWDBAll;
+	s32	RecvSignalPower;
 };
 
 
@@ -215,10 +235,10 @@ struct recv_priv {
 	uint  rx_middlepacket_crcerr;
 
 #ifdef CONFIG_USB_HCI	
-	//u8 *pallocated_urb_buf;	
+	//u8 *pallocated_urb_buf;
 	_sema allrxreturnevt;
 	uint	ff_hwaddr;
-	u8  rx_pending_cnt;	
+	u8	rx_pending_cnt;
 	
 #ifdef CONFIG_USB_INTERRUPT_IN_PIPE
 #ifdef PLATFORM_LINUX
@@ -230,11 +250,16 @@ struct recv_priv {
 
 #endif	
 #ifdef PLATFORM_LINUX
+	struct tasklet_struct irq_prepare_beacon_tasklet;
 	struct tasklet_struct recv_tasklet;
 	struct sk_buff_head free_recv_skb_queue;
 	struct sk_buff_head rx_skb_queue;
+
+#ifdef CONFIG_USE_USB_BUFFER_ALLOC
+	_queue	recv_buf_pending_queue;
 #endif
-  
+#endif
+
 	u8 *pallocated_recv_buf;
 	u8 *precv_buf;    // 4 alignment	
 	_queue	free_recv_buf_queue;
@@ -242,7 +267,7 @@ struct recv_priv {
 
 #ifdef CONFIG_SDIO_HCI
         u8 bytecnt_buf[512];
-//	u8 * recvbuf_drop_ori;
+	//u8 * recvbuf_drop_ori;
 	//u8 * recvbuf_drop;
 	struct recv_buf *recvbuf_drop;
 #endif
@@ -256,6 +281,7 @@ struct recv_priv {
 
 	//For display the phy informatiom
 	s8 rssi;
+	s8 rxpwdb;
 	u8 signal_strength;
 	u8 signal_qual;
 	u8 noise;
@@ -304,6 +330,8 @@ struct recv_buf{
 
 	#if defined(PLATFORM_OS_XP)||defined(PLATFORM_LINUX)
 	PURB	purb;
+	dma_addr_t dma_transfer_addr;	/* (in) dma addr for transfer_buffer */
+	u32 alloc_sz;
 	#endif
 
 	#ifdef PLATFORM_OS_XP
@@ -402,6 +430,9 @@ extern int	 free_recvframe(union recv_frame *precvframe, _queue *pfree_recv_queu
 extern union recv_frame *dequeue_recvframe (_queue *queue);
 extern int	enqueue_recvframe(union recv_frame *precvframe, _queue *queue);
 extern void free_recvframe_queue(_queue *pframequeue,  _queue *pfree_recv_queue);  
+
+sint enqueue_recvbuf(struct recv_buf *precvbuf, _queue *queue);
+struct recv_buf *dequeue_recvbuf (_queue *queue);
 
 void reordering_ctrl_timeout_handler(void *pcontext);
 

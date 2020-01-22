@@ -1,4 +1,23 @@
-
+/******************************************************************************
+ *
+ * Copyright(c) 2007 - 2011 Realtek Corporation. All rights reserved.
+ *                                        
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
+ *
+ *
+ 
+******************************************************************************/
 #ifndef __RTW_MLME_EXT_H_
 #define __RTW_MLME_EXT_H_
 
@@ -41,6 +60,7 @@
 #define	DYNAMIC_FUNC_HP			BIT(1)
 #define	DYNAMIC_FUNC_SS			BIT(2) //Tx Power Tracking
 #define DYNAMIC_FUNC_BT			BIT(3)
+#define DYNAMIC_FUNC_ANT_DIV		BIT(4)
 
 #define _HW_STATE_NOLINK_		0x00
 #define _HW_STATE_ADHOC_		0x01
@@ -81,11 +101,23 @@ typedef enum _RT_CHANNEL_DOMAIN
 	RT_CHANNEL_DOMAIN_MKK1 = 6,
 	RT_CHANNEL_DOMAIN_ISRAEL = 7,
 	RT_CHANNEL_DOMAIN_TELEC = 8,
+#if 0 /* Not using EEPROM_CHANNEL_PLAN directly */
 	RT_CHANNEL_DOMAIN_MIC = 9,				// Be compatible with old channel plan. No good!
 	RT_CHANNEL_DOMAIN_GLOBAL_DOAMIN = 10,		// Be compatible with old channel plan. No good!
 	RT_CHANNEL_DOMAIN_WORLD_WIDE_13 = 11,		// Be compatible with old channel plan. No good!
 	RT_CHANNEL_DOMAIN_TELEC_NETGEAR = 12,		// Be compatible with old channel plan. No good!
 	RT_CHANNEL_DOMAIN_NCC = 13,
+#endif /* Not using EEPROM_CHANNEL_PLAN directly */
+	RT_CHANNEL_DOMAIN_GLOBAL_DOAMIN = 0x09,
+	RT_CHANNEL_DOMAIN_WORLD_WIDE_13 = 0x0A,
+	RT_CHANNEL_DOMAIN_NCC = 0x0B,
+	RT_CHANNEL_DOMAIN_CHINA = 0x0C,
+	RT_CHANNEL_DOMAIN_SINGAPORE_INDIA_MEXICO = 0x0D,
+	RT_CHANNEL_DOMAIN_KOREA = 0x0E,
+	RT_CHANNEL_DOMAIN_TURKEY = 0x0F,
+	RT_CHANNEL_DOMAIN_JAPAN = 0x10,
+	RT_CHANNEL_DOMAIN_FCC_NO_DFS = 0x11,
+	RT_CHANNEL_DOMAIN_JAPAN_NO_DFS = 0x12,
 	//===== Add new channel plan above this line===============//
 	RT_CHANNEL_DOMAIN_MAX,
 }RT_CHANNEL_DOMAIN, *PRT_CHANNEL_DOMAIN;
@@ -142,12 +174,12 @@ struct action_handler {
 
 struct	ss_res	
 {
-	int							state;
-	int							bss_cnt;
-	int							channel_idx;
+	int	state;
+	int	bss_cnt;
+	int	channel_idx;
 	int	scan_mode;
-	int							ss_ssidlen;
-	unsigned char 	ss_ssid[IW_ESSID_MAX_SIZE + 1];
+	int	ss_ssidlen;
+	unsigned char	ss_ssid[IW_ESSID_MAX_SIZE + 1];
 };
 
 //#define AP_MODE				0x0C
@@ -218,9 +250,9 @@ struct mlme_ext_info
 	struct ADDBA_request		ADDBA_req;
 	struct WMM_para_element	WMM_param;
 	struct HT_caps_element	HT_caps;
-	struct HT_info_element	HT_info;
-	WLAN_BSSID_EX network;//join network or bss_network, if in ap mode, it is the same to cur_network.network
-	struct FW_Sta_Info FW_sta_info[NUM_STA];	
+	struct HT_info_element		HT_info;
+	WLAN_BSSID_EX			network;//join network or bss_network, if in ap mode, it is the same to cur_network.network
+	struct FW_Sta_Info		FW_sta_info[NUM_STA];
 };
 
 // The channel information about this channel including joining, scanning, and power constraints.
@@ -231,30 +263,37 @@ typedef struct _RT_CHANNEL_INFO
 	//u16				ScanPeriod;		// Listen time in millisecond in this channel.
 	//s32				MaxTxPwrDbm;	// Max allowed tx power.
 	//u32				ExInfo;			// Extended Information for this channel.
+#ifdef CONFIG_FIND_BEST_CHANNEL
+	u32				rx_count;
+#endif
 }RT_CHANNEL_INFO, *PRT_CHANNEL_INFO;
 
 struct mlme_ext_priv
 {
-	_adapter			*padapter;
+	_adapter	*padapter;
 	u8	mlmeext_init;
-	u8				event_seq;
+	#ifdef USE_ATOMIC_EVENT_SEQ
+	ATOMIC_T		event_seq;
+	#else
+	u8	event_seq;
+	#endif
 	u16	mgnt_seq;
 	
 	//struct fw_priv 	fwpriv;
 	
-	unsigned char		cur_channel;
-	unsigned char		cur_bwmode;
-	unsigned char 	cur_ch_offset;//PRIME_CHNL_OFFSET
-	unsigned char 	cur_wireless_mode;
+	unsigned char	cur_channel;
+	unsigned char	cur_bwmode;
+	unsigned char	cur_ch_offset;//PRIME_CHNL_OFFSET
+	unsigned char	cur_wireless_mode;
 	//unsigned char	channel_set[NUM_CHANNELS];
 	unsigned char	max_chan_nums;
 	RT_CHANNEL_INFO		channel_set[NUM_CHANNELS];
-	unsigned char		basicrate[NumRates];
-	unsigned char		datarate[NumRates];
+	unsigned char	basicrate[NumRates];
+	unsigned char	datarate[NumRates];
 	
 	struct ss_res		sitesurvey_res;		
 	struct mlme_ext_info	mlmext_info;//for sta/adhoc mode, including current scanning/connecting/connected related info.
-	                                                     //for ap mode, network includes ap's cap_info
+                                                     //for ap mode, network includes ap's cap_info
 	_timer		survey_timer;
 	_timer		link_timer;
 	//_timer		ADDBA_timer;
@@ -266,7 +305,7 @@ struct mlme_ext_priv
 	u64 TSFValue;
 	
 #ifdef CONFIG_AP_MODE	
-	unsigned char bstart_bss;	
+	unsigned char bstart_bss;
 #endif
 
 };
@@ -298,6 +337,7 @@ void SetBWMode(_adapter *padapter, unsigned short bwmode, unsigned char channel_
 unsigned int decide_wait_for_beacon_timeout(unsigned int bcn_interval);
 
 void write_cam(_adapter *padapter, u8 entry, u16 ctrl, u8 *mac, u8 *key);
+void clear_cam_entry(_adapter *padapter, u8 entry);
 
 void invalidate_cam_all(_adapter *padapter);
 void CAM_empty_entry(PADAPTER Adapter, u8 ucIndex);
@@ -336,14 +376,14 @@ void update_beacon_info(_adapter *padapter, u8 *pframe, uint len, struct sta_inf
 void update_IOT_info(_adapter *padapter);
 void update_capinfo(PADAPTER Adapter, u16 updateCap);
 void update_wireless_mode(_adapter * padapter);
+void update_bmc_sta_support_rate(_adapter *padapter, u32 mac_id);
 int update_sta_support_rate(_adapter *padapter, u8* pvar_ie, uint var_ie_len, int cam_idx);
 
 unsigned int update_basic_rate(unsigned char *ptn, unsigned int ptn_sz);
 unsigned int update_supported_rate(unsigned char *ptn, unsigned int ptn_sz);
 unsigned int update_MSC_rate(struct HT_caps_element *pHT_caps);
-void Update_RA_Entry(_adapter *padapter, unsigned int cam_idx);
-void enable_rate_adaptive(_adapter *padapter);
-void set_sta_rate(_adapter *padapter);
+void Update_RA_Entry(_adapter *padapter, u32 mac_id);
+void set_sta_rate(_adapter *padapter, struct sta_info *psta);
 
 unsigned int receive_disconnect(_adapter *padapter, unsigned char *MacAddr);
 
@@ -364,9 +404,16 @@ unsigned int setup_beacon_frame(_adapter *padapter, unsigned char *beacon_frame)
 void update_mgntframe_attrib(_adapter *padapter, struct pkt_attrib *pattrib);
 void dump_mgntframe(_adapter *padapter, struct xmit_frame *pmgntframe);
 
+#if ( P2P_INCLUDED == 1 )
+void issue_probersp_p2p(_adapter *padapter, unsigned char *da);
+void issue_p2p_provision_request(_adapter *padapter, u8* raddr);
+void issue_p2p_GO_request(_adapter *padapter, u8* raddr);
+void issue_probereq_p2p(_adapter *padapter);
+void issue_p2p_invitation_response(_adapter *padapter, u8* raddr, u8 dialogToken, u8 success);
+void issue_p2p_invitation_request(_adapter *padapter, u8* raddr );
+#endif
 void issue_beacon(_adapter *padapter);
 void issue_probersp(_adapter *padapter, unsigned char *da, u8 is_valid_p2p_probereq);
-void issue_probersp_p2p(_adapter *padapter, unsigned char *da);
 void issue_assocreq(_adapter *padapter);
 void issue_asocrsp(_adapter *padapter, unsigned short status, struct sta_info *pstat, int pkt_type);
 void issue_auth(_adapter *padapter, struct sta_info *psta, unsigned short status);
@@ -374,7 +421,6 @@ void issue_auth(_adapter *padapter, struct sta_info *psta, unsigned short status
 //	blnbc: 1 -> broadcast probe request
 //	blnbc: 0 -> unicast probe request. The address 1 will be the BSSID.
 void issue_probereq(_adapter *padapter, u8 blnbc);
-void issue_probereq_p2p(_adapter *padapter);
 void issue_nulldata(_adapter *padapter, unsigned int power_mode);
 void issue_qos_nulldata(_adapter *padapter, unsigned char *da, u16 tid);
 void issue_deauth(_adapter *padapter, unsigned char *da, unsigned short reason);
@@ -406,12 +452,12 @@ unsigned int OnAction_back(_adapter *padapter, union recv_frame *precv_frame);
 unsigned int OnAction_public(_adapter *padapter, union recv_frame *precv_frame);
 unsigned int OnAction_ht(_adapter *padapter, union recv_frame *precv_frame);
 unsigned int OnAction_wmm(_adapter *padapter, union recv_frame *precv_frame);
+unsigned int OnAction_p2p(_adapter *padapter, union recv_frame *precv_frame);
+
 
 void mlmeext_joinbss_event_callback(_adapter *padapter);
 void mlmeext_sta_del_event_callback(_adapter *padapter);
 void mlmeext_sta_add_event_callback(_adapter *padapter, struct sta_info *psta);
-void issue_p2p_invitation_response(_adapter *padapter, u8* raddr, u8 dialogToken, u8 success);
-void issue_p2p_invitation_request(_adapter *padapter, u8* raddr );
 
 void linked_status_chk(_adapter *padapter);
 
@@ -434,7 +480,7 @@ extern void correct_TSF(_adapter *padapter, struct mlme_ext_priv *pmlmeext);
 void init_mlme_ap_info(_adapter *padapter);
 //void update_BCNTIM(_adapter *padapter);
 void update_beacon(_adapter *padapter, u8 ie_id, u8 *oui, u8 tx);
-void expire_timeout_chk(_adapter *padapter);
+void expire_timeout_chk(_adapter *padapter);	
 void update_sta_info_apmode(_adapter *padapter, struct sta_info *psta);
 void start_bss_network(_adapter *padapter, u8 *pbuf);
 #ifdef CONFIG_NATIVEAP_MLME

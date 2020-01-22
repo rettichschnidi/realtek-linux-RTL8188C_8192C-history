@@ -1,5 +1,23 @@
+/******************************************************************************
+ *
+ * Copyright(c) 2007 - 2011 Realtek Corporation. All rights reserved.
+ *                                        
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
+ *
+ *
+ ******************************************************************************/
 /*****************************************************************************
- *	Copyright(c) 2008,  RealTEK Technology Inc. All Right Reserved.
  *
  * Module:	__INC_HAL8192DPHYREG_H
  *
@@ -991,7 +1009,12 @@
 //#define		bMask20Bits               	0xfffff	// RF Reg mask bits T65 RF
 #define 		bRFRegOffsetMask		0xfffff
 //#define 		bRFRegOffsetMask		0xfff	
-  		
+
+//MAC0 will wirte PHY1
+#define	MAC0_ACCESS_PHY1	0x4000
+//MAC1 will wirte PHY0
+#define	MAC1_ACCESS_PHY0	0x2000
+
 #define		bEnable			0x1	// Useless
 #define		bDisable		0x0
        		

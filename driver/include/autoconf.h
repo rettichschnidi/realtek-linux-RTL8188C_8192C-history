@@ -1,3 +1,22 @@
+/******************************************************************************
+ *
+ * Copyright(c) 2007 - 2011 Realtek Corporation. All rights reserved.
+ *                                        
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
+ *
+ *
+ ******************************************************************************/
 /*
  * Automatically generated C config: don't edit
  */
@@ -45,24 +64,32 @@
 
 #ifndef CONFIG_MP_INCLUDED
 #define CONFIG_IPS	1
+#ifdef CONFIG_IPS
+//#define CONFIG_IPS_LEVEL_2	
+#endif
 #define CONFIG_LPS	1
-#define CONFIG_PM 	1
 #define CONFIG_BT_COEXIST  	1
 #define CONFIG_ANTENNA_DIVERSITY	1
+#define SUPPORT_HW_RFOFF_DETECTED	1
 #else
 #define MP_IWPRIV_SUPPORT 1
 #endif
 
 #ifdef PLATFORM_LINUX
-	//#define CONFIG_PROC_DEBUG 1
+//	#define CONFIG_PROC_DEBUG 1
 	
 	#define CONFIG_AP_MODE 1
 	#define CONFIG_NATIVEAP_MLME 1
+
+	//	Added by Albert 20110314
+	//	The P2P code won't be included into the driver if we change the following value from 1 to 0
+	#define P2P_INCLUDED	1
 
 	#ifdef CONFIG_AP_MODE
 		#ifndef CONFIG_NATIVEAP_MLME
 			#define CONFIG_HOSTAPD_MLME 1
 		#endif			
+		//#define CONFIG_FIND_BEST_CHANNEL
 	#endif
 	
 #endif
@@ -84,8 +111,17 @@
 
 		#define DEV_BUS_TYPE	DEV_BUS_USB_INTERFACE
 
-		#define USB_TX_AGGREGATION_92C	1
-		#define USB_RX_AGGREGATION_92C	1
+		#ifdef CONFIG_MINIMAL_MEMORY_USAGE
+			#define USB_TX_AGGREGATION	0
+			#define USB_RX_AGGREGATION	0
+		#else
+			#define USB_TX_AGGREGATION	1
+			#define USB_RX_AGGREGATION	1
+		#endif
+		
+	        #ifdef CONFIG_WISTRON_PLATFORM	
+			#define SILENT_RESET_FOR_SPECIFIC_PLATFOM	1				
+		#endif
 
 		#define RTL8192CU_FW_DOWNLOAD_ENABLE	1
 
@@ -101,17 +137,25 @@
 
 		#define RTL8192CU_ADHOC_WORKAROUND_SETTING 1
 
-		#ifdef PLATFORM_LINUX			
+		#ifdef PLATFORM_LINUX
 			#define CONFIG_SKB_COPY 		1//for amsdu
-			#define CONFIG_PREALLOC_RECV_SKB 1			
-			#define CONFIG_REDUCE_USB_TX_INT 1	
-			//#define CONFIG_EASY_REPLACEMENT	1
+			#define CONFIG_PREALLOC_RECV_SKB	1
+			#define CONFIG_REDUCE_USB_TX_INT	1
+			#define CONFIG_EASY_REPLACEMENT	1
+			#ifdef CONFIG_WISTRON_PLATFORM
+			#define DYNAMIC_ALLOCIATE_VENDOR_CMD	0
+			#else
+			#define DYNAMIC_ALLOCIATE_VENDOR_CMD	1
+			#endif
+
+			//#define CONFIG_USE_USB_BUFFER_ALLOC 1
+			
 		#endif
 
 		#ifdef CONFIG_R871X_TEST
 
-		#endif    
-	
+		#endif
+
 	#endif
 
 	#ifdef CONFIG_PCI_HCI
@@ -129,11 +173,23 @@
 
 	#ifdef CONFIG_MP_INCLUDED
 		#define MP_DRIVER 1
-		#undef USB_TX_AGGREGATION_92C
-		#undef USB_RX_AGGREGATION_92C
+		#undef USB_TX_AGGREGATION
+		#undef USB_RX_AGGREGATION
 	#else
 		#define MP_DRIVER 0
 	#endif
 
+	
+	#define MEM_ALLOC_REFINE // general, now applied on 8192c only
+	#define INDICATE_SCAN_COMPLETE_EVENT// general
+	#define USB_INTERFERENCE_ISSUE // this should be checked in all usb interface
+	#define WPA_SET_ENCRYPTION_REFINE // general
+	#define STADEL_EVENT_REMOVE_SCANNED_ENTRY // general
+	#define USE_ATOMIC_EVENT_SEQ // general
+	#define HANDLE_JOINBSS_ON_ASSOC_RSP // general
+
 #endif
+
+//#define DBG_TX
+//#define DBG_XMIT_BUF
 

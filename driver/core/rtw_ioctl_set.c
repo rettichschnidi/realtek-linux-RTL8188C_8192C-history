@@ -1,20 +1,23 @@
 /******************************************************************************
-* rtw_ioctl_set.c                                                                                                                                 *
-*                                                                                                                                          *
-* Description :                                                                                                                       *
-*                                                                                                                                           *
-* Author :                                                                                                                       *
-*                                                                                                                                         *
-* History :                                                          
-*
-*                                        
-*                                                                                                                                       *
-* Copyright 2007, Realtek Corp.                                                                                                  *
-*                                                                                                                                        *
-* The contents of this file is the sole property of Realtek Corp.  It can not be                                     *
-* be used, copied or modified without written permission from Realtek Corp.                                         *
-*                                                                                                                                          *
-*******************************************************************************/
+ *
+ * Copyright(c) 2007 - 2011 Realtek Corporation. All rights reserved.
+ *                                        
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
+ *
+ *
+ 
+******************************************************************************/
 #define _RTW_IOCTL_SET_C_
 
 
@@ -453,9 +456,9 @@ _func_enter_;
 				}
 				else
 				{
-				       goto _Abort_Set_SSID;//it means driver is in WIFI_ADHOC_MASTER_STATE, we needn't create bss again.
-			        }			
-			}			
+					goto _Abort_Set_SSID;//it means driver is in WIFI_ADHOC_MASTER_STATE, we needn't create bss again.
+				}
+			}
 #ifdef CONFIG_LPS
 			else {
 				lps_ctrl_wk_cmd(padapter, LPS_CTRL_JOINBSS, 1);
@@ -579,8 +582,8 @@ _func_enter_;
 		if(*pold_state==Ndis802_11APMode)
 		{		
 			//change to other mode from Ndis802_11APMode			
-			cur_network->join_res = -1;			
-
+			cur_network->join_res = -1;
+			
 #ifdef CONFIG_NATIVEAP_MLME
 			stop_ap_mode(padapter);
 #endif
@@ -588,7 +591,7 @@ _func_enter_;
 		
 		*pold_state = networktype;
 
-		// clear WIFI_STATION_STATE; WIFI_AP_STATE; WIFI_ADHOC_STATE; WIFI_ADHOC_MASTER_STATE
+				// clear WIFI_STATION_STATE; WIFI_AP_STATE; WIFI_ADHOC_STATE; WIFI_ADHOC_MASTER_STATE
 		//pmlmepriv->fw_state &= 0xffffff87;		
 		_clr_fwstate_(pmlmepriv, WIFI_STATION_STATE|WIFI_AP_STATE|WIFI_ADHOC_STATE|WIFI_ADHOC_MASTER_STATE);
 				

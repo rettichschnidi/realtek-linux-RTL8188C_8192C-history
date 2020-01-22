@@ -1,6 +1,24 @@
 /******************************************************************************
-
-     (c) Copyright 2008, RealTEK Technologies Inc. All Rights Reserved.
+ *
+ * Copyright(c) 2007 - 2011 Realtek Corporation. All rights reserved.
+ *                                        
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
+ *
+ *
+ 
+******************************************************************************/
+/******************************************************************************
 
  Module:	rtl8192c_phycfg.c	
 
@@ -323,6 +341,9 @@ phy_RFSerialRead(
 	PHY_SetBBReg(Adapter, rFPGA0_XA_HSSIParameter2, bMaskDWord, tmplong|bLSSIReadEdge);	
 	udelay_os(10);//PlatformStallExecution(10);
 	//mdelay_os(1);
+
+	PHY_SetBBReg(Adapter, rFPGA0_XA_HSSIParameter2, bMaskDWord, tmplong&(~bLSSIReadEdge));	
+	udelay_os(10);// PlatformStallExecution(10);
 
 	if(eRFPath == RF90_PATH_A)
 		RfPiEnable = (u8)PHY_QueryBBReg(Adapter, rFPGA0_XA_HSSIParameter1, BIT8);
@@ -711,11 +732,17 @@ PHY_MACConfig8192C(
 	//this switching setting cause some 8192cu hw have redownload fw fail issue
 	//improve 2-stream TX EVM by Jenyu
 	if(isNormal && is92C)
-		write8(Adapter, 0x14,0x71);
+		write8(Adapter, REG_SPS0_CTRL+3,0x71);
 	#endif
 
+
 	// 2010.07.13 AMPDU aggregation number 9
-	write16(Adapter, REG_MAX_AGGR_NUM, MAX_AGGR_NUM);
+	//write16(Adapter, REG_MAX_AGGR_NUM, MAX_AGGR_NUM);
+	write8(Adapter, REG_MAX_AGGR_NUM, 0x0A); //By tynli. 2010.11.18.
+#if DEV_BUS_TYPE==DEV_BUS_USB_INTERFACE
+	if(is92C && (BOARD_USB_DONGLE == pHalData->BoardType))
+		write8(Adapter, 0x40,0x04);	
+#endif		
 
 	return rtStatus;
 
@@ -1006,8 +1033,7 @@ phy_ConfigBBWithHeaderFile(
 				udelay_os(1);
 			PHY_SetBBReg(Adapter, Rtl819XPHY_REGArray_Table[i], bMaskDWord, Rtl819XPHY_REGArray_Table[i+1]);		
 
-			// Add 1us delay between BB/RF register setting.
-			udelay_os(1);
+			// Add 1us delay between BB/RF register setting.			udelay_os(1);
 
 			//RT_TRACE(COMP_INIT, DBG_TRACE, ("The Rtl819XPHY_REGArray_Table[0] is %lx Rtl819XPHY_REGArray[1] is %lx \n",Rtl819XPHY_REGArray_Table[i], Rtl819XPHY_REGArray_Table[i+1]));
 		}
@@ -1609,52 +1635,87 @@ PHY_BBConfig8192C(
 	int	rtStatus = _SUCCESS;
 	HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(Adapter);
 	u32	RegVal;
+	u8	TmpU1B=0;
+	u8	value8;
 
 	phy_InitBBRFRegisterDefinition(Adapter);
 
-	// Enable BB and RF
-	RegVal = read16(Adapter, REG_SYS_FUNC_EN);
-	write16(Adapter, REG_SYS_FUNC_EN, (u16)(RegVal|BIT13|BIT0|BIT1));
-
-	// 20090923 Joseph: Advised by Steven and Jenyu. Power sequence before init RF.
-	write8(Adapter, REG_AFE_PLL_CTRL, 0x83);
-	write8(Adapter, REG_AFE_PLL_CTRL+1, 0xdb);
-	write8(Adapter, REG_RF_CTRL, RF_EN|RF_RSTB|RF_SDMRSTB);
-
-#if DEV_BUS_TYPE == DEV_BUS_USB_INTERFACE
-	write8(Adapter, REG_SYS_FUNC_EN, FEN_USBA | FEN_USBD | FEN_BB_GLB_RSTn | FEN_BBRSTB);
-#else
-	write8(Adapter, REG_SYS_FUNC_EN, FEN_PPLL|FEN_PCIEA|FEN_DIO_PCIE|FEN_BB_GLB_RSTn|FEN_BBRSTB);
-#endif
-
-	// 2009/10/21 by SD1 Jong. Modified by tynli. Not in Documented in V8.1. 
-	if(!IS_NORMAL_CHIP(pHalData->VersionID))
+	if(IS_HARDWARE_TYPE_8723(Adapter))
 	{
-#if DEV_BUS_TYPE == DEV_BUS_USB_INTERFACE
-		write8(Adapter, REG_LDOHCI12_CTRL, 0x1f);
-#else
-		write8(Adapter, REG_LDOHCI12_CTRL, 0x1b); 
-#endif
+		// Suggested by Scott. tynli_test. 2010.12.30.
+		//1. 0x28[1] = 1
+		TmpU1B = read8(Adapter, REG_AFE_PLL_CTRL);
+		udelay_os(2);
+		write8(Adapter, REG_AFE_PLL_CTRL, (TmpU1B|BIT1));
+		udelay_os(2);
+		
+		//2. 0x29[7:0] = 0xFF
+		write8(Adapter, REG_AFE_PLL_CTRL+1, 0xff);
+		udelay_os(2);
+		
+		//3. 0x02[1:0] = 2b'11
+		TmpU1B = read8(Adapter, REG_SYS_FUNC_EN);
+		write8(Adapter, REG_SYS_FUNC_EN, (TmpU1B|FEN_BB_GLB_RSTn|FEN_BBRSTB));
+		
+		//4. 0x25[6] = 0
+		TmpU1B = read8(Adapter, REG_AFE_XTAL_CTRL+1);
+		write8(Adapter, REG_AFE_XTAL_CTRL+1, (TmpU1B&(~BIT6)));
+		
+		//5. 0x24[20] = 0 	//Advised by SD3 Alex Wang. 2011.02.09.
+		TmpU1B = read8(Adapter, REG_AFE_XTAL_CTRL+2);
+		write8(Adapter, REG_AFE_XTAL_CTRL+2, (TmpU1B&(~BIT4)));
+		
+		//6. 0x1f[7:0] = 0x07
+		write8(Adapter, REG_RF_CTRL, 0x07);
 	}
 	else
 	{
+		// Enable BB and RF
+		RegVal = read16(Adapter, REG_SYS_FUNC_EN);
+		write16(Adapter, REG_SYS_FUNC_EN, (u16)(RegVal|BIT13|BIT0|BIT1));
+
+		// 20090923 Joseph: Advised by Steven and Jenyu. Power sequence before init RF.
+		write8(Adapter, REG_AFE_PLL_CTRL, 0x83);
+		write8(Adapter, REG_AFE_PLL_CTRL+1, 0xdb);
+
+		write8(Adapter, REG_RF_CTRL, RF_EN|RF_RSTB|RF_SDMRSTB);
+
 #if DEV_BUS_TYPE == DEV_BUS_USB_INTERFACE
-		//To Fix MAC loopback mode fail. Suggested by SD4 Johnny. 2010.03.23.
-		write8(Adapter, REG_LDOHCI12_CTRL, 0x0f);	
-		write8(Adapter, 0x15, 0xe9);
+		write8(Adapter, REG_SYS_FUNC_EN, FEN_USBA | FEN_USBD | FEN_BB_GLB_RSTn | FEN_BBRSTB);
+#else
+		write8(Adapter, REG_SYS_FUNC_EN, FEN_PPLL|FEN_PCIEA|FEN_DIO_PCIE|FEN_BB_GLB_RSTn|FEN_BBRSTB);
+#endif
+
+		// 2009/10/21 by SD1 Jong. Modified by tynli. Not in Documented in V8.1. 
+		if(!IS_NORMAL_CHIP(pHalData->VersionID))
+		{
+#if DEV_BUS_TYPE == DEV_BUS_USB_INTERFACE
+			write8(Adapter, REG_LDOHCI12_CTRL, 0x1f);
+#else
+			write8(Adapter, REG_LDOHCI12_CTRL, 0x1b); 
+#endif
+		}
+		else
+		{
+#if DEV_BUS_TYPE == DEV_BUS_USB_INTERFACE
+			//To Fix MAC loopback mode fail. Suggested by SD4 Johnny. 2010.03.23.
+			write8(Adapter, REG_LDOHCI12_CTRL, 0x0f);	
+			write8(Adapter, 0x15, 0xe9);
+#endif
+		}
+
+		write8(Adapter, REG_AFE_XTAL_CTRL+1, 0x80);
+
+#if DEV_BUS_TYPE==DEV_BUS_PCI_INTERFACE
+		// Force use left antenna by default for 88C.
+	//	if(!IS_92C_SERIAL(pHalData->VersionID) || IS_92C_1T2R(pHalData->VersionID))
+		if(Adapter->ledpriv.LedStrategy != SW_LED_MODE10)
+		{
+			RegVal = read32(Adapter, REG_LEDCFG0);
+			write32(Adapter, REG_LEDCFG0, RegVal|BIT23);
+		}
 #endif
 	}
-
-	write8(Adapter, REG_AFE_XTAL_CTRL+1, 0x80);
-
-#if DEV_BUS_TYPE == DEV_BUS_PCI_INTERFACE
-	// Force use left antenna by default for 88C.
-	//if(!IS_92C_SERIAL(pHalData->VersionID)|| IS_92C_1T2R(pHalData->VersionID))
-	{
-		RegVal = read32(Adapter, REG_LEDCFG0);
-		write32(Adapter, REG_LEDCFG0, RegVal|BIT23);
-	}
-#endif
 
 	//
 	// Config BB and AGC
@@ -1682,6 +1743,31 @@ PHY_BBConfig8192C(
 			break;
 	}
 #endif	
+#if DEV_BUS_TYPE==DEV_BUS_USB_INTERFACE
+	if(IS_HARDWARE_TYPE_8192CU(Adapter)&&IS_81xxC_VENDOR_UMC_B_CUT(pHalData->VersionID)
+		&&(pHalData->BoardType == BOARD_USB_High_PA))
+			write8(Adapter, 0xc72, 0x50);		
+#endif
+
+	// <tynli_note> For fix 8723 WL_TRSW bug. Suggested by Scott. 2011.01.24.
+	if(IS_HARDWARE_TYPE_8723(Adapter))
+	{
+		if(!IS_NORMAL_CHIP(pHalData->VersionID))
+		{
+			// 1. 0x40[2] = 1	
+			value8 = read8(Adapter, REG_GPIO_MUXCFG);
+			write8(Adapter, REG_GPIO_MUXCFG, (value8|BIT2));
+
+			// 2. 0x804[14] = 0 // BB disable TRSW control, enable SW control
+			PHY_SetBBReg(Adapter, rFPGA0_TxInfo, BIT14, 0x0);
+			
+			// 3. 0x870[6:5] = 2'b11
+			PHY_SetBBReg(Adapter, rFPGA0_XAB_RFInterfaceSW, (BIT5|BIT6), 0x3);
+			
+			// 4. 0x860[6:5] = 2'b00 // BB SW control TRSW pin output level 
+			PHY_SetBBReg(Adapter, rFPGA0_XA_RFInterfaceOE, (BIT5|BIT6), 0x0);
+		}
+	}
 #if 0
 	// Check BB/RF confiuration setting.
 	// We only need to configure RF which is turned on.
@@ -4874,12 +4960,13 @@ static VOID _PHY_SetRFPathSwitch(
 	IN	BOOLEAN		is2T
 	)
 {
-//	if(is2T)
-//		return;
-	
+	u8	u1bTmp;
+
 	if(!pAdapter->hw_init_completed)
 	{
-		PHY_SetBBReg(pAdapter, REG_LEDCFG0, BIT23, 0x01);
+		u1bTmp = read8(pAdapter, REG_LEDCFG2) | BIT7;
+		write8(pAdapter, REG_LEDCFG2, u1bTmp);
+		//PHY_SetBBReg(pAdapter, REG_LEDCFG0, BIT23, 0x01);
 		PHY_SetBBReg(pAdapter, rFPGA0_XAB_RFParameter, BIT13, 0x01);
 	}
 
@@ -4898,8 +4985,6 @@ static VOID _PHY_SetRFPathSwitch(
 		else
 			PHY_SetBBReg(pAdapter, rFPGA0_XA_RFInterfaceOE, 0x300, 0x1);	//Aux		
 	}
-
-	//RT_TRACE(COMP_OID_SET, DBG_LOUD, ("_PHY_SetRFPathSwitch 0x4C %lx, 0x878 %lx, 0x860 %lx \n", PHY_QueryBBReg(pAdapter, 0x4C, BIT23), PHY_QueryBBReg(pAdapter, 0x878, BIT13), PHY_QueryBBReg(pAdapter, 0x860, 0x300)));
 
 }
 

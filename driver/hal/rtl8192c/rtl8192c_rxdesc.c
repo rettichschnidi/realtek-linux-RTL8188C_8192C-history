@@ -1,20 +1,23 @@
 /******************************************************************************
-* rtl8192c_rxdesc.c                                                                                                                                 *
-*                                                                                                                                          *
-* Description :                                                                                                                       *
-*                                                                                                                                           *
-* Author :                                                                                                                       *
-*                                                                                                                                         *
-* History :
-*
-*
-*                                                                                                                                       *
-* Copyright 2008, Realtek Corp.                                                                                                  *
-*                                                                                                                                        *
-* The contents of this file is the sole property of Realtek Corp.  It can not be                                     *
-* be used, copied or modified without written permission from Realtek Corp.                                         *
-*                                                                                                                                          *
-*******************************************************************************/
+ *
+ * Copyright(c) 2007 - 2011 Realtek Corporation. All rights reserved.
+ *                                        
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
+ *
+ *
+ 
+******************************************************************************/
 #define _RTL8192C_REDESC_C_
 #include <drv_conf.h>
 #include <osdep_service.h>
@@ -296,7 +299,7 @@ void rtl8192c_query_rx_phy_status(union recv_frame *prframe, struct phy_stat *pp
 
 		pattrib->RxPWDBAll = pwdb_all;	//for DIG/rate adaptive
 		pattrib->RecvSignalPower = rx_pwr_all;	//dBM
-
+		padapter->recvpriv.rxpwdb = rx_pwr_all;
 		//
 		// (3) Get Signal Quality (EVM)
 		//
@@ -419,7 +422,7 @@ void rtl8192c_query_rx_phy_status(union recv_frame *prframe, struct phy_stat *pp
 
 		pattrib->RxPWDBAll = pwdb_all;	//for DIG/rate adaptive
 		pattrib->RecvSignalPower = rx_pwr_all;//dBM
-
+		padapter->recvpriv.rxpwdb = rx_pwr_all;
 		//
 		// (3)EVM of HT rate
 		//
@@ -527,12 +530,12 @@ static void process_PWDB(_adapter *padapter, union recv_frame *prframe)
 	}
 	else
 	{
-		UndecoratedSmoothedPWDB = pdmpriv->UndecoratedSmoothedPWDB;		
+		UndecoratedSmoothedPWDB = pdmpriv->UndecoratedSmoothedPWDB;
 		UndecoratedSmoothedCCK = pdmpriv->UndecoratedSmoothedCCK;
 	}
 
 	//if(pRfd->Status.bPacketToSelf || pRfd->Status.bPacketBeacon)
-	
+
 	if(!isCCKrate)
 	{
 		// Process OFDM RSSI
@@ -555,7 +558,6 @@ static void process_PWDB(_adapter *padapter, union recv_frame *prframe)
 					( ((UndecoratedSmoothedPWDB)*(Rx_Smooth_Factor-1)) +
 					(pattrib->RxPWDBAll)) /(Rx_Smooth_Factor);
 		}
-		
 	}
 	else
 	{
@@ -579,39 +581,35 @@ static void process_PWDB(_adapter *padapter, union recv_frame *prframe)
 					( ((UndecoratedSmoothedCCK)*(Rx_Smooth_Factor-1)) +
 					(pattrib->RxPWDBAll)) /(Rx_Smooth_Factor);
 		}
-
-
 	}
 		
 
 
-		if(psta)
-		{
-			//psta->UndecoratedSmoothedPWDB = UndecoratedSmoothedPWDB;//todo:
+	if(psta)
+	{
+		//psta->UndecoratedSmoothedPWDB = UndecoratedSmoothedPWDB;//todo:
+		pdmpriv->UndecoratedSmoothedPWDB = UndecoratedSmoothedPWDB;
+
+		if(pdmpriv->RSSI_Select == RSSI_OFDM)
+			psta->rssi_stat.UndecoratedSmoothedPWDB = UndecoratedSmoothedPWDB;
+		else if(pdmpriv->RSSI_Select == RSSI_CCK)
+			psta->rssi_stat.UndecoratedSmoothedPWDB = UndecoratedSmoothedCCK;
+
+		psta->rssi_stat.UndecoratedSmoothedCCK = UndecoratedSmoothedCCK;
+	}
+	else
+	{
+		//pdmpriv->UndecoratedSmoothedPWDB = UndecoratedSmoothedPWDB;
+
+		if(pdmpriv->RSSI_Select == RSSI_OFDM)
 			pdmpriv->UndecoratedSmoothedPWDB = UndecoratedSmoothedPWDB;
+		else if(pdmpriv->RSSI_Select == RSSI_CCK)
+			pdmpriv->UndecoratedSmoothedPWDB = UndecoratedSmoothedCCK;
 
+		pdmpriv->UndecoratedSmoothedCCK = UndecoratedSmoothedCCK;
+	}
 
-			if(pdmpriv->RSSI_Select == RSSI_OFDM)
-				psta->rssi_stat.UndecoratedSmoothedPWDB = UndecoratedSmoothedPWDB;
-			else if(pdmpriv->RSSI_Select == RSSI_CCK)
-				psta->rssi_stat.UndecoratedSmoothedPWDB = UndecoratedSmoothedCCK;
-			
-			psta->rssi_stat.UndecoratedSmoothedCCK = UndecoratedSmoothedCCK;
-			
-		}
-		else
-		{
-			//pdmpriv->UndecoratedSmoothedPWDB = UndecoratedSmoothedPWDB;
-
-			if(pdmpriv->RSSI_Select == RSSI_OFDM)
-				pdmpriv->UndecoratedSmoothedPWDB = UndecoratedSmoothedPWDB;
-			else if(pdmpriv->RSSI_Select == RSSI_CCK)
-				pdmpriv->UndecoratedSmoothedPWDB = UndecoratedSmoothedCCK;
-			
-			pdmpriv->UndecoratedSmoothedCCK = UndecoratedSmoothedCCK;
-		}
-
-		//UpdateRxSignalStatistics8192C(padapter, prframe);	
+	//UpdateRxSignalStatistics8192C(padapter, prframe);
 
 }
 

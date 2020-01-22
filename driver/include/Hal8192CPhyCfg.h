@@ -1,6 +1,23 @@
-/*****************************************************************************
- *	Copyright(c) 2008,  RealTEK Technology Inc. All Right Reserved.
+/******************************************************************************
  *
+ * Copyright(c) 2007 - 2011 Realtek Corporation. All rights reserved.
+ *                                        
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
+ *
+ *
+ ******************************************************************************/
+/*****************************************************************************
  * Module:	__INC_HAL8192CPHYCFG_H
  *
  *
@@ -215,6 +232,7 @@ typedef struct _BB_REGISTER_DEFINITION{
 
 }BB_REGISTER_DEFINITION_T, *PBB_REGISTER_DEFINITION_T;
 
+#ifdef CONFIG_MP_INCLUDED
 typedef enum _ANTENNA_PATH{
         ANTENNA_NONE 	= 0x00,
 		ANTENNA_D		,
@@ -233,6 +251,7 @@ typedef enum _ANTENNA_PATH{
 		ANTENNA_ABC		,
 		ANTENNA_ABCD	
 } ANTENNA_PATH;
+#endif
 
 typedef struct _R_ANTENNA_SELECT_OFDM{	
 	u32			r_tx_antenna:4;	

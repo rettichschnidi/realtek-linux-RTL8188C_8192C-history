@@ -1,3 +1,23 @@
+/******************************************************************************
+ *
+ * Copyright(c) 2007 - 2011 Realtek Corporation. All rights reserved.
+ *                                        
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
+ *
+ *
+ 
+******************************************************************************/
 //============================================================
 // Description:
 //
@@ -421,7 +441,7 @@ dm_initial_gain_Multi_STA(
 	BOOLEAN			bMulti_STA = _FALSE;
 
 	//ADHOC and AP Mode
-	if(check_fwstate(pmlmepriv, WIFI_AP_STATE|WIFI_ADHOC_STATE|WIFI_ADHOC_MASTER_STATE) == _TRUE)	
+	if(check_fwstate(pmlmepriv, WIFI_AP_STATE|WIFI_ADHOC_STATE|WIFI_ADHOC_MASTER_STATE) == _TRUE)
 	{
 		bMulti_STA = _TRUE;
 	}
@@ -876,15 +896,15 @@ static VOID PWDB_Monitor(
 					
 					if(psta->rssi_stat.UndecoratedSmoothedPWDB < tmpEntryMinPWDB)
 						tmpEntryMinPWDB = psta->rssi_stat.UndecoratedSmoothedPWDB;
-					
+
 					if(psta->rssi_stat.UndecoratedSmoothedPWDB > tmpEntryMaxPWDB)
 						tmpEntryMaxPWDB = psta->rssi_stat.UndecoratedSmoothedPWDB;
 
 					PWDB_rssi[sta_cnt++] = (psta->mac_id | (psta->rssi_stat.UndecoratedSmoothedPWDB<<16));
-				}				
+				}
 			
 			}
-			
+
 		}
 	
 		_exit_critical_bh(&pstapriv->sta_hash_lock, &irqL);
@@ -897,9 +917,9 @@ static VOID PWDB_Monitor(
 			for(i=0; i< sta_cnt; i++)
 			{
 				rtl8192c_set_rssi_cmd(Adapter, (u8*)&PWDB_rssi[i]);
-			}	
+			}
 		}
-				
+
 	}
 
 
@@ -929,9 +949,9 @@ static VOID PWDB_Monitor(
 		if(pHalData->fw_ractrl == _TRUE)
 		{
 			u32 param = (u32)(pdmpriv->UndecoratedSmoothedPWDB<<16);
-
+		
 			param |= 0;//macid=0 for sta mode;
-
+			
 			rtl8192c_set_rssi_cmd(Adapter, (u8*)&param);
 		}
 	}
@@ -1102,7 +1122,7 @@ dm_TXPowerTrackingCallback_ThermalMeter_92C(
 	s8			delta_DPK;
 	int 			ele_A, ele_D, TempCCk, X, value32;
 	int			Y, ele_C;
-	char			OFDM_index[2], CCK_index, OFDM_index_old[2], CCK_index_old, delta_APK;
+	s8			OFDM_index[2], CCK_index, OFDM_index_old[2], CCK_index_old, delta_APK;
 	int			i = 0, CCKSwingNeedUpdate = 0;
 	BOOLEAN		is2T = IS_92C_SERIAL(pHalData->VersionID);
 	//PMPT_CONTEXT	pMptCtx = &(Adapter->MptCtx);	
@@ -1988,6 +2008,7 @@ static u8 BT_RssiStateChange(
 static void dm_BTCoexist(PADAPTER Adapter )
 {
 	HAL_DATA_TYPE			*pHalData = GET_HAL_DATA(Adapter);
+	struct dm_priv			*pdmpriv = &pHalData->dmpriv;
 	struct mlme_priv	 		*pmlmepriv = &(Adapter->mlmepriv);
 	struct mlme_ext_info		*pmlmeinfo = &Adapter->mlmeextpriv.mlmext_info;
 	struct mlme_ext_priv		*pmlmeext = &Adapter->mlmeextpriv;
@@ -2002,6 +2023,9 @@ static void dm_BTCoexist(PADAPTER Adapter )
 	BOOLEAN		bWifiConnectChange, bBtStateChange,bRssiStateChange;
 
 	if(pbtpriv->bCOBT == _FALSE)		return;
+
+	if(!( pdmpriv->DMFlag & DYNAMIC_FUNC_BT)) return;
+	
 	if( (pbtpriv->BT_Coexist) &&(pbtpriv->BT_CoexistType == BT_CSR_BC4) && (check_fwstate(pmlmepriv, WIFI_AP_STATE) == _FALSE)	)
 	{
 		bWifiConnectChange = BT_WifiConnectChange(Adapter);
@@ -3164,10 +3188,21 @@ dm_InitGPIOSetting(
 	IN	PADAPTER	Adapter
 	)
 {
+	PHAL_DATA_TYPE		pHalData = GET_HAL_DATA(Adapter);
+	
 	u8	tmp1byte;
 	
 	tmp1byte = read8(Adapter, REG_GPIO_MUXCFG);
 	tmp1byte &= (GPIOSEL_GPIO | ~GPIOSEL_ENBT);
+	
+#ifdef CONFIG_BT_COEXIST
+	// UMB-B cut bug. We need to support the modification.
+	if (IS_81xxC_VENDOR_UMC_B_CUT(pHalData->VersionID) && 
+		pHalData->bt_coexist.BT_Coexist)
+	{
+		tmp1byte |= (BIT5);	
+	}
+#endif	
 	write8(Adapter, REG_GPIO_MUXCFG, tmp1byte);
 
 }
@@ -3553,8 +3588,8 @@ u8 SwAntDivBeforeLink8192C(IN PADAPTER Adapter)
 		pDM_SWAT_Table->SWAS_NoLink_State = 1;
 		pDM_SWAT_Table->CurAntenna = (pDM_SWAT_Table->CurAntenna==Antenna_A)?Antenna_B:Antenna_A;
 
-		PHY_SetBBReg(Adapter, rFPGA0_XA_RFInterfaceOE, 0x300, pDM_SWAT_Table->CurAntenna);
-
+		//PHY_SetBBReg(Adapter, rFPGA0_XA_RFInterfaceOE, 0x300, pDM_SWAT_Table->CurAntenna);
+		antenna_select_cmd(Adapter, pDM_SWAT_Table->CurAntenna, _FALSE);
 		DBG_8192C("%s change antenna to ANT_( %s ).....\n",__FUNCTION__, (pDM_SWAT_Table->CurAntenna==Antenna_A)?"A":"B");
 		return _TRUE;
 	}
@@ -3567,7 +3602,6 @@ u8 SwAntDivBeforeLink8192C(IN PADAPTER Adapter)
 
 
 }
-
 
 //
 // 20100514 Luke/Joseph:
@@ -3586,15 +3620,26 @@ SwAntDivRestAfterLink8192C(
 		return;
 
 	DBG_8192C("======>   SwAntDivRestAfterLink <========== \n");
-	pHalData->RSSI_cnt = 0;
+	pHalData->RSSI_cnt_A= 0;
+	pHalData->RSSI_cnt_B= 0;
 	pHalData->RSSI_test = _FALSE;
 	
 	pDM_SWAT_Table->try_flag = 0xff;
-	pDM_SWAT_Table->stop_trying = 0;
-	pDM_SWAT_Table->penalty = 0;
-	pDM_SWAT_Table->failure_cnt = 0;
+	pDM_SWAT_Table->RSSI_Trying = 0;	
+	pDM_SWAT_Table->SelectAntennaMap=0xAA;
 	pDM_SWAT_Table->CurAntenna = pHalData->CurAntenna;
 	pDM_SWAT_Table->PreAntenna = pHalData->CurAntenna;
+		
+	pdmpriv->lastTxOkCnt=0;
+	pdmpriv->lastRxOkCnt=0;
+
+	pdmpriv->TXByteCnt_A=0;
+	pdmpriv->TXByteCnt_B=0;
+	pdmpriv->RXByteCnt_A=0;
+	pdmpriv->RXByteCnt_B=0;
+	pdmpriv->DoubleComfirm=0;	
+	pdmpriv->TrafficLoad = TRAFFIC_LOW;
+	
 }
 
 
@@ -3620,13 +3665,22 @@ dm_SW_AntennaSwitch(
 	HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(Adapter);
 	struct dm_priv	*pdmpriv = &pHalData->dmpriv;
 	SWAT_T	*pDM_SWAT_Table = &pdmpriv->DM_SWAT_Table;
-	s32		curRSSI;
+	s32			curRSSI=100, RSSI_A, RSSI_B;
+	u64			curTxOkCnt, curRxOkCnt;
+	u64			CurByteCnt, PreByteCnt;	
 	u8		nextAntenna;
+	u8			Score_A=0, Score_B=0;
+	u8			i;
 
 	// Condition that does not need to use antenna diversity.
 	if(IS_92C_SERIAL(pHalData->VersionID) ||(pHalData->AntDivCfg==0))
 	{
 		//RT_TRACE(COMP_SWAS, DBG_LOUD, ("dm_SW_AntennaSwitch(): No AntDiv Mechanism.\n"));
+		return;
+	}
+	// If dynamic ant_div is disabled.
+	if(!(pdmpriv->DMFlag & DYNAMIC_FUNC_ANT_DIV) )
+	{	
 		return;
 	}
 	
@@ -3640,7 +3694,7 @@ dm_SW_AntennaSwitch(
 		return;
 	}
 #endif
-	DBG_8192C("\n............................ %s.........................(%d)\n", __FUNCTION__, Step);
+	//printk("\n............................ %s.........................\n",__FUNCTION__);
 	// Handling step mismatch condition.
 	// Peak step is not finished at last time. Recover the variable and check again.
 	if( Step != pDM_SWAT_Table->try_flag	)
@@ -3670,6 +3724,11 @@ dm_SW_AntennaSwitch(
 				// Target: AP/IBSS peer.
 				pTargetAdapter = Adapter;
 			}
+			else if(ACTING_AS_AP(ADJUST_TO_ADAPTIVE_ADAPTER(Adapter, FALSE)))
+			{
+				// Target: VWIFI peer.
+				pTargetAdapter = ADJUST_TO_ADAPTIVE_ADAPTER(Adapter, FALSE);
+			}
 
 			if(pTargetAdapter != NULL)
 			{
@@ -3697,129 +3756,292 @@ dm_SW_AntennaSwitch(
 			}
 		}
 			
+			
 #endif
-		pHalData->RSSI_cnt = 0;
+		
+		pHalData->RSSI_cnt_A= 0;
+		pHalData->RSSI_cnt_B= 0;
 		pDM_SWAT_Table->try_flag = 0;
-		DBG_8192C("dm_SW_AntennaSwitch(): Set try_flag to 0 prepare for peak!\n");
+	//	DBG_8192C("dm_SW_AntennaSwitch(): Set try_flag to 0 prepare for peak!\n");
 		return;
 	}
 	else
 	{
-		//1 1.Calculate average RSSI
-		if(pHalData->RSSI_cnt <= 2)
-			curRSSI = 0;
-		else
-			curRSSI = pHalData->RSSI_sum /pHalData->RSSI_cnt;
-		DBG_8192C("SWAS: preAntenna= %s, curAntenna= %s \n", (pDM_SWAT_Table->PreAntenna == Antenna_A?"A":"B"), (pDM_SWAT_Table->CurAntenna == Antenna_A?"A":"B"));
-		DBG_8192C("SWAS: PreRSSI= %d, curRSSI= %d, RSSI_cnt = %d\n", pDM_SWAT_Table->PreRSSI, curRSSI, pHalData->RSSI_cnt);
+		curTxOkCnt = Adapter->xmitpriv.tx_bytes - pdmpriv->lastTxOkCnt;
+		curRxOkCnt = Adapter->recvpriv.rx_bytes - pdmpriv->lastRxOkCnt;
 
-		//DM_SWAT_Table.stop_trying = 0;
+		pdmpriv->lastTxOkCnt = Adapter->xmitpriv.tx_bytes ;
+		pdmpriv->lastRxOkCnt = Adapter->recvpriv.rx_bytes ;
 
-		if(pDM_SWAT_Table->stop_trying > 0)
+		if(pDM_SWAT_Table->try_flag == 1)
 		{
-			//2 Determine when to try another antenna
-			if(curRSSI < (pDM_SWAT_Table->PreRSSI -10))
-			{
-				nextAntenna = (pDM_SWAT_Table->CurAntenna == Antenna_A)? Antenna_B : Antenna_A;
-				pDM_SWAT_Table->try_flag = 1;
-				pDM_SWAT_Table->stop_trying = 0;
-				pHalData->RSSI_test = _TRUE;
-				DBG_8192C("SWAS: Begin Trying!\n");
+			if(pDM_SWAT_Table->CurAntenna == Antenna_A)
+		{
+				pdmpriv->TXByteCnt_A += curTxOkCnt;
+				pdmpriv->RXByteCnt_A += curRxOkCnt;
+				//printk("#####  TXByteCnt_A(%lld) , RXByteCnt_A(%lld) ####\n",pdmpriv->TXByteCnt_A,pdmpriv->RXByteCnt_A);
 			}
 			else
 			{
-				nextAntenna = pDM_SWAT_Table->CurAntenna;
-				pDM_SWAT_Table->try_flag = 0;
-				pDM_SWAT_Table->stop_trying --;
-				DBG_8192C("SWAS: Stop Trying!\n");
+				pdmpriv->TXByteCnt_B += curTxOkCnt;
+				pdmpriv->RXByteCnt_B += curRxOkCnt;
+				//printk("#####  TXByteCnt_B(%lld) , RXByteCnt_B(%lld) ####\n",pdmpriv->TXByteCnt_B,pdmpriv->RXByteCnt_B);
 			}
+		
+			nextAntenna = (pDM_SWAT_Table->CurAntenna == Antenna_A)? Antenna_B : Antenna_A;
+			pDM_SWAT_Table->RSSI_Trying--;
+			//printk("RSSI_Trying = %d\n",pDM_SWAT_Table->RSSI_Trying);
+			
+			if(pDM_SWAT_Table->RSSI_Trying == 0)
+			{
+				CurByteCnt = (pDM_SWAT_Table->CurAntenna == Antenna_A)? (pdmpriv->TXByteCnt_A+pdmpriv->RXByteCnt_A) : (pdmpriv->TXByteCnt_B+pdmpriv->RXByteCnt_B);
+				PreByteCnt = (pDM_SWAT_Table->CurAntenna == Antenna_A)? (pdmpriv->TXByteCnt_B+pdmpriv->RXByteCnt_B) : (pdmpriv->TXByteCnt_A+pdmpriv->RXByteCnt_A);
+
+				//printk("CurByteCnt = %lld\n", CurByteCnt);
+				//printk("PreByteCnt = %lld\n",PreByteCnt);		
+				
+				if(pdmpriv->TrafficLoad == TRAFFIC_HIGH)
+				{
+					PreByteCnt = PreByteCnt*9;	//normalize:Cur=90ms:Pre=10ms					
+				}
+				else if(pdmpriv->TrafficLoad == TRAFFIC_LOW)
+				{					
+					//CurByteCnt = CurByteCnt/2;
+					CurByteCnt = CurByteCnt>>1;//normalize:100ms:50ms					
+				}
+
+
+				//printk("After DIV=>CurByteCnt = %lld\n", CurByteCnt);
+				//printk("PreByteCnt = %lld\n",PreByteCnt);		
+
+				if(pHalData->RSSI_cnt_A > 0)
+					RSSI_A = pHalData->RSSI_sum_A/pHalData->RSSI_cnt_A; 
+				else
+					RSSI_A = 0;
+				if(pHalData->RSSI_cnt_B > 0)
+					RSSI_B = pHalData->RSSI_sum_B/pHalData->RSSI_cnt_B; 
+				else
+					RSSI_B = 0;
+				
+				curRSSI = (pDM_SWAT_Table->CurAntenna == Antenna_A)? RSSI_A : RSSI_B;
+				pDM_SWAT_Table->PreRSSI =  (pDM_SWAT_Table->CurAntenna == Antenna_A)? RSSI_B : RSSI_A;
+				//printk("Luke:PreRSSI = %d, CurRSSI = %d\n",pDM_SWAT_Table->PreRSSI, curRSSI);
+				//printk("SWAS: preAntenna= %s, curAntenna= %s \n", 
+				//(pDM_SWAT_Table->PreAntenna == Antenna_A?"A":"B"), (pDM_SWAT_Table->CurAntenna == Antenna_A?"A":"B"));
+				//printk("Luke:RSSI_A= %d, RSSI_cnt_A = %d, RSSI_B= %d, RSSI_cnt_B = %d\n",
+					//RSSI_A, pHalData->RSSI_cnt_A, RSSI_B, pHalData->RSSI_cnt_B);
+			}
+
+			}
+			else
+			{
+		
+			if(pHalData->RSSI_cnt_A > 0)
+				RSSI_A = pHalData->RSSI_sum_A/pHalData->RSSI_cnt_A; 
+			else
+				RSSI_A = 0;
+			if(pHalData->RSSI_cnt_B > 0)
+				RSSI_B = pHalData->RSSI_sum_B/pHalData->RSSI_cnt_B; 
+			else
+				RSSI_B = 0;
+			curRSSI = (pDM_SWAT_Table->CurAntenna == Antenna_A)? RSSI_A : RSSI_B;
+			pDM_SWAT_Table->PreRSSI =  (pDM_SWAT_Table->PreAntenna == Antenna_A)? RSSI_A : RSSI_B;
+			//printk("Ekul:PreRSSI = %d, CurRSSI = %d\n", pDM_SWAT_Table->PreRSSI, curRSSI);
+			//printk("SWAS: preAntenna= %s, curAntenna= %s \n", 
+			//(pDM_SWAT_Table->PreAntenna == Antenna_A?"A":"B"), (pDM_SWAT_Table->CurAntenna == Antenna_A?"A":"B"));
+
+			//printk("Ekul:RSSI_A= %d, RSSI_cnt_A = %d, RSSI_B= %d, RSSI_cnt_B = %d\n",
+			//	RSSI_A, pHalData->RSSI_cnt_A, RSSI_B, pHalData->RSSI_cnt_B);
+			//RT_TRACE(COMP_SWAS, DBG_LOUD, ("Ekul:curTxOkCnt = %d\n", curTxOkCnt));
+			//RT_TRACE(COMP_SWAS, DBG_LOUD, ("Ekul:curRxOkCnt = %d\n", curRxOkCnt));
+			}
+
+		//1 Trying State
+		if((pDM_SWAT_Table->try_flag == 1)&&(pDM_SWAT_Table->RSSI_Trying == 0))
+		{
+
+			if(pDM_SWAT_Table->TestMode == TP_MODE)
+			{
+				printk("SWAS: TestMode = TP_MODE\n");
+				//printk("TRY:CurByteCnt = %lld\n", CurByteCnt);
+				//printk("TRY:PreByteCnt = %lld\n",PreByteCnt);		
+				if(CurByteCnt < PreByteCnt)
+				{
+					if(pDM_SWAT_Table->CurAntenna == Antenna_A)
+						pDM_SWAT_Table->SelectAntennaMap=pDM_SWAT_Table->SelectAntennaMap<<1;
+					else
+						pDM_SWAT_Table->SelectAntennaMap=(pDM_SWAT_Table->SelectAntennaMap<<1)+1;
 		}
 		else
 		{
-			//1 2. Check if another antenna is better
-			if(pDM_SWAT_Table->try_flag == 1)
+					if(pDM_SWAT_Table->CurAntenna == Antenna_A)
+						pDM_SWAT_Table->SelectAntennaMap=(pDM_SWAT_Table->SelectAntennaMap<<1)+1;
+					else
+						pDM_SWAT_Table->SelectAntennaMap=pDM_SWAT_Table->SelectAntennaMap<<1;
+				}
+				for (i= 0; i<8; i++)
 			{	
+					if(((pDM_SWAT_Table->SelectAntennaMap>>i)&BIT0) == 1)
+						Score_A++;
+					else
+						Score_B++;
+				}
+				//printk("SelectAntennaMap=%x\n ",pDM_SWAT_Table->SelectAntennaMap);
+				//printk("Score_A=%d, Score_B=%d\n", Score_A, Score_B);
+				
+				if(pDM_SWAT_Table->CurAntenna == Antenna_A)
+				{
+					nextAntenna = (Score_A > Score_B)?Antenna_A:Antenna_B;
+				}
+				else
+					{
+					nextAntenna = (Score_B > Score_A)?Antenna_B:Antenna_A;
+					}
+				//RT_TRACE(COMP_SWAS, DBG_LOUD, ("nextAntenna=%s\n",(nextAntenna==Antenna_A)?"A":"B"));
+				//RT_TRACE(COMP_SWAS, DBG_LOUD, ("preAntenna= %s, curAntenna= %s \n", 
+					//(DM_SWAT_Table.PreAntenna == Antenna_A?"A":"B"), (DM_SWAT_Table.CurAntenna == Antenna_A?"A":"B")));
+
+				if(nextAntenna != pDM_SWAT_Table->CurAntenna)
+				{
+					printk("SWAS: Switch back to another antenna\n");
+				}
+				else
+				{
+					printk("SWAS: current anntena is good\n");
+				}	
+			}
+
+			if(pDM_SWAT_Table->TestMode == RSSI_MODE)
+			{	
+				printk("SWAS: TestMode = RSSI_MODE\n");
+				pDM_SWAT_Table->SelectAntennaMap=0xAA;
 				if(curRSSI < pDM_SWAT_Table->PreRSSI) //Current antenna is worse than previous antenna
 				{
-					DBG_8192C("SWAS: Switch back to another antenna\n");
+					printk("SWAS: Switch back to another antenna\n");
 					nextAntenna = (pDM_SWAT_Table->CurAntenna == Antenna_A)? Antenna_B : Antenna_A;
-					if(curRSSI < (pDM_SWAT_Table->PreRSSI-5))
-					{
-						pDM_SWAT_Table->penalty++;
-						if(pDM_SWAT_Table->penalty > 50)
-							pDM_SWAT_Table->penalty = 50;
-						pDM_SWAT_Table->stop_trying = 5*pDM_SWAT_Table->penalty;
-					}
 				}
 				else // current anntena is good
 				{
 					nextAntenna = pDM_SWAT_Table->CurAntenna;
-					//RT_TRACE(COMP_SWAS, DBG_LOUD, ("SWAS: current anntena is good\n"));
-					pDM_SWAT_Table->penalty = 0;
-					//DM_SWAT_Table.stop_trying = 0;
+					//printk("SWAS: current anntena is good\n");
+				}
 				}
 				pDM_SWAT_Table->try_flag = 0;
 				pHalData->RSSI_test = _FALSE;
+				pHalData->RSSI_sum_A = 0;
+				pHalData->RSSI_cnt_A = 0;
+				pHalData->RSSI_sum_B = 0;
+				pHalData->RSSI_cnt_B = 0;
+				pdmpriv->TXByteCnt_A = 0;
+				pdmpriv->TXByteCnt_B = 0;
+				pdmpriv->RXByteCnt_A = 0;
+				pdmpriv->RXByteCnt_B = 0;
+			
 			}
 
-			//1 3.1 Determine when to try another antenna
-			else
+		//1 Normal State
+		else if(pDM_SWAT_Table->try_flag == 0)
 			{
-				if((curRSSI < pDM_SWAT_Table->Trying_Threshold)||(curRSSI < (pDM_SWAT_Table->PreRSSI -10)))
+			if(pdmpriv->TrafficLoad == TRAFFIC_HIGH)
 				{
+				if(((curTxOkCnt+curRxOkCnt)>>1) > 1875000)
+					pdmpriv->TrafficLoad = TRAFFIC_HIGH;
+				else
+					pdmpriv->TrafficLoad = TRAFFIC_LOW;
+			}
+			else if(pdmpriv->TrafficLoad == TRAFFIC_LOW)
+				{
+				if(((curTxOkCnt+curRxOkCnt)>>1) > 1875000)
+					pdmpriv->TrafficLoad = TRAFFIC_HIGH;
+				else
+					pdmpriv->TrafficLoad = TRAFFIC_LOW;
+			}
+			if(pdmpriv->TrafficLoad == TRAFFIC_HIGH)
+				pDM_SWAT_Table->bTriggerAntennaSwitch = 0;
+			//printk("Normal:TrafficLoad = %lld\n", curTxOkCnt+curRxOkCnt);
+
+			//Prepare To Try Antenna		
 					nextAntenna = (pDM_SWAT_Table->CurAntenna == Antenna_A)? Antenna_B : Antenna_A;
 					pDM_SWAT_Table->try_flag = 1;
 					pHalData->RSSI_test = _TRUE;
-					//RT_TRACE(COMP_SWAS, DBG_LOUD, ("SWAS: Begin Trying!\n"));
+			if((curRxOkCnt+curTxOkCnt) > 1000)
+			{
+				pDM_SWAT_Table->RSSI_Trying = 4;
+				pDM_SWAT_Table->TestMode = TP_MODE;
 				}
 				else
 				{
-					nextAntenna = pDM_SWAT_Table->CurAntenna;
-					pDM_SWAT_Table->try_flag = 0;
-					//DM_SWAT_Table.stop_trying = 1;
-					//RT_TRACE(COMP_SWAS, DBG_LOUD, ("SWAS: No Need Trying!\n"));
-				}
+				pDM_SWAT_Table->RSSI_Trying = 2;
+				pDM_SWAT_Table->TestMode = RSSI_MODE;
+
 			}
+			//printk("SWAS: Normal State -> Begin Trying! TestMode=%s\n",(pDM_SWAT_Table->TestMode == TP_MODE)?"TP":"RSSI");
+			
+			
+			pHalData->RSSI_sum_A = 0;
+			pHalData->RSSI_cnt_A = 0;
+			pHalData->RSSI_sum_B = 0;
+			pHalData->RSSI_cnt_B = 0;
 		}
 	}
 
 	//1 4.Change TRX antenna
 	if(nextAntenna != pDM_SWAT_Table->CurAntenna)
 	{
-		DBG_8192C("SWAS: Change TX Antenna!\n ");
-
-		//antenna_select_cmd(Adapter, nextAntenna, 1);
-		if(Step)
-			antenna_select_cmd(Adapter, nextAntenna); //timer context, do IO in passive level.
-		else
-			PHY_SetBBReg(Adapter, rFPGA0_XA_RFInterfaceOE, 0x300, nextAntenna);
+		printk("@@@@@@@@ SWAS: Change TX Antenna!\n ");		
+		antenna_select_cmd(Adapter, nextAntenna, 1);
 	}
 
 	//1 5.Reset Statistics
 	pDM_SWAT_Table->PreAntenna = pDM_SWAT_Table->CurAntenna;
 	pDM_SWAT_Table->CurAntenna = nextAntenna;
 	pDM_SWAT_Table->PreRSSI = curRSSI;
-	pHalData->RSSI_cnt = 0;
-	pHalData->RSSI_sum = 0;
 
 
 	//1 6.Set next timer
-//	if(DM_SWAT_Table.stop_trying == 1) // stable at good antenna for several seconds
-	if(pDM_SWAT_Table->try_flag == 0 || pDM_SWAT_Table->stop_trying >= 1)
+
+	if(pDM_SWAT_Table->RSSI_Trying == 0)
+		return;
+
+	if(pDM_SWAT_Table->RSSI_Trying%2 == 0)
 	{
-		//PlatformSetTimer( Adapter, &pHalData->SwAntennaSwitchTimer, 5000 ); //ms
-		//DbgPrint("dm_SW_AntennaSwitch(): Not need to try!!!\n");
+		if(pDM_SWAT_Table->TestMode == TP_MODE)
+		{
+			if(pdmpriv->TrafficLoad == TRAFFIC_HIGH)
+			{
+				_set_timer(&pdmpriv->SwAntennaSwitchTimer,10 ); //ms
+				//printk("dm_SW_AntennaSwitch(): Test another antenna for 10 ms\n");
+			}
+			else if(pdmpriv->TrafficLoad == TRAFFIC_LOW)
+	{
+				_set_timer(&pdmpriv->SwAntennaSwitchTimer, 50 ); //ms
+				//printk("dm_SW_AntennaSwitch(): Test another antenna for 50 ms\n");
+			}
 	}
 	else
 	{
-		//PlatformSetTimer( Adapter, &pHalData->SwAntennaSwitchTimer, 500 ); //ms
-
-		_set_timer(&pdmpriv->SwAntennaSwitchTimer, 500);
-
-		DBG_8192C("dm_SW_AntennaSwitch(): Test another antenna for 500 ms\n");
+			_set_timer(&pdmpriv->SwAntennaSwitchTimer, 500 ); //ms
+			//printk("dm_SW_AntennaSwitch(): Test another antenna for 500 ms\n");
+		}
+	}
+	else
+	{
+		if(pDM_SWAT_Table->TestMode == TP_MODE)
+		{
+			if(pdmpriv->TrafficLoad == TRAFFIC_HIGH)			
+				_set_timer(&pdmpriv->SwAntennaSwitchTimer,90 ); //ms			
+			else if(pdmpriv->TrafficLoad == TRAFFIC_LOW)
+				_set_timer(&pdmpriv->SwAntennaSwitchTimer,100 ); //ms
+		}
+		else
+		{
+			_set_timer(&pdmpriv->SwAntennaSwitchTimer,500 ); //ms
+			//printk("dm_SW_AntennaSwitch(): Test another antenna for 500 ms\n");
+		}
 	}
 
 //	RT_TRACE(COMP_SWAS, DBG_LOUD, ("SWAS: -----The End-----\n "));
+
 }
 
 //
@@ -3846,19 +4068,31 @@ void SwAntDivRSSICheck8192C(_adapter *padapter ,u32 RxPWDBAll)
 {
 	HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(padapter);	
 	struct mlme_priv	*pmlmepriv = &padapter->mlmepriv;
+	struct dm_priv	*pdmpriv = &pHalData->dmpriv;
 
+	SWAT_T	*pDM_SWAT_Table = &pdmpriv->DM_SWAT_Table;
 
 	if(IS_92C_SERIAL(pHalData->VersionID) ||pHalData->AntDivCfg==0)
 		return;
 	
 	if(check_fwstate(pmlmepriv, _FW_LINKED) == _TRUE)		
 	{			
-		pHalData->RSSI_sum += RxPWDBAll;
-		pHalData->RSSI_cnt++;
-		//DBG_8192C("%s Ant_(%s),RSSI_sum(%d),RSSI_cnt(%d)\n",__FUNCTION__,(2==pHalData->CurAntenna)?"A":"B",pHalData->RSSI_sum,pHalData->RSSI_cnt);
+		if(pDM_SWAT_Table->CurAntenna == Antenna_A)
+		{			
+			pHalData->RSSI_sum_A += RxPWDBAll;
+			pHalData->RSSI_cnt_A++;
+		}
+		else
+		{
+			pHalData->RSSI_sum_B+= RxPWDBAll;
+			pHalData->RSSI_cnt_B++;
+		
+		}
+		//printk("%s Ant_(%s),RSSI_sum(%d),RSSI_cnt(%d)\n",__FUNCTION__,(2==pHalData->CurAntenna)?"A":"B",pHalData->RSSI_sum,pHalData->RSSI_cnt);
 	}
 	
 }
+
 
 
 static VOID
@@ -3870,18 +4104,17 @@ dm_SW_AntennaSwitchInit(
 	struct dm_priv	*pdmpriv = &pHalData->dmpriv;
 	SWAT_T	*pDM_SWAT_Table = &pdmpriv->DM_SWAT_Table;
 
-	
-	pHalData->RSSI_sum = 0;
-	pHalData->RSSI_cnt = 0;
+	pHalData->RSSI_sum_A = 0;	
+	pHalData->RSSI_sum_B = 0;
+	pHalData->RSSI_cnt_A = 0;
+	pHalData->RSSI_cnt_B = 0;
+
 	pDM_SWAT_Table->CurAntenna = pHalData->CurAntenna;
 	pDM_SWAT_Table->PreAntenna = pHalData->CurAntenna;
 	pDM_SWAT_Table->try_flag = 0xff;
-	pDM_SWAT_Table->stop_trying = 0;
-	pDM_SWAT_Table->failure_cnt = 0;
 	pDM_SWAT_Table->PreRSSI = 0;
-	pDM_SWAT_Table->Trying_Threshold = 20;
-	pDM_SWAT_Table->penalty = 0;
-	pDM_SWAT_Table->SWAS_NoLink_State = 0;	
+	pDM_SWAT_Table->bTriggerAntennaSwitch = 0;	
+	pDM_SWAT_Table->SelectAntennaMap=0xAA;
 	
 	// Move the timer initialization to InitializeVariables function.
 	//PlatformInitializeTimer(Adapter, &pMgntInfo->SwAntennaSwitchTimer, (RT_TIMER_CALL_BACK)dm_SW_AntennaSwitchCallback, NULL, "SwAntennaSwitchTimer");	
@@ -3949,6 +4182,7 @@ rtl8192c_InitHalDm(
 {
 	PHAL_DATA_TYPE	pHalData = GET_HAL_DATA(Adapter);
 	struct dm_priv	*pdmpriv = &pHalData->dmpriv;
+	u8	i;
 
 #if DEV_BUS_TYPE==DEV_BUS_USB_INTERFACE
 	dm_InitGPIOSetting(Adapter);
@@ -3985,6 +4219,7 @@ rtl8192c_InitHalDm(
 	dm_InitDynamicBBPowerSaving(Adapter);
 
 #ifdef CONFIG_ANTENNA_DIVERSITY
+	pdmpriv->DMFlag |= DYNAMIC_FUNC_ANT_DIV;
 	dm_SW_AntennaSwitchInit(Adapter);
 #endif
 
@@ -3992,6 +4227,11 @@ rtl8192c_InitHalDm(
 
 	pdmpriv->DMFlag_tmp = pdmpriv->DMFlag;
 
+	// Save REG_INIDATA_RATE_SEL value for TXDESC.
+	for(i = 0 ; i<32 ; i++)
+	{
+		pdmpriv->INIDATA_RATE[i] = read8(Adapter, REG_INIDATA_RATE_SEL+i);
+	}
 }
 
 VOID
@@ -4001,9 +4241,8 @@ rtl8192c_HalDmWatchDog(
 {
 	BOOLEAN		bFwCurrentInPSMode = _FALSE;
 	BOOLEAN		bFwPSAwake = _TRUE;
-#ifdef CONFIG_PCI_HCI
 	PHAL_DATA_TYPE	pHalData = GET_HAL_DATA(Adapter);
-#endif
+	struct dm_priv	*pdmpriv = &pHalData->dmpriv;
 
 
 #ifdef CONFIG_LPS
@@ -4089,8 +4328,21 @@ rtl8192c_HalDmWatchDog(
 
 		//if(Adapter->HalFunc.TxCheckStuckHandler(Adapter))
 		//	PlatformScheduleWorkItem(&(GET_HAL_DATA(Adapter)->HalResetWorkItem));
-#endif	
+#endif
 
+		// Read REG_INIDATA_RATE_SEL value for TXDESC.
+		if(check_fwstate(&Adapter->mlmepriv, WIFI_STATION_STATE) == _TRUE)
+		{
+			pdmpriv->INIDATA_RATE[0] = read8(Adapter, REG_INIDATA_RATE_SEL);
+		}
+		else
+		{
+			u8	i;
+			for(i=1 ; i < (Adapter->stapriv.asoc_sta_count + 1); i++)
+			{
+				pdmpriv->INIDATA_RATE[i] = read8(Adapter, (REG_INIDATA_RATE_SEL+i));
+			}
+		}
 	}
 
 	// Check GPIO to determine current RF on/off and Pbc status.

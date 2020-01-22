@@ -1,20 +1,22 @@
 /******************************************************************************
-* mlme_linux.c                                                                                                                                 *
-*                                                                                                                                          *
-* Description :                                                                                                                       *
-*                                                                                                                                           *
-* Author :                                                                                                                       *
-*                                                                                                                                         *
-* History :                                                          
-*
-*                                        
-*                                                                                                                                       *
-* Copyright 2007, Realtek Corp.                                                                                                  *
-*                                                                                                                                        *
-* The contents of this file is the sole property of Realtek Corp.  It can not be                                     *
-* be used, copied or modified without written permission from Realtek Corp.                                         *
-*                                                                                                                                          *
-*******************************************************************************/
+ *
+ * Copyright(c) 2007 - 2011 Realtek Corporation. All rights reserved.
+ *                                        
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
+ *
+ *
+ ******************************************************************************/
 
 
 #define _MLME_OSDEP_C_
@@ -128,20 +130,10 @@ _func_exit_;
 }
 
 static RT_PMKID_LIST   backupPMKIDList[ NUM_PMKID_CACHE ];
-void os_indicate_disconnect( _adapter *adapter )
+void rtw_reset_securitypriv( _adapter *adapter )
 {
-   //RT_PMKID_LIST   backupPMKIDList[ NUM_PMKID_CACHE ];
    u8              backupPMKIDIndex = 0;
    u8              backupTKIPCountermeasure = 0x00;
-      
-_func_enter_;
-
-	indicate_wx_disassoc_event(adapter);	
-	netif_carrier_off(adapter->pnetdev);
-
-#ifdef RTK_DMP_PLATFORM
-	_set_workitem(&adapter->mlmepriv.Linkdown_workitem);
-#endif
 
 	if(adapter->securitypriv.dot11AuthAlgrthm == dot11AuthAlgrthm_8021X)//802.1x
 	{		 
@@ -188,6 +180,21 @@ _func_enter_;
 		psec_priv->wps_phase = _FALSE;
 		//}
 	}
+}
+
+void os_indicate_disconnect( _adapter *adapter )
+{
+   //RT_PMKID_LIST   backupPMKIDList[ NUM_PMKID_CACHE ];
+  
+_func_enter_;
+
+	indicate_wx_disassoc_event(adapter);	
+	netif_carrier_off(adapter->pnetdev);
+
+#ifdef RTK_DMP_PLATFORM
+	_set_workitem(&adapter->mlmepriv.Linkdown_workitem);
+#endif
+	 rtw_reset_securitypriv( adapter );
 
 _func_exit_;
 
@@ -208,7 +215,7 @@ _func_enter_;
 	{
 		RT_TRACE(_module_mlme_osdep_c_,_drv_info_,("report_sec_ie, authmode=%d\n", authmode));
 		
-		buff = _malloc(IW_CUSTOM_MAX);
+		buff = rtw_malloc(IW_CUSTOM_MAX);
 		
 		_memset(buff,0,IW_CUSTOM_MAX);
 		
@@ -234,7 +241,7 @@ _func_enter_;
 		wireless_send_event(adapter->pnetdev,IWEVCUSTOM,&wrqu,buff);
 
 		if(buff)
-		    _mfree(buff, IW_CUSTOM_MAX);
+		    rtw_mfree(buff, IW_CUSTOM_MAX);
 		
 	}
 

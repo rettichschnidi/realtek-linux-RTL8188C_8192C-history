@@ -1,3 +1,23 @@
+/******************************************************************************
+ *
+ * Copyright(c) 2007 - 2011 Realtek Corporation. All rights reserved.
+ *                                        
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
+ *
+ *
+ 
+******************************************************************************/
 #ifndef __RTW_LED_H_
 #define __RTW_LED_H_
 
@@ -136,6 +156,7 @@ typedef struct _LED_871x{
 	u8					bLedOn; // TRUE if LED is ON, FALSE if LED is OFF.
 
 	u8					bLedBlinkInProgress; // TRUE if it is blinking, FALSE o.w..
+	u8					bLedWPSBlinkInProgress; // TRUE if it is blinking, FALSE o.w..
 
 	u8					bLedSlowBlinkInProgress;//added by vivi, for led new mode
 	u32					BlinkTimes; // Number of times to toggle led state for blinking.
@@ -159,7 +180,8 @@ typedef	enum _LED_STRATEGY_871x{
 	SW_LED_MODE6, //added by vivi, for led new mode, PRONET
 	SW_LED_MODE7, //added by chiyokolin, for Lenovo, PCI Express Minicard Spec Rev.1.2 spec
 	SW_LED_MODE8, //added by chiyokolin, for QMI
-	SW_LED_MODE9, //added by chiyokolin, for BITLAND, PCI Express Minicard Spec Rev.1.1 	
+	SW_LED_MODE9, //added by chiyokolin, for BITLAND, PCI Express Minicard Spec Rev.1.1 
+	SW_LED_MODE10, //added by chiyokolin, for Edimax-ASUS
 	HW_LED, // HW control 2 LEDs, LED0 and LED1 (there are 4 different control modes)
 }LED_STRATEGY_871x, *PLED_STRATEGY_871x;
 

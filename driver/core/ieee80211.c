@@ -1,20 +1,22 @@
 /******************************************************************************
-* ieee80211.c                                                                                                                                 *
-*                                                                                                                                          *
-* Description :                                                                                                                       *
-*                                                                                                                                           *
-* Author :                                                                                                                       *
-*                                                                                                                                         *
-* History :                                                          
-*
-*                                        
-*                                                                                                                                       *
-* Copyright 2007, Realtek Corp.                                                                                                  *
-*                                                                                                                                        *
-* The contents of this file is the sole property of Realtek Corp.  It can not be                                     *
-* be used, copied or modified without written permission from Realtek Corp.                                         *
-*                                                                                                                                          *
-*******************************************************************************/
+ *
+ * Copyright(c) 2007 - 2011 Realtek Corporation. All rights reserved.
+ *                                        
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
+ *
+ *
+ ******************************************************************************/
 #define _IEEE80211_C
 
 #include <drv_types.h>
@@ -896,6 +898,7 @@ ParseRes rtw_ieee802_11_parse_elems(u8 *start, uint len,
 	
 }
 
+#if ( P2P_INCLUDED == 1 )
 //	Added by Albert 20100910
 //	The input buffer in_ie should be pointer to the address of any information element of management frame.
 //	The p2p_ie buffer will contain "whole" the P2P IE, include the Element ID, Length, P2P OUI and P2P Attributes.
@@ -930,7 +933,7 @@ int get_p2p_ie(u8 *in_ie, uint in_len, u8 *p2p_ie, uint *p2p_ielen)
 					*p2p_ielen = 0;
 				}
 			}
-	
+			
 			cnt += in_ie[ cnt + 1 ] + 2;
 
 			match = _TRUE;
@@ -975,10 +978,10 @@ int get_p2p_attr_content(u8 *p2p_ie, uint p2p_ielen, u8 target_attr_id ,u8 *attr
 		{
 			//	3 -> 1 byte for attribute ID field, 2 bytes for length field
 			if(attr_content)
-				_memcpy( attr_content, &p2p_ie[ cnt + 3 ], attrlen );
-		
+			_memcpy( attr_content, &p2p_ie[ cnt + 3 ], attrlen );
+			
 			if(attr_contentlen)
-				*attr_contentlen = attrlen;
+			*attr_contentlen = attrlen;
 			
 			cnt += attrlen + 3;
 
@@ -1086,7 +1089,7 @@ int get_wps_ie_p2p(u8 *in_ie, uint in_len, u8 *wps_ie, uint *wps_ielen)
 			{
 				_memcpy(wps_ie, &in_ie[cnt], in_ie[cnt+1]+2);
 			}
-		
+			
 			*wps_ielen = in_ie[cnt+1]+2;
 			
 			cnt+=in_ie[cnt+1]+2;
@@ -1104,4 +1107,5 @@ int get_wps_ie_p2p(u8 *in_ie, uint in_len, u8 *wps_ie, uint *wps_ielen)
 	return match;
 
 }
+#endif
 

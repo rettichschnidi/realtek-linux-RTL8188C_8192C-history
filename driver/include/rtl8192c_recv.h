@@ -1,3 +1,23 @@
+/******************************************************************************
+ *
+ * Copyright(c) 2007 - 2011 Realtek Corporation. All rights reserved.
+ *                                        
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
+ *
+ *
+ 
+******************************************************************************/
 #ifndef _RTL8192C_RECV_H_
 #define _RTL8192C_RECV_H_
 
@@ -25,10 +45,15 @@
 #ifdef PLATFORM_OS_CE
 #define MAX_RECVBUF_SZ (8192+1024) // 8K+1k
 #else
-//#define MAX_RECVBUF_SZ (32768) // 32k
-//#define MAX_RECVBUF_SZ (16384) //16K
-//#define MAX_RECVBUF_SZ (10240) //10K
-#define MAX_RECVBUF_SZ (15360) // 15k < 16k
+	#ifndef CONFIG_MINIMAL_MEMORY_USAGE
+		//#define MAX_RECVBUF_SZ (32768) // 32k
+		//#define MAX_RECVBUF_SZ (16384) //16K
+		//#define MAX_RECVBUF_SZ (10240) //10K
+		#define MAX_RECVBUF_SZ (15360) // 15k < 16k
+		//#define MAX_RECVBUF_SZ (8192+1024) // 8K+1k
+	#else
+		#define MAX_RECVBUF_SZ (2048) // 2K
+	#endif
 #endif
 
 #elif defined(CONFIG_PCI_HCI)

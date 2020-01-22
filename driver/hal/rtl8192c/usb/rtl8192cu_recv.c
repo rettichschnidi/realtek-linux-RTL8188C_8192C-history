@@ -1,20 +1,23 @@
 /******************************************************************************
-* rtl8192cu_recv.c                                                                                                                                 *
-*                                                                                                                                          *
-* Description :                                                                                                                       *
-*                                                                                                                                           *
-* Author :                                                                                                                       *
-*                                                                                                                                         *
-* History :
-*
-*
-*                                                                                                                                       *
-* Copyright 2008, Realtek Corp.                                                                                                  *
-*                                                                                                                                        *
-* The contents of this file is the sole property of Realtek Corp.  It can not be                                     *
-* be used, copied or modified without written permission from Realtek Corp.                                         *
-*                                                                                                                                          *
-*******************************************************************************/
+ *
+ * Copyright(c) 2007 - 2011 Realtek Corporation. All rights reserved.
+ *                                        
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
+ *
+ *
+ 
+******************************************************************************/
 #define _RTL8192CU_RECV_C_
 #include <drv_conf.h>
 #include <osdep_service.h>
@@ -80,7 +83,7 @@ int	rtl8192cu_init_recv_priv(_adapter *padapter)
 		DBG_8192C("alloc_urb for interrupt in endpoint fail !!!!\n");
 	}
 #endif
-	precvpriv->int_in_buf = _malloc(sizeof(INTERRUPT_MSG_FORMAT_EX));
+	precvpriv->int_in_buf = rtw_zmalloc(sizeof(INTERRUPT_MSG_FORMAT_EX));
 	if(precvpriv->int_in_buf == NULL){
 		DBG_8192C("alloc_mem for interrupt in endpoint fail !!!!\n");
 	}
@@ -89,7 +92,11 @@ int	rtl8192cu_init_recv_priv(_adapter *padapter)
 	//init recv_buf
 	_init_queue(&precvpriv->free_recv_buf_queue);
 
-	precvpriv->pallocated_recv_buf = _malloc(NR_RECVBUFF *sizeof(struct recv_buf) + 4);
+#ifdef CONFIG_USE_USB_BUFFER_ALLOC
+	_init_queue(&precvpriv->recv_buf_pending_queue);
+#endif
+
+	precvpriv->pallocated_recv_buf = rtw_zmalloc(NR_RECVBUFF *sizeof(struct recv_buf) + 4);
 	if(precvpriv->pallocated_recv_buf==NULL){
 		res= _FAIL;
 		RT_TRACE(_module_rtl871x_recv_c_,_drv_err_,("alloc recv_buf fail!\n"));
@@ -110,6 +117,8 @@ int	rtl8192cu_init_recv_priv(_adapter *padapter)
 
 		_spinlock_init(&precvbuf->recvbuf_lock);
 
+		precvbuf->alloc_sz = MAX_RECVBUF_SZ;
+
 		res = os_recvbuf_resource_alloc(padapter, precvbuf);
 		if(res==_FAIL)
 			break;
@@ -118,7 +127,7 @@ int	rtl8192cu_init_recv_priv(_adapter *padapter)
 		precvbuf->adapter =padapter;
 
 
-		list_insert_tail(&precvbuf->list, &(precvpriv->free_recv_buf_queue.queue));
+		//list_insert_tail(&precvbuf->list, &(precvpriv->free_recv_buf_queue.queue));
 
 		precvbuf++;
 
@@ -188,7 +197,7 @@ void rtl8192cu_free_recv_priv (_adapter *padapter)
 	}
 
 	if(precvpriv->pallocated_recv_buf)
-		_mfree(precvpriv->pallocated_recv_buf, NR_RECVBUFF *sizeof(struct recv_buf) + 4);
+		rtw_mfree(precvpriv->pallocated_recv_buf, NR_RECVBUFF *sizeof(struct recv_buf) + 4);
 
 #ifdef CONFIG_USB_INTERRUPT_IN_PIPE
 #ifdef PLATFORM_LINUX
@@ -198,7 +207,7 @@ void rtl8192cu_free_recv_priv (_adapter *padapter)
 	}
 #endif
 	if(precvpriv->int_in_buf)
-		_mfree(precvpriv->int_in_buf, sizeof(INTERRUPT_MSG_FORMAT_EX));
+		rtw_mfree(precvpriv->int_in_buf, sizeof(INTERRUPT_MSG_FORMAT_EX));
 #endif
 
 #ifdef PLATFORM_LINUX
@@ -226,9 +235,9 @@ void rtl8192cu_free_recv_priv (_adapter *padapter)
 void rtl8192cu_update_recvframe_attrib_from_recvstat(union recv_frame *precvframe, struct recv_stat *prxstat)
 {
 	u8	physt, qos, shift, icverr, htc, crcerr;
-	u16 drvinfo_sz=0;
+	u16	drvinfo_sz=0;
 	struct phy_stat		*pphy_info;
-	struct rx_pkt_attrib *pattrib = &precvframe->u.hdr.attrib;
+	struct rx_pkt_attrib	*pattrib = &precvframe->u.hdr.attrib;
 	_adapter				*padapter = precvframe->u.hdr.adapter;
 	u8	bPacketMatchBSSID =_FALSE;
 	u8	bPacketToSelf = _FALSE;
@@ -303,7 +312,7 @@ void rtl8192cu_update_recvframe_attrib_from_recvstat(union recv_frame *precvfram
 	{
 		bPacketMatchBSSID = ((!IsFrameTypeCtrl(precvframe->u.hdr.rx_data)) && !icverr && !crcerr &&
 			_memcmp(get_hdr_bssid(precvframe->u.hdr.rx_data), get_bssid(&padapter->mlmepriv), ETH_ALEN));
-
+			
 
 		bPacketToSelf = bPacketMatchBSSID &&  (_memcmp(get_da(precvframe->u.hdr.rx_data), myid(&padapter->eeprompriv), ETH_ALEN));
 
@@ -352,12 +361,12 @@ void rtl8192cu_update_recvframe_attrib_from_recvstat(union recv_frame *precvfram
 				psta = get_stainfo(pstapriv, sa);
 				if(psta)
 				{
-					precvframe->u.hdr.psta = psta;					
+					precvframe->u.hdr.psta = psta;
 				}				
 			}
 					
-			rtl8192c_process_phy_info(padapter, precvframe);			
-		}	
+			rtl8192c_process_phy_info(padapter, precvframe);
+		}
 
 #if 0 //dump phy_status for debug
 

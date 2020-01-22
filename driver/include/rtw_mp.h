@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2007 - 2010 Realtek Corporation. All rights reserved.
+ * Copyright(c) 2007 - 2011 Realtek Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -293,6 +293,17 @@ typedef struct _MPT_CONTEXT
 #endif
 //#endif
 
+/* E-Fuse */
+#ifdef CONFIG_RTL8192D
+#define EFUSE_MAP_SIZE		255
+#endif
+#ifdef CONFIG_RTL8192C
+#define EFUSE_MAP_SIZE		128
+#endif
+#define EFUSE_MAX_SIZE		512
+
+/* end of E-Fuse */
+
 struct mp_priv
 {
 	_adapter *papdater;
@@ -323,7 +334,9 @@ struct mp_priv
 	u8 bandwidth;
 	u8 prime_channel_offset;
 	u8 txpoweridx;
+	u8 txpoweridx_b;
 	u8 rateidx;
+	u32 preamble;
 //	u8 modem;
 
 //	u32 curr_crystalcap;
@@ -369,9 +382,7 @@ struct mp_priv
 	_queue free_mp_xmitqueue;
 	u32 free_mp_xmitframe_cnt;
 
-#ifdef CONFIG_RTL8192C
 	MPT_CONTEXT MptCtx;
-#endif
 };
 
 typedef struct _IOCMD_STRUCT_ {
@@ -587,7 +598,8 @@ extern void write_rfreg(PADAPTER padapter, u8 rfpath, u32 addr, u32 val);
 
 extern void	SetChannel(PADAPTER pAdapter);
 extern void	SetBandwidth(PADAPTER pAdapter);
-extern void	SetTxPower(PADAPTER pAdapte);
+extern void	SetTxPower(PADAPTER pAdapter);
+extern void	SetAntennaPathPower(PADAPTER pAdapter);
 //extern void	SetTxAGCOffset(PADAPTER pAdapter, u32 ulTxAGCOffset);
 extern void	SetDataRate(PADAPTER pAdapter);
 

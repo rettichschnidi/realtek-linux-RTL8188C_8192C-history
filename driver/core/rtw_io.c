@@ -1,20 +1,23 @@
 /******************************************************************************
-* rtw_io.c                                                                                                                                 *
-*                                                                                                                                          *
-* Description :                                                                                                                       *
-*                                                                                                                                           *
-* Author :                                                                                                                       *
-*                                                                                                                                         *
-* History :                                                          
-*
-*                                        
-*                                                                                                                                       *
-* Copyright 2007, Realtek Corp.                                                                                                  *
-*                                                                                                                                        *
-* The contents of this file is the sole property of Realtek Corp.  It can not be                                     *
-* be used, copied or modified without written permission from Realtek Corp.                                         *
-*                                                                                                                                          *
-*******************************************************************************/
+ *
+ * Copyright(c) 2007 - 2011 Realtek Corporation. All rights reserved.
+ *                                        
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
+ *
+ *
+ 
+******************************************************************************/
 /*
 
 The purpose of rtw_io.c
@@ -78,7 +81,7 @@ u8 read8(_adapter *adapter, u32 addr)
 	u8 (*_read8)(struct intf_hdl *pintfhdl, u32 addr);
 	_func_enter_;
 	_read8 = pintfhdl->io_ops._read8;
-	
+
 	r_val = _read8(pintfhdl, addr);
 	_func_exit_;
 	return r_val;
@@ -108,7 +111,7 @@ u32 read32(_adapter *adapter, u32 addr)
 	u32 	(*_read32)(struct intf_hdl *pintfhdl, u32 addr);
 	_func_enter_;
 	_read32 = pintfhdl->io_ops._read32;
-	
+
 	r_val = _read32(pintfhdl, addr);
 	_func_exit_;
 	return r_val;	
@@ -123,7 +126,7 @@ void write8(_adapter *adapter, u32 addr, u8 val)
 	void (*_write8)(struct intf_hdl *pintfhdl, u32 addr, u8 val);
 	_func_enter_;
 	_write8 = pintfhdl->io_ops._write8;
-	
+
 	_write8(pintfhdl, addr, val);
 }
 void write16(_adapter *adapter, u32 addr, u16 val)
@@ -147,8 +150,8 @@ void write32(_adapter *adapter, u32 addr, u32 val)
 	void (*_write32)(struct intf_hdl *pintfhdl, u32 addr, u32 val);
 	_func_enter_;
 	_write32 = pintfhdl->io_ops._write32;
-	
-	_write32(pintfhdl, addr, val);	
+
+	_write32(pintfhdl, addr, val);
 	_func_exit_;
 
 }
@@ -160,7 +163,7 @@ void writeN(_adapter *adapter, u32 addr ,u32 length , u8 *pdata)
 	void (*_writeN)(struct intf_hdl *pintfhdl, u32 addr,u32 length, u8 *pdata);
 	_func_enter_;
 	_writeN = pintfhdl->io_ops._writeN;
-	
+
 	_writeN(pintfhdl, addr,length,pdata);	
 	_func_exit_;
 
@@ -357,7 +360,7 @@ int init_io_priv(_adapter *padapter)
 	piopriv->padapter = padapter;
 	pintf->padapter = padapter;
 	pintf->pintf_dev = &padapter->dvobjpriv;
-	
+
 	
 #ifdef CONFIG_SDIO_HCI	
 	set_intf_ops = &sdio_set_intf_ops;	

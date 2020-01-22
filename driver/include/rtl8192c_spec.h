@@ -1,4 +1,23 @@
-
+/******************************************************************************
+ *
+ * Copyright(c) 2007 - 2011 Realtek Corporation. All rights reserved.
+ *                                        
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
+ *
+ *
+ 
+******************************************************************************/
 #ifndef __RTL8192C_SPEC_H__
 #define __RTL8192C_SPEC_H__
 
@@ -144,8 +163,8 @@
 #define REG_MBIST_DONE				0x0178
 #define REG_MBIST_FAIL				0x017C
 #define REG_C2HEVT_MSG_NORMAL	0x01A0
+#define REG_C2HEVT_CLEAR			0x01AF
 #define REG_C2HEVT_MSG_TEST		0x01B8
-#define REG_C2HEVT_CLEAR			0x01BF
 #define REG_MCUTST_1				0x01c0
 #define REG_FMETHR					0x01C8
 #define REG_HMETFR					0x01CC
@@ -276,6 +295,8 @@
 #define REG_BCNTCFG					0x0510
 #define REG_PIFS						0x0512
 #define REG_RDG_PIFS				0x0513
+#define REG_SIFS_CCK				0x0514
+#define REG_SIFS_OFDM				0x0516
 #define REG_SIFS_CTX				0x0514
 #define REG_SIFS_TRX				0x0516
 #define REG_AGGR_BREAK_TIME		0x051A
@@ -780,6 +801,7 @@ Default: 00b.
 #ifdef CONFIG_PCI_HCI
 #define RT_IBSS_INT_MASKS				(IMR_BcnInt | IMR_TBDOK | IMR_TBDER)
 #define RT_AC_INT_MASKS				(IMR_VIDOK | IMR_VODOK | IMR_BEDOK|IMR_BKDOK)
+#define RT_BSS_INT_MASKS				(RT_IBSS_INT_MASKS)
 
 //
 // Interface type.
@@ -812,6 +834,7 @@ typedef	enum _INTERFACE_SELECT_8192CPCIe{
 #define EEPROM_HT40_MAX_PWR_OFFSET			0x6F
 #define EEPROM_HT20_MAX_PWR_OFFSET			0x72
 
+#define EEPROM_CHANNEL_PLAN 				0x75
 #define EEPROM_TSSI_A						0x76
 #define EEPROM_TSSI_B						0x77
 #define EEPROM_THERMAL_METER				0x78
@@ -819,37 +842,10 @@ typedef	enum _INTERFACE_SELECT_8192CPCIe{
 #define EEPROM_RF_OPT2						0x7A
 #define EEPROM_RF_OPT3						0x7B
 #define EEPROM_RF_OPT4						0x7C
-#define EEPROM_CHANNEL_PLAN				0x7D
 #define EEPROM_VERSION						0x7E
 #define EEPROM_CUSTOMER_ID				0x7F
-//----------------------------------------------------------------
 
-
-#define EEPROM_PwDiff				0x54 // Difference of gain index between legacy and high throughput OFDM.
-
-#define EEPROM_TxPowerCCK			0x5A // CCK Tx Power base
-#define EEPROM_TxPowerHT40_1S		0x60 // HT40 Tx Power base
-#define EEPROM_TxPowerHT40_2SDiff	0x66 // HT40 Tx Power diff
-#define EEPROM_TxPowerHT20Diff		0x69// HT20 Tx Power diff
-#define EEPROM_TxPowerOFDMDiff		0x6C// OFDM Tx Power diff
-
-
-#define EEPROM_TxPWRGroup			0x6F// Power diff for channel group
-
-//
-#define EEPROM_TSSI_A				0x76 //TSSI value of path A.
-#define EEPROM_TSSI_B				0x77 //TSSI value of path B.
-#define EEPROM_ThermalMeter			0x78 // Thermal meter default value.
-
-#define EEPROM_ChannelPlan				0x75 // Map of supported channels.	
-
-#define RF_OPTION1						0x79// Check if power safety spec is need
-#define RF_OPTION2						0x7A
-#define RF_OPTION3						0x7B
-#define RF_OPTION4						0x7C
-
-#define EEPROM_Version					0x7E // The EEPROM content version
-#define EEPROM_CustomID				0x7F
+#define EEPROM_NORMAL_BoardType			EEPROM_RF_OPT1	//[7:5]
 
 #endif 
 
@@ -857,8 +853,8 @@ typedef	enum _INTERFACE_SELECT_8192CPCIe{
 
 //should be renamed and moved to another file
 typedef	enum _BOARD_TYPE_8192CUSB{
-	BOARD_USB_DONGLE 			= 0,		// USB
-	BOARD_USB_High_PA 			= 1,		// USB with high power PA
+	BOARD_USB_DONGLE 			= 0,		// USB dongle
+	BOARD_USB_High_PA 		= 1,		// USB dongle with high power PA
 	BOARD_MINICARD		  	= 2,		// Minicard
 	BOARD_USB_SOLO 		 	= 3,		// USB solo-Slim module
 	BOARD_USB_COMBO			= 4,		// USB Combo-Slim module
@@ -913,7 +909,7 @@ typedef	enum _BOARD_TYPE_8192CUSB{
 #define EEPROM_HT40_MAX_PWR_OFFSET			0x6F
 #define EEPROM_HT20_MAX_PWR_OFFSET			0x72
 
-#define EEPROM_XTAL_K							0x75
+#define EEPROM_CHANNEL_PLAN					0x75
 #define EEPROM_TSSI_A							0x76
 #define EEPROM_TSSI_B							0x77
 #define EEPROM_THERMAL_METER					0x78
@@ -921,7 +917,6 @@ typedef	enum _BOARD_TYPE_8192CUSB{
 #define EEPROM_RF_OPT2							0x7A
 #define EEPROM_RF_OPT3							0x7B
 #define EEPROM_RF_OPT4							0x7C
-#define EEPROM_CHANNEL_PLAN					0x7D
 #define EEPROM_VERSION							0x7E
 #define EEPROM_CUSTOMER_ID					0x7F
 
@@ -1207,8 +1202,17 @@ Current IOREG MAP
 
 //2 9346CR
 
+
+#define 	EEDO					BIT(0)
+#define 	EEDI					BIT(1)
+#define 	EESK					BIT(2)
+#define 	EECS					BIT(3)
+//#define 	EERPROMSEL			BIT(4)
+//#define 	EEPROM_EN			BIT(5)
 #define		BOOT_FROM_EEPROM		BIT(4)
 #define		EEPROM_EN				BIT(5)
+#define 	EEM0					BIT(6)
+#define 	EEM1					BIT(7)
 
 
 //2 AFE_MISC
@@ -1872,6 +1876,19 @@ Current IOREG MAP
 #define	MAX_MSS_DENSITY_2T				0x13
 #define	MAX_MSS_DENSITY_1T				0x0A
 
+//----------------------------------------------------------------------------
+//       8192C GPIO MUX Configuration Register (offset 0x40, 4 byte)
+//----------------------------------------------------------------------------
+#define	GPIOSEL_GPIO				0
+#define	GPIOSEL_ENBT				BIT5
+
+//----------------------------------------------------------------------------
+//       8192C GPIO PIN Control Register (offset 0x44, 4 byte)
+//----------------------------------------------------------------------------
+#define	GPIO_IN						REG_GPIO_PIN_CTRL		// GPIO pins input value
+#define	GPIO_OUT					(REG_GPIO_PIN_CTRL+1)	// GPIO pins output value
+#define	GPIO_IO_SEL				(REG_GPIO_PIN_CTRL+2)	// GPIO pins output enable when a bit is set to "1"; otherwise, input is configured.
+#define	GPIO_MOD					(REG_GPIO_PIN_CTRL+3)
 
 
 

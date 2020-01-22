@@ -1,3 +1,23 @@
+/******************************************************************************
+ *
+ * Copyright(c) 2007 - 2011 Realtek Corporation. All rights reserved.
+ *                                        
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
+ *
+ *
+ 
+******************************************************************************/
 #ifndef _RTW_XMIT_H_
 #define _RTW_XMIT_H_
 
@@ -11,7 +31,7 @@
 #define NR_XMITBUFF	(16)
 
 #elif defined (CONFIG_USB_HCI)
-#ifdef USB_TX_AGGREGATION_92C
+#ifdef USB_TX_AGGREGATION
 #define MAX_XMITBUF_SZ	20480	// 20k
 #else
 #define MAX_XMITBUF_SZ	(2048)
@@ -33,7 +53,22 @@
 #endif
 #endif
 
+// xmit extension buff defination
+#define MAX_XMIT_EXTBUF_SZ	(2048)
+#define NR_XMIT_EXTBUFF	(4)
+
 #define MAX_NUMBLKS		(1)
+
+#define XMIT_VO_QUEUE (0)
+#define XMIT_VI_QUEUE (1)
+#define XMIT_BE_QUEUE (2)
+#define XMIT_BK_QUEUE (3)
+
+#ifdef CONFIG_PCI_HCI
+#define TXDESC_NUM						64
+//#define TXDESC_NUM						128
+#define TXDESC_NUM_BE_QUEUE			256
+#endif
 
 #define WEP_IV(pattrib_iv, dot11txpn, keyidx)\
 do{\
@@ -315,18 +350,18 @@ struct pkt_attrib
 struct xmit_buf
 {
 	_list	list;
-		
+
 	_adapter *padapter;
 
 	u8 *pallocated_buf;
-	
-       u8 *pbuf;
+
+	u8 *pbuf;
 
 	void *priv_data;
 
-	//for dynamic allocation
-	u16	bdynamic;
-	u16	dynamic_len;
+	u16 ext_tag; // 0: Normal xmitbuf, 1: extension xmitbuf.
+	u16 flags;
+	u32 alloc_sz;
 
 #ifdef CONFIG_USB_HCI
        
@@ -334,6 +369,7 @@ struct xmit_buf
 
 #if defined(PLATFORM_OS_XP)||defined(PLATFORM_LINUX)
 	PURB	pxmit_urb[8];
+	dma_addr_t dma_transfer_addr;	/* (in) dma addr for transfer_buffer */
 #endif
 
 #ifdef PLATFORM_OS_XP
@@ -368,6 +404,10 @@ struct xmit_buf
 	u32  len;
 #endif
 
+#ifdef DBG_XMIT_BUF
+	u8 no;
+#endif
+
 };
 
 struct xmit_frame
@@ -391,7 +431,7 @@ struct xmit_frame
 #endif
 
 #ifdef CONFIG_USB_HCI
-#ifdef USB_TX_AGGREGATION_92C
+#ifdef USB_TX_AGGREGATION
 	u8	agg_num;
 #endif
 	u8	pkt_offset;
@@ -541,19 +581,25 @@ struct	xmit_priv	{
 #endif
 
 	_queue free_xmitbuf_queue;
-	_queue pending_xmitbuf_queue;
+	_queue pending_xmitbuf_queue; // unused??
 	u8 *pallocated_xmitbuf;
 	u8 *pxmitbuf;
 	uint free_xmitbuf_cnt;
-
+	
+	_queue free_xmit_extbuf_queue;
+	u8 *pallocated_xmit_extbuf;
+	u8 *pxmit_extbuf;
+	uint free_xmit_extbuf_cnt;
+	
+        u16 nqos_ssn;
 };
 
-extern s32 free_xmitbuf_dynamic(struct xmit_priv *pxmitpriv, struct xmit_buf *pxmitbuf);
-extern struct xmit_buf *alloc_xmitbuf_dynamic(struct xmit_priv *pxmitpriv, u16 len);
+extern struct xmit_buf *alloc_xmitbuf_ext(struct xmit_priv *pxmitpriv);
 
 extern s32 free_xmitbuf(struct xmit_priv *pxmitpriv, struct xmit_buf *pxmitbuf);
 extern struct xmit_buf *alloc_xmitbuf(struct xmit_priv *pxmitpriv);
 
+void count_tx_stats(_adapter *padapter, struct xmit_frame *pxmitframe, int sz);
 extern void update_protection(_adapter *padapter, u8 *ie, uint ie_len);
 extern s32 make_wlanhdr(_adapter *padapter, u8 *hdr, struct pkt_attrib *pattrib);
 extern s32 rtw_put_snap(u8 *data, u16 h_proto);

@@ -1,3 +1,22 @@
+/******************************************************************************
+ *
+ * Copyright(c) 2007 - 2011 Realtek Corporation. All rights reserved.
+ *                                        
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
+ *
+ *
+ ******************************************************************************/
 /*-------------------------------------------------------------------------------
 	
 	For type defines and data structure defines
@@ -76,6 +95,7 @@ typedef struct _ADAPTER _adapter, ADAPTER,*PADAPTER;
 #define SPEC_DEV_ID_ENABLE_PS BIT(2)
 #define SPEC_DEV_ID_RF_CONFIG_1T1R BIT(3)
 #define SPEC_DEV_ID_RF_CONFIG_2T2R BIT(4)
+#define SPEC_DEV_ID_ASSIGN_IFNAME BIT(5)
 
 struct specific_device_id{
 	
@@ -147,9 +167,12 @@ struct registry_priv
 #endif
 	BOOLEAN	bAcceptAddbaReq;	
 
-#ifdef CONFIG_ANTENNA_DIVERSITY
 	u8		antdiv_cfg;
-#endif
+	  
+	u8		usbss_enable;//0:disable,1:enable
+	u8		hwpdn_mode;//0:disable,1:enable,2:deside by EFUSE config
+	u8		hwpwrp_detect;//0:disable,1:enable
+	  
 };
 
 
@@ -248,6 +271,7 @@ struct dvobj_priv {
 #endif//PLATFORM_WINDOWS
 
 #ifdef PLATFORM_LINUX
+	struct usb_interface *pusbintf;
 	struct usb_device *pusbdev;
 #endif//PLATFORM_LINUX
 
@@ -268,7 +292,7 @@ struct dvobj_priv {
 	unsigned long	pci_base_addr;	/* device I/O address	*/
 
 	//PciBridge
-	struct pci_priv	ndis_adapter;
+	struct pci_priv	pcipriv;
 
 	u16	irqline;
 	u8	irq_enabled;
@@ -305,7 +329,7 @@ struct _ADAPTER{
 	u16 	chip_type;
 	u16	HardwareType;
 	u16	interface_type;//USB,SDIO,PCI
- 	
+ 
 	struct 	dvobj_priv dvobjpriv;
 	struct	mlme_priv mlmepriv;
 	struct	mlme_ext_priv mlmeextpriv;
@@ -322,7 +346,7 @@ struct _ADAPTER{
 	struct	pwrctrl_priv	pwrctrlpriv;
 	struct 	eeprom_priv eeprompriv;
 	struct	led_priv	ledpriv;
-
+	
 #ifdef CONFIG_MP_INCLUDED
        struct	mp_priv	mppriv;
 #endif
@@ -335,7 +359,10 @@ struct _ADAPTER{
 	struct	hostapd_priv	*phostapdpriv;		
 #endif
 
+#if ( P2P_INCLUDED == 1 )
 	struct wifidirect_info	wdinfo;
+#endif
+
 	PVOID			HalData;
 	struct hal_ops	HalFunc;
 
@@ -348,9 +375,10 @@ struct _ADAPTER{
 
 	u32	IsrContent;
 	u32	ImrContent;	
-	
-	u8	EepromAddressSize;		
-	u8	hw_init_completed;	
+
+	u8	EepromAddressSize;
+	u8	hw_init_completed;
+	u8	init_adpt_in_progress;
 	u8	bfirst_init;
 	
 	_thread_hdl_	cmdThread;
@@ -360,8 +388,10 @@ struct _ADAPTER{
 
 
 	NDIS_STATUS (*dvobj_init)(_adapter * adapter);
-	void  (*dvobj_deinit)(_adapter * adapter);
-	
+	void (*dvobj_deinit)(_adapter * adapter);
+
+	void (*intf_start)(_adapter * adapter);
+	void (*intf_stop)(_adapter * adapter);
 
 #ifdef PLATFORM_WINDOWS
 	_nic_hdl		hndis_adapter;//hNdisAdapter(NDISMiniportAdapterHandle);
@@ -388,6 +418,9 @@ struct _ADAPTER{
 	u8 bReadPortCancel;
 	u8 bWritePortCancel;
 	u8 bRxRSSIDisplay;
+#ifdef CONFIG_AUTOSUSPEND
+	u8	bDisableAutosuspend;
+#endif
 };	
   
 __inline static u8 *myid(struct eeprom_priv *peepriv)

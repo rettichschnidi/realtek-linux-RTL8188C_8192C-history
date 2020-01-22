@@ -1,21 +1,22 @@
 /******************************************************************************
-* os_intfs.c                                                                                                                                 *
-*                                                                                                                                          *
-* Description :                      
-*		drv_entry
-*                                                                                                                                           *
-* Author :                                                                                                                       *
-*                                                                                                                                         *
-* History :                                                          
-*
-*                                        
-*                                                                                                                                       *
-* Copyright 2007, Realtek Corp.                                                                                                  *
-*                                                                                                                                        *
-* The contents of this file is the sole property of Realtek Corp.  It can not be                                     *
-* be used, copied or modified without written permission from Realtek Corp.                                         *
-*                                                                                                                                          *
-*******************************************************************************/
+ *
+ * Copyright(c) 2007 - 2011 Realtek Corporation. All rights reserved.
+ *                                        
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
+ *
+ *
+ ******************************************************************************/
 #define _OS_INTFS_C_
 
 #include <drv_conf.h>
@@ -70,7 +71,11 @@ int scan_mode = 1;//active, passive
 int adhoc_tx_pwr = 1;
 int soft_ap = 0;
 //int smart_ps = 1;  
+#ifdef CONFIG_POWER_SAVING
+int power_mgnt = 1;
+#else
 int power_mgnt = PS_MODE_ACTIVE;
+#endif	
 int radio_enable = 1;
 int long_retry_lmt = 7;
 int short_retry_lmt = 7;
@@ -111,15 +116,29 @@ int bt_ampdu =1 ;// 0:Disable BT control A-MPDU, 1:Enable BT control A-MPDU.
 #endif
 int AcceptAddbaReq = _TRUE;// 0:Reject AP's Add BA req, 1:Accept AP's Add BA req.
 
-#ifdef CONFIG_ANTENNA_DIVERSITY
 int  antdiv_cfg = 2; // 0:OFF , 1:ON, 2:decide by Efuse config
+
+#ifdef CONFIG_USB_AUTOSUSPEND
+int enusbss = 1;//0:disable,1:enable
+#else
+int enusbss = 0;//0:disable,1:enable
 #endif
+
+int hwpdn_mode=2;//0:disable,1:enable,2: by EFUSE config
+
+#ifdef CONFIG_HW_PWRP_DETECTION
+int hwpwrp_detect = 1; 
+#else
+int hwpwrp_detect = 0; //HW power  ping detect 0:disable , 1:enable
+#endif
+
 char* ifname = "wlan%d";
 
 char* initmac = 0;  // temp mac address if users want to use instead of the mac address in Efuse
 
 module_param(ifname, charp, 0644);
 module_param(initmac, charp, 0644);
+module_param(channel_plan, int, 0644);
 module_param(chip_version, int, 0644);
 module_param(rfintfs, int, 0644);
 module_param(lbkmode, int, 0644);
@@ -140,9 +159,12 @@ module_param(power_mgnt, int, 0644);
 module_param(low_power, int, 0644);
 module_param(wifi_spec, int, 0644);
 
-#ifdef CONFIG_ANTENNA_DIVERSITY
 module_param(antdiv_cfg, int, 0644);
-#endif
+
+
+module_param(enusbss, int, 0644);
+module_param(hwpdn_mode, int, 0644);
+module_param(hwpwrp_detect, int, 0644);
 
 static uint loadparam( _adapter *padapter,  _nic_hdl	pnetdev);
 static int netdev_open (struct net_device *pnetdev);
@@ -298,6 +320,25 @@ void rtw_proc_init_one(struct net_device *dev)
 	}
 #endif
 
+#ifdef MEMORY_LEAK_DEBUG
+	entry = create_proc_read_entry("_malloc_cnt", S_IFREG | S_IRUGO,
+				   dir_dev, proc_get_malloc_cnt, dev);				   
+	if (!entry) {
+		DBG_871X("Unable to create_proc_read_entry!\n"); 
+		return;
+	}
+#endif
+
+#ifdef CONFIG_FIND_BEST_CHANNEL
+	entry = create_proc_read_entry("best_channel", S_IFREG | S_IRUGO,
+				   dir_dev, proc_get_best_channel, dev);				   
+	if (!entry) {
+		DBG_871X("Unable to create_proc_read_entry!\n"); 
+		return;
+	}
+#endif
+
+
 }
 
 void rtw_proc_remove_one(struct net_device *dev)
@@ -327,6 +368,13 @@ void rtw_proc_remove_one(struct net_device *dev)
 		remove_proc_entry("all_sta_info", dir_dev);
 #endif		
 
+#ifdef MEMORY_LEAK_DEBUG
+		remove_proc_entry("_malloc_cnt", dir_dev);
+#endif 
+
+#ifdef CONFIG_FIND_BEST_CHANNEL
+		remove_proc_entry("best_channel", dir_dev);
+#endif 
 		remove_proc_entry(dev->name, rtw_proc);
 		dir_dev = NULL;
 		
@@ -421,8 +469,14 @@ _func_enter_;
 #endif
 	registry_par->bAcceptAddbaReq = (u8)AcceptAddbaReq;
 
-#ifdef CONFIG_ANTENNA_DIVERSITY
 	registry_par->antdiv_cfg = (u8)antdiv_cfg;
+
+#ifdef CONFIG_AUTOSUSPEND
+	registry_par->usbss_enable = (u8)enusbss;//0:disable,1:enable
+#endif
+#ifdef SUPPORT_HW_RFOFF_DETECTED
+	registry_par->hwpdn_mode = (u8)hwpdn_mode;//0:disable,1:enable,2:by EFUSE config
+	registry_par->hwpwrp_detect = (u8)hwpwrp_detect;//0:disable,1:enable
 #endif
 
 _func_exit_;
@@ -440,8 +494,8 @@ static int rtw_net_set_mac_address(struct net_device *pnetdev, void *p)
 	{
 		//printk("r8711_net_set_mac_address(), MAC=%x:%x:%x:%x:%x:%x\n", addr->sa_data[0], addr->sa_data[1], addr->sa_data[2], addr->sa_data[3],
 		//addr->sa_data[4], addr->sa_data[5]);
-		//_memcpy(padapter->eeprompriv.mac_addr, addr->sa_data, ETH_ALEN);
-		_memcpy(pnetdev->dev_addr, addr->sa_data, ETH_ALEN);
+		_memcpy(padapter->eeprompriv.mac_addr, addr->sa_data, ETH_ALEN);
+		//_memcpy(pnetdev->dev_addr, addr->sa_data, ETH_ALEN);
 		//padapter->bset_hwaddr = _TRUE;
 	}
 
@@ -494,7 +548,7 @@ int init_netdev_name(struct net_device *pnetdev)
 	#else
 		devnet = dev_net(pnetdev);
 	#endif
-		TargetNetdev = dev_get_by_name(dev_net(pnetdev), "wlan0");
+		TargetNetdev = dev_get_by_name(devnet, "wlan0");
 #endif
 		if(TargetNetdev) {
 			printk("Force onboard module driver disappear !!!\n");
@@ -546,7 +600,7 @@ struct net_device *init_netdev(void)
 	//pnetdev->init = NULL;
 #if (LINUX_VERSION_CODE>=KERNEL_VERSION(2,6,29))
 
-	printk("register rtl8712_netdev_ops to netdev_ops\n");
+	printk("register rtw_netdev_ops to netdev_ops\n");
 	pnetdev->netdev_ops = &rtw_netdev_ops;
 
 #else
@@ -735,13 +789,30 @@ u8 reset_drv_sw(_adapter *padapter)
 	pmlmepriv->scan_interval = SCAN_INTERVAL;// 30*2 sec = 60sec
 	pmlmepriv->scan_mode = SCAN_ACTIVE; // 1: active scan ,0 passive scan
 
-	pwrctrlpriv->inactive_pwrstate = rf_on;
 	pwrctrlpriv->bips_processing = _FALSE;		
 
 	padapter->xmitpriv.tx_pkts = 0;
 	padapter->recvpriv.rx_pkts = 0;
 
 	pmlmepriv->LinkDetectInfo.bBusyTraffic = _FALSE;
+
+	if(pmlmepriv->fw_state & _FW_UNDER_SURVEY)			
+		pmlmepriv->fw_state ^= _FW_UNDER_SURVEY;
+	
+	if(pmlmepriv->fw_state & _FW_UNDER_LINKING) 		
+		pmlmepriv->fw_state ^= _FW_UNDER_LINKING;
+
+#ifdef CONFIG_AUTOSUSPEND	
+	#if (LINUX_VERSION_CODE>=KERNEL_VERSION(2,6,22) && LINUX_VERSION_CODE<=KERNEL_VERSION(2,6,34))
+		padapter->dvobjpriv.pusbdev->autosuspend_disabled = 1;//autosuspend disabled by the user
+	#endif
+#endif
+
+#ifdef SILENT_RESET_FOR_SPECIFIC_PLATFOM
+	if(padapter->HalFunc.sreset_reset_value)
+		padapter->HalFunc.sreset_reset_value(padapter);
+#endif
+	pwrctrlpriv->pwr_state_check_cnts = 0;
 
 	return ret8;
 }
@@ -824,6 +895,10 @@ _func_enter_;
 
 	rtw_led_init(padapter);
 
+#ifdef SILENT_RESET_FOR_SPECIFIC_PLATFOM
+	rtw_sreset_init(padapter);
+#endif	
+
 exit:
 	
 	RT_TRACE(_module_os_intfs_c_,_drv_info_,("-init_drv_sw\n"));
@@ -859,10 +934,9 @@ void cancel_all_timer(_adapter *padapter)
 	_cancel_timer_ex(&padapter->pwrctrlpriv.pwr_state_check_timer);
 #endif
 
-#ifdef CONFIG_ANTENNA_DIVERSITY
 	// cancel dm  timer
 	padapter->HalFunc.dm_deinit(padapter);
-#endif
+
 }
 
 u8 free_drv_sw(_adapter *padapter)
@@ -889,7 +963,7 @@ u8 free_drv_sw(_adapter *padapter)
 	
 	_free_recv_priv(&padapter->recvpriv);	
 
-	//_mfree((void *)padapter, sizeof (padapter));
+	//rtw_mfree((void *)padapter, sizeof (padapter));
 
 #ifdef CONFIG_DRVEXT_MODULE
 	free_drvext(&padapter->drvextpriv);
@@ -966,42 +1040,38 @@ static int netdev_open(struct net_device *pnetdev)
 			goto netdev_open_error;
 		}
 
-		
+
 #ifdef CONFIG_DRVEXT_MODULE
 		init_drvext(padapter);
-#endif	   		
+#endif
 
-		rtw_intf_start(padapter);
+		if(padapter->intf_start)
+		{
+			padapter->intf_start(padapter);
+		}
 
+#ifdef CONFIG_PROC_DEBUG
+#ifndef RTK_DMP_PLATFORM
+		rtw_proc_init_one(pnetdev);
+#endif
+#endif
 		padapter->bup = _TRUE;
-	}		
-	padapter->net_closed = _FALSE;	
-		
-#ifdef CONFIG_IPS
-	if( pwrctrlpriv->power_mgnt != PS_MODE_ACTIVE )
-	{
-		//if(pwrctrlpriv->ips_enable){
-			padapter->pwrctrlpriv.bips_processing = _FALSE;		
-			_set_timer(&padapter->pwrctrlpriv.pwr_state_check_timer, 2000);
-		//}
 	}
-	else
- #endif
- 	{
- 		_set_timer(&padapter->mlmepriv.dynamic_chk_timer, 2000);
+	padapter->net_closed = _FALSE;
+
+	_set_timer(&padapter->mlmepriv.dynamic_chk_timer, 2000);
+
+	if(( pwrctrlpriv->power_mgnt != PS_MODE_ACTIVE ) ||(padapter->pwrctrlpriv.bHWPwrPindetect))
+	{
+		padapter->pwrctrlpriv.bips_processing = _FALSE;	
+		_set_timer(&padapter->pwrctrlpriv.pwr_state_check_timer, padapter->pwrctrlpriv.pwr_state_check_inverval);
  	}
-		
+
 	//netif_carrier_on(pnetdev);//call this func when joinbss_event_callback return success       
  	if(!netif_queue_stopped(pnetdev))
       		netif_start_queue(pnetdev);
 	else
 		netif_wake_queue(pnetdev);
-
-#ifdef CONFIG_PROC_DEBUG
-#ifndef RTK_DMP_PLATFORM
-	rtw_proc_init_one(pnetdev);
-#endif
-#endif
 
 	RT_TRACE(_module_os_intfs_c_,_drv_info_,("-871x_drv - dev_open\n"));
 	printk("-871x_drv - drv_open, bup=%d\n", padapter->bup);
@@ -1022,71 +1092,134 @@ netdev_open_error:
 	
 }
 
-#ifdef CONFIG_PM
-int pm_netdev_open(struct net_device *pnetdev)
-{
-	return netdev_open(pnetdev);
-}
-#endif
+
 
 #ifdef CONFIG_IPS
 int  ips_netdrv_open(_adapter *padapter)
 {
-	int status;
+	int status = _SUCCESS;
 	padapter->net_closed = _FALSE;
-	//printk("%s\n",__FUNCTION__);
-	//if(padapter->bup == _FALSE)
-    	{    
-		padapter->bDriverStopped = _FALSE;
-	 	padapter->bSurpriseRemoved = _FALSE;	 
-		padapter->bCardDisableWOHSM = _FALSE;
-		padapter->bup = _TRUE;        	
-	
-		status = rtw_hal_init(padapter);		
-		if (status ==_FAIL)
-		{			
-			RT_TRACE(_module_os_intfs_c_,_drv_err_,("_r871xu_netdrv_open(): Can't init h/w!\n"));
-			goto netdev_open_error;
-		}
+	printk("===> %s.........\n",__FUNCTION__);
 
-		rtw_intf_start(padapter);  		
 
-		_set_timer(&padapter->pwrctrlpriv.pwr_state_check_timer, 2000);
-  		_set_timer(&padapter->mlmepriv.dynamic_chk_timer,5000);
+	padapter->bDriverStopped = _FALSE;
+	padapter->bSurpriseRemoved = _FALSE;
+	padapter->bCardDisableWOHSM = _FALSE;
+	padapter->bup = _TRUE;
 
-	}		
-		
-        RT_TRACE(_module_os_intfs_c_,_drv_info_,("-871x_drv - dev_open\n"));
-	//printk("-ips_netdrv_open - drv_open, bup=%d\n", padapter->bup);
-		
+	status = rtw_hal_init(padapter);
+	if (status ==_FAIL)
+	{
+		RT_TRACE(_module_os_intfs_c_,_drv_err_,("ips_netdrv_open(): Can't init h/w!\n"));
+		goto netdev_open_error;
+	}
+
+	if(padapter->intf_start)
+	{
+		padapter->intf_start(padapter);
+	}
+
+	_set_timer(&padapter->pwrctrlpriv.pwr_state_check_timer, padapter->pwrctrlpriv.pwr_state_check_inverval);
+  	_set_timer(&padapter->mlmepriv.dynamic_chk_timer,5000);
+
 	 return _SUCCESS;
 
 netdev_open_error:
+	padapter->bup = _FALSE;
+	printk("-ips_netdrv_open - drv_open failure, bup=%d\n", padapter->bup);
 
-	//padapter->bup = _FALSE;
-	
-	RT_TRACE(_module_os_intfs_c_,_drv_err_,("-871x_drv - dev_open, fail!\n"));
-	//printk("-ips_netdrv_open - drv_open fail, bup=%d\n", padapter->bup);
-	
 	return _FAIL;
 }
+
+void ips_dev_unload(_adapter *padapter)
+{
+	struct net_device *pnetdev= (struct net_device*)padapter->pnetdev;
+	struct xmit_priv	*pxmitpriv = &(padapter->xmitpriv);
+	printk("====> %s...\n",__FUNCTION__);
+
+	padapter->HalFunc.SetHwRegHandler(padapter, HW_VAR_FIFO_CLEARN_UP, 0);
+
+	if(padapter->intf_stop)
+	{
+		padapter->intf_stop(padapter);
+	}
+
+	//s5.
+	if(padapter->bSurpriseRemoved == _FALSE)
+	{
+		rtw_hal_deinit(padapter);
+	}
+
+	//s6.
+	if(padapter->dvobj_deinit)
+	{
+		padapter->dvobj_deinit(padapter);
+	}
+	else
+	{
+		RT_TRACE(_module_hci_intfs_c_,_drv_err_,("Initialize hcipriv.hci_priv_init error!!!\n"));
+	}
+
+}
+
+int rtw_ips_pwr_up(_adapter *padapter)
+{	
+	int result;
+	printk("===>  rtw_ips_pwr_up..............\n");
+	reset_drv_sw(padapter);
+	result = ips_netdrv_open(padapter);
+ 	printk("<===  rtw_ips_pwr_up..............\n");
+	return result;
+
+}
+
+void rtw_ips_pwr_down(_adapter *padapter)
+{
+	printk("===> rtw_ips_pwr_down...................\n");
+
+	padapter->bCardDisableWOHSM = _TRUE;
+	padapter->net_closed = _TRUE;
+
+	padapter->ledpriv.LedControlHandler(padapter, LED_CTL_NO_LINK);
+	
+	ips_dev_unload(padapter);
+	padapter->bCardDisableWOHSM = _FALSE;
+	printk("<=== rtw_ips_pwr_down.....................\n");
+}
 #endif
+
+int pm_netdev_open(struct net_device *pnetdev,u8 bnormal)
+{
+	int status;
+	if(bnormal)
+		status = netdev_open(pnetdev);
+#ifdef CONFIG_IPS
+	else
+		status =  (_SUCCESS == ips_netdrv_open((_adapter *)netdev_priv(pnetdev)))?(0):(-1);
+#endif
+
+	return status;
+}
+extern int rfpwrstate_check(_adapter *padapter);
 static int netdev_close(struct net_device *pnetdev)
 {
 	_adapter *padapter = (_adapter *)netdev_priv(pnetdev);
-		
+
 	RT_TRACE(_module_os_intfs_c_,_drv_info_,("+871x_drv - drv_close\n"));	
 
-
+	if(padapter->pwrctrlpriv.bInternalAutoSuspend == _TRUE)
+	{
+		rfpwrstate_check(padapter);
+	}
 	padapter->net_closed = _TRUE;
 
 /*	if(!padapter->hw_init_completed)
 	{
 		printk("(1)871x_drv - drv_close, bup=%d, hw_init_completed=%d\n", padapter->bup, padapter->hw_init_completed);
 
-	padapter->bDriverStopped = _TRUE;   
+		padapter->bDriverStopped = _TRUE;
 
-	rtw_dev_unload(padapter);	
+		rtw_dev_unload(padapter);
 	}
 	else*/
 	{
@@ -1098,8 +1231,8 @@ static int netdev_close(struct net_device *pnetdev)
 			if (!netif_queue_stopped(pnetdev))
 				netif_stop_queue(pnetdev);
      		}
-		
-#ifndef CONFIG_PLATFORM_ANDROID
+
+#ifndef CONFIG_ANDROID
 
 		//s2.	
 		//s2-1.  issue disassoc_cmd to fw

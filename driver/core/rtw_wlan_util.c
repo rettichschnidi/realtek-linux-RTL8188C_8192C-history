@@ -1,20 +1,23 @@
 /******************************************************************************
-* rtw_wlan_util.c                                                                                                                                 *
-*                                                                                                                                          *
-* Description :                                                                                                                       *
-*                                                                                                                                           *
-* Author :                                                                                                                       *
-*                                                                                                                                         *
-* History :                                                          
-*
-*                                        
-*                                                                                                                                       *
-* Copyright 2008, Realtek Corp.                                                                                                  *
-*                                                                                                                                        *
-* The contents of this file is the sole property of Realtek Corp.  It can not be                                     *
-* be used, copied or modified without written permission from Realtek Corp.                                         *
-*                                                                                                                                          *
-*******************************************************************************/
+ *
+ * Copyright(c) 2007 - 2011 Realtek Corporation. All rights reserved.
+ *                                        
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
+ *
+ *
+ 
+******************************************************************************/
 #define _RTW_WLAN_UTIL_C_
 
 #include <drv_conf.h>
@@ -528,13 +531,44 @@ void write_cam(_adapter *padapter, u8 entry, u16 ctrl, u8 *mac, u8 *key)
 
 }
 
+void clear_cam_entry(_adapter *padapter, u8 entry)
+{	
+#if 0
+	u32	addr, val=0;
+	u32	cam_val[2];
+
+	addr = entry << 3;
+	
+
+	cam_val[0] = val;
+	cam_val[1] = addr + (unsigned int)0;
+
+	padapter->HalFunc.SetHwRegHandler(padapter, HW_VAR_CAM_WRITE, (u8 *)cam_val);
+
+
+
+	cam_val[0] = val;
+	cam_val[1] = addr + (unsigned int)1;
+
+	padapter->HalFunc.SetHwRegHandler(padapter, HW_VAR_CAM_WRITE, (u8 *)cam_val);
+#else
+
+	unsigned char null_sta[] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+
+	unsigned char null_key[] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,0x00, 0x00, 0x00, 0x00,0x00, 0x00, 0x00, 0x00};
+
+	write_cam(padapter, entry, 0, null_sta, null_key);
+
+#endif
+}
+
 int allocate_cam_entry(_adapter *padapter)
 {
 	unsigned int cam_idx;
 	struct mlme_ext_priv	*pmlmeext = &padapter->mlmeextpriv;
 	struct mlme_ext_info	*pmlmeinfo = &(pmlmeext->mlmext_info);
 	
-	for (cam_idx = 6; cam_idx < NUM_STA; cam_idx++)
+	for (cam_idx = 2; cam_idx < NUM_STA; cam_idx++)
 	{
 		if (pmlmeinfo->FW_sta_info[cam_idx].status == 0)
 		{
@@ -577,7 +611,7 @@ int WMM_param_handler(_adapter *padapter, PNDIS_802_11_VARIABLE_IEs	pIE)
 		pmlmeinfo->WMM_enable = 0;
 		return _FAIL;
 	}	
-	
+
 	pmlmeinfo->WMM_enable = 1;
 	_memcpy(&(pmlmeinfo->WMM_param), (pIE->data + 6), sizeof(struct WMM_para_element));
 	return _TRUE;
@@ -615,7 +649,7 @@ void WMMOnAssocRsp(_adapter *padapter)
 	
 	if (pmlmeinfo->WMM_enable == 0)
 		return;
-	
+
 	if( pmlmeext->cur_wireless_mode == WIRELESS_11B)
 		aSifsTime = 10;
 	else
@@ -780,7 +814,7 @@ void HT_caps_handler(_adapter *padapter, PNDIS_802_11_VARIABLE_IEs pIE)
 			{
 				max_AMPDU_len = (pmlmeinfo->HT_caps.HT_cap_element.AMPDU_para & 0x3);
 			}
-		
+			
 			if ((pmlmeinfo->HT_caps.HT_cap_element.AMPDU_para & 0x1c) > (pIE->data[i] & 0x1c))
 			{
 				min_MPDU_spacing = (pmlmeinfo->HT_caps.HT_cap_element.AMPDU_para & 0x1c);
@@ -899,12 +933,12 @@ void HTOnAssocRsp(_adapter *padapter)
 				break;
 		}
 		
-		//SelectChannel(padapter, pmlmeext->cur_channel, pmlmeext->cur_ch_offset);	
+		//SelectChannel(padapter, pmlmeext->cur_channel, pmlmeext->cur_ch_offset);
 	}
 
 	set_channel_bwmode(padapter, pmlmeext->cur_channel, pmlmeext->cur_ch_offset, pmlmeext->cur_bwmode);
 
-        //
+	//
 	// Config SM Power Save setting
 	//
 	pmlmeinfo->SM_PS = (pmlmeinfo->HT_caps.HT_cap_element.HT_caps_info & 0x0C) >> 2;
@@ -995,7 +1029,7 @@ void update_beacon_info(_adapter *padapter, u8 *pframe, uint pkt_len, struct sta
 	PNDIS_802_11_VARIABLE_IEs	pIE;
 		
 	len = pkt_len - (_BEACON_IE_OFFSET_ + WLAN_HDR_A3_LEN);
-	
+
 	for (i = 0; i < len;)
 	{
 		pIE = (PNDIS_802_11_VARIABLE_IEs)(pframe + (_BEACON_IE_OFFSET_ + WLAN_HDR_A3_LEN) + i);
@@ -1010,7 +1044,7 @@ void update_beacon_info(_adapter *padapter, u8 *pframe, uint pkt_len, struct sta
 					(WMM_param_handler(padapter, pIE))? WMMOnAssocRsp(padapter): 0;
 				}				
 				break;
-#endif								
+#endif
 
 			case _HT_EXTRA_INFO_IE_:	//HT info				
 				//HT_info_handler(padapter, pIE);
@@ -1232,24 +1266,20 @@ unsigned char get_highest_mcs_rate(struct HT_caps_element *pHT_caps)
 	return i;
 }
 
-void Update_RA_Entry(_adapter *padapter, unsigned int cam_idx)
+void Update_RA_Entry(_adapter *padapter, u32 mac_id)
 {
-	padapter->HalFunc.UpdateRAMaskHandler(padapter, cam_idx);
+	padapter->HalFunc.UpdateRAMaskHandler(padapter, mac_id);
 }
 
-void enable_rate_adaptive(_adapter *padapter)
+void enable_rate_adaptive(_adapter *padapter, u32 mac_id)
 {
-	Update_RA_Entry(padapter, 4);
-	//Update_RA_Entry(padapter, 5);
-	Update_RA_Entry(padapter, 0);
-	
-	return;
+	Update_RA_Entry(padapter, mac_id);
 }
 
-void set_sta_rate(_adapter *padapter)
+void set_sta_rate(_adapter *padapter, struct sta_info *psta)
 {
 	//rate adaptive	
-	enable_rate_adaptive(padapter);
+	enable_rate_adaptive(padapter, psta->mac_id);
 }
 
 unsigned char check_assoc_AP(u8 *pframe, uint len)
@@ -1420,6 +1450,7 @@ void update_capinfo(PADAPTER Adapter, u16 updateCap)
 void update_wireless_mode(_adapter *padapter)
 {
 	int ratelen, network_type = 0;
+	u16 SIFS_Timer;
 	struct mlme_ext_priv	*pmlmeext = &padapter->mlmeextpriv;
 	struct mlme_ext_info	*pmlmeinfo = &(pmlmeext->mlmext_info);
 	WLAN_BSSID_EX 		*cur_network = &(pmlmeinfo->network);
@@ -1463,6 +1494,11 @@ void update_wireless_mode(_adapter *padapter)
 	}
 
 	pmlmeext->cur_wireless_mode = network_type & padapter->registrypriv.wireless_mode;
+	if(pmlmeext->cur_wireless_mode & WIRELESS_11G )//WIRELESS_MODE_G)
+		SIFS_Timer = 0x0a0a;
+	else
+		SIFS_Timer = 0x0e0e;//pHalData->SifsTime;
+	padapter->HalFunc.SetHwRegHandler( padapter, HW_VAR_SIFS,  (u8 *)&SIFS_Timer);
 	
 }
 
@@ -1474,14 +1510,14 @@ void fire_write_MAC_cmd(_adapter *padapter, unsigned int addr, unsigned int valu
 	struct reg_rw_parm			*pwriteMacPara;
 	struct cmd_priv					*pcmdpriv = &(padapter->cmdpriv);
 
-	if ((ph2c = (struct cmd_obj*)_zmalloc(sizeof(struct cmd_obj))) == NULL)
+	if ((ph2c = (struct cmd_obj*)rtw_zmalloc(sizeof(struct cmd_obj))) == NULL)
 	{
 		return;
 	}	
 
-	if ((pwriteMacPara = (struct reg_rw_parm*)_malloc(sizeof(struct reg_rw_parm))) == NULL) 
+	if ((pwriteMacPara = (struct reg_rw_parm*)rtw_malloc(sizeof(struct reg_rw_parm))) == NULL) 
 	{		
-		_mfree((unsigned char *)ph2c, sizeof(struct cmd_obj));
+		rtw_mfree((unsigned char *)ph2c, sizeof(struct cmd_obj));
 		return;
 	}
 	
@@ -1492,6 +1528,29 @@ void fire_write_MAC_cmd(_adapter *padapter, unsigned int addr, unsigned int valu
 	init_h2fwcmd_w_parm_no_rsp(ph2c, pwriteMacPara, GEN_CMD_CODE(_Write_MACREG));
 	enqueue_cmd(pcmdpriv, ph2c);
 #endif	
+}
+
+u8 bmc_support_rate_ofdm[4] = 
+	{IEEE80211_OFDM_RATE_6MB|IEEE80211_BASIC_RATE_MASK, IEEE80211_OFDM_RATE_12MB|IEEE80211_BASIC_RATE_MASK,
+	IEEE80211_OFDM_RATE_18MB|IEEE80211_BASIC_RATE_MASK, IEEE80211_OFDM_RATE_24MB|IEEE80211_BASIC_RATE_MASK};
+u8 bmc_support_rate_cck[4] =
+	{IEEE80211_CCK_RATE_1MB|IEEE80211_BASIC_RATE_MASK, IEEE80211_CCK_RATE_2MB|IEEE80211_BASIC_RATE_MASK,
+	IEEE80211_CCK_RATE_5MB|IEEE80211_BASIC_RATE_MASK, IEEE80211_CCK_RATE_11MB|IEEE80211_BASIC_RATE_MASK};
+
+void update_bmc_sta_support_rate(_adapter *padapter, u32 mac_id)
+{
+	struct mlme_ext_priv	*pmlmeext = &(padapter->mlmeextpriv);
+	struct mlme_ext_info	*pmlmeinfo = &(pmlmeext->mlmext_info);
+
+	if(pmlmeext->cur_wireless_mode & WIRELESS_11B)
+	{
+		// Only B, B/G, and B/G/N AP could use CCK rate
+		_memcpy((pmlmeinfo->FW_sta_info[mac_id].SupportedRates), bmc_support_rate_cck, 4);
+	}
+	else
+	{
+		_memcpy((pmlmeinfo->FW_sta_info[mac_id].SupportedRates), bmc_support_rate_ofdm, 4);
+	}
 }
 
 int update_sta_support_rate(_adapter *padapter, u8* pvar_ie, uint var_ie_len, int cam_idx)

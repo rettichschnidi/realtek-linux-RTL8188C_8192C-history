@@ -1,20 +1,23 @@
 /******************************************************************************
-* rtw_security.c                                                                                                                                 *
-*                                                                                                                                          *
-* Description :                                                                                                                       *
-*                                                                                                                                           *
-* Author :                                                                                                                       *
-*                                                                                                                                         *
-* History :                                                          
-*
-*                                        
-*                                                                                                                                       *
-* Copyright 2007, Realtek Corp.                                                                                                  *
-*                                                                                                                                        *
-* The contents of this file is the sole property of Realtek Corp.  It can not be                                     *
-* be used, copied or modified without written permission from Realtek Corp.                                         *
-*                                                                                                                                          *
-*******************************************************************************/
+ *
+ * Copyright(c) 2007 - 2011 Realtek Corporation. All rights reserved.
+ *                                        
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
+ *
+ *
+ 
+******************************************************************************/
 #define  _RTW_SECURITY_C_
 
 #include <drv_conf.h>
@@ -164,7 +167,7 @@ void wep_encrypt(_adapter *padapter, u8 *pxmitframe)
 	unsigned char	crc[4];
 	struct arc4context	 mycontext;
 
-	sint 			curfragnum,length;
+	sint	curfragnum,length;
 	u32	keylength;
 
 	u8	*pframe, *payload,*iv;    //,*wepkey
@@ -179,7 +182,7 @@ _func_enter_;
 	if(((struct xmit_frame*)pxmitframe)->buf_addr==NULL)
 		return;
 
-#ifdef USB_TX_AGGREGATION_92C
+#ifdef USB_TX_AGGREGATION
 	pframe = ((struct xmit_frame*)pxmitframe)->buf_addr + TXDESC_SIZE +
 		 (((struct xmit_frame*)pxmitframe)->pkt_offset * PACKET_OFFSET_SZ);
 #else
@@ -660,7 +663,7 @@ _func_enter_;
 	if(((struct xmit_frame*)pxmitframe)->buf_addr==NULL)
 		return _FAIL;
 
-#ifdef USB_TX_AGGREGATION_92C
+#ifdef USB_TX_AGGREGATION
 	pframe = ((struct xmit_frame*)pxmitframe)->buf_addr + TXDESC_SIZE +
 		 (((struct xmit_frame*)pxmitframe)->pkt_offset * PACKET_OFFSET_SZ);
 #else
@@ -676,7 +679,7 @@ _func_enter_;
 		}
 		else
 		{
-		stainfo=get_stainfo(&padapter->stapriv ,&pattrib->ra[0] );
+			stainfo=get_stainfo(&padapter->stapriv ,&pattrib->ra[0] );
 		}	
 		
 		if (stainfo!=NULL){
@@ -1495,7 +1498,7 @@ _func_enter_;
 	if(((struct xmit_frame*)pxmitframe)->buf_addr==NULL)
 		return _FAIL;
 
-#ifdef USB_TX_AGGREGATION_92C
+#ifdef USB_TX_AGGREGATION
 	pframe = ((struct xmit_frame*)pxmitframe)->buf_addr + TXDESC_SIZE +
 		 (((struct xmit_frame*)pxmitframe)->pkt_offset * PACKET_OFFSET_SZ);
 #else
@@ -1511,7 +1514,7 @@ _func_enter_;
 		}
 		else
 		{
-		stainfo=get_stainfo(&padapter->stapriv ,&pattrib->ra[0] );
+			stainfo=get_stainfo(&padapter->stapriv ,&pattrib->ra[0] );
 		}	
 		
 		if (stainfo!=NULL){

@@ -1,3 +1,23 @@
+/******************************************************************************
+ *
+ * Copyright(c) 2007 - 2011 Realtek Corporation. All rights reserved.
+ *                                        
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
+ *
+ *
+ 
+******************************************************************************/
 #ifndef __RTW_CMD_H_
 #define __RTW_CMD_H_
 
@@ -75,7 +95,11 @@
 		u8	lbkevt_num;
 		u8	*cmdevt_parm;		
 #endif		
+		#ifdef USE_ATOMIC_EVENT_SEQ
+		ATOMIC_T event_seq;
+		#else
 		u8	event_seq;
+		#endif
 		u8	*evt_buf;	//shall be non-paged, and 4 bytes aligned		
 		u8	*evt_allocated_buf;
 		u32	evt_done_cnt;
@@ -131,8 +155,12 @@ enum rtw_drvextra_cmd_id
 {	
 	NONE_WK_CID,
 	DYNAMIC_CHK_WK_CID,
+	DM_CTRL_WK_CID,
+	PBC_POLLING_WK_CID,
+	POWER_SAVING_CTRL_WK_CID,//IPS,AUTOSuspend
 	LPS_CTRL_WK_CID,
 	ANT_SELECT_WK_CID,
+	P2P_PS_WK_CID,
 	MAX_WK_CID
 };
 
@@ -882,8 +910,10 @@ extern u8 dynamic_chk_wk_cmd(_adapter *adapter);
 u8 lps_ctrl_wk_cmd(_adapter*padapter, u8 lps_ctrl_type, u8 enqueue);
 #endif
 #ifdef CONFIG_ANTENNA_DIVERSITY
-u8 antenna_select_cmd(_adapter*padapter, u8 antenna);
+extern  u8 antenna_select_cmd(_adapter*padapter, u8 antenna,u8 enqueue);
 #endif
+
+extern u8 rtw_ps_cmd(_adapter*padapter);
 
 u8 drvextra_cmd_hdl(_adapter *padapter, unsigned char *pbuf);
 

@@ -1,20 +1,22 @@
 /******************************************************************************
-* osdep_service.c                                                                                                                                 *
-*                                                                                                                                          *
-* Description :                                                                                                                       *
-*                                                                                                                                           *
-* Author :                                                                                                                       *
-*                                                                                                                                         *
-* History :                                                          
-*
-*                                        
-*                                                                                                                                       *
-* Copyright 2007, Realtek Corp.                                                                                                  *
-*                                                                                                                                        *
-* The contents of this file is the sole property of Realtek Corp.  It can not be                                     *
-* be used, copied or modified without written permission from Realtek Corp.                                         *
-*                                                                                                                                          *
-*******************************************************************************/
+ *
+ * Copyright(c) 2007 - 2011 Realtek Corporation. All rights reserved.
+ *                                        
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
+ *
+ *
+ ******************************************************************************/
 
 
 #define _OSDEP_SERVICE_C_
@@ -23,16 +25,39 @@
 #include <osdep_service.h>
 #include <drv_types.h>
 #include <recv_osdep.h>
+#include <linux/vmalloc.h>
 
 
 #define RT_TAG	'1178'
 
-u8* _zmalloc(u32 sz)
+#ifdef MEMORY_LEAK_DEBUG
+#ifdef PLATFORM_LINUX
+#include <asm/atomic.h>
+atomic_t _malloc_cnt = ATOMIC_INIT(0);
+atomic_t _malloc_size = ATOMIC_INIT(0);
+#endif
+#endif /* MEMORY_LEAK_DEBUG */
+
+
+inline u8* _rtw_vmalloc(u32 sz)
+{
+	u8 	*pbuf;
+#ifdef PLATFORM_LINUX	
+	pbuf = vmalloc(sz);	
+#endif	
+	
+#ifdef PLATFORM_WINDOWS
+	NdisAllocateMemoryWithTag(&pbuf,sz, RT_TAG);	
+#endif
+
+	return pbuf;	
+}
+
+inline u8* _rtw_zvmalloc(u32 sz)
 {
 	u8 	*pbuf;
 #ifdef PLATFORM_LINUX
-	// kzalloc(sz, GFP_KERNEL);
-	pbuf = 	kmalloc(sz, /*GFP_KERNEL*/GFP_ATOMIC);
+	pbuf = _rtw_vmalloc(sz);
 	if (pbuf != NULL)
 		memset(pbuf, 0, sz);
 #endif	
@@ -44,10 +69,20 @@ u8* _zmalloc(u32 sz)
 #endif
 
 	return pbuf;	
+	}
+
+inline void _rtw_vmfree(u8 *pbuf, u32 sz)
+{
+#ifdef	PLATFORM_LINUX
+	vfree(pbuf);
+#endif	
 	
+#ifdef PLATFORM_WINDOWS
+	NdisFreeMemory(pbuf,sz, 0);
+#endif
 }
 
-u8* _malloc(u32 sz)
+u8* _rtw_malloc(u32 sz)
 {
 
 	u8 	*pbuf=NULL;
@@ -58,7 +93,7 @@ u8* _malloc(u32 sz)
 		pbuf = (u8 *)dvr_malloc(sz);
 	else
 #endif
-		pbuf = 	kmalloc(sz, /*GFP_KERNEL*/GFP_ATOMIC);
+		pbuf = kmalloc(sz, /*GFP_KERNEL*/GFP_ATOMIC);
 
 #endif	
 	
@@ -68,11 +103,41 @@ u8* _malloc(u32 sz)
 
 #endif
 
+#ifdef MEMORY_LEAK_DEBUG
+#ifdef PLATFORM_LINUX
+	if ( pbuf != NULL) {
+		atomic_inc(&_malloc_cnt);
+		atomic_add(sz, &_malloc_size);
+	}
+#endif
+#endif /* MEMORY_LEAK_DEBUG */
+
 	return pbuf;	
 	
 }
 
-void	_mfree(u8 *pbuf, u32 sz)
+
+u8* _rtw_zmalloc(u32 sz)
+{
+	u8 	*pbuf = _rtw_malloc(sz);
+
+	if (pbuf != NULL) {
+
+#ifdef PLATFORM_LINUX
+		memset(pbuf, 0, sz);
+#endif	
+	
+#ifdef PLATFORM_WINDOWS
+		NdisFillMemory(pbuf, sz, 0);
+#endif
+
+	}
+
+	return pbuf;	
+	
+}
+
+void	_rtw_mfree(u8 *pbuf, u32 sz)
 {
 
 #ifdef	PLATFORM_LINUX
@@ -91,8 +156,58 @@ void	_mfree(u8 *pbuf, u32 sz)
 
 #endif
 	
+#ifdef MEMORY_LEAK_DEBUG
+#ifdef PLATFORM_LINUX
+	atomic_dec(&_malloc_cnt);
+	atomic_sub(sz, &_malloc_size);
+#endif
+#endif /* MEMORY_LEAK_DEBUG */
 	
 }
+
+
+#ifdef DBG_MEM_ALLOC
+inline u8* dbg_rtw_vmalloc(u32 sz, const char *func, int line)
+{
+	DBG_871X("DBG_MEM_ALLOC %s:%d %s(%d)\n", func,  line, __FUNCTION__, (sz));
+	return _rtw_vmalloc((sz));
+}
+
+inline u8* dbg_rtw_zvmalloc(u32 sz, const char *func, int line)
+{
+	DBG_871X("DBG_MEM_ALLOC %s:%d %s(%d)\n", func, line, __FUNCTION__, (sz)); 
+	return _rtw_zvmalloc((sz)); 
+}
+
+inline void dbg_rtw_vmfree(u8 *pbuf, u32 sz, const char *func, int line)
+{
+	DBG_871X("DBG_MEM_ALLOC %s:%d %s(%p,%d)\n",  func, line, __FUNCTION__, (pbuf), (sz));
+	_rtw_vmfree((pbuf), (sz)); 
+}
+
+inline u8* dbg_rtw_malloc(u32 sz, const char *func, int line) 
+{
+	if((sz)>4096) 
+		DBG_871X("DBG_MEM_ALLOC !!!!!!!!!!!!!! %s:%d %s(%d)\n", func, line, __FUNCTION__, (sz)); 
+	return _rtw_malloc((sz)); 
+}
+
+inline u8* dbg_rtw_zmalloc(u32 sz, const char *func, int line)
+{
+	if((sz)>4096)
+		DBG_871X("DBG_MEM_ALLOC !!!!!!!!!!!!!! %s:%d %s(%d)\n", func, line, __FUNCTION__, (sz));
+	return _rtw_zmalloc((sz));
+}
+
+inline void dbg_rtw_mfree(u8 *pbuf, u32 sz, const char *func, int line)
+{
+	if((sz)>4096)
+		DBG_871X("DBG_MEM_ALLOC !!!!!!!!!!!!!! %s:%d %s(%p,%d)\n", func, line, __FUNCTION__, (pbuf), (sz));
+	_rtw_mfree((pbuf), (sz));
+}
+#endif
+
+
 void _memcpy(void* dst, void* src, u32 sz)
 {
 
@@ -289,8 +404,8 @@ u32 _down_sema(_sema *sema)
 	
 	if (down_interruptible(sema))
 		return _FAIL;
-    else
-    	return _SUCCESS;
+	else
+		return _SUCCESS;
 
 #endif    	
 
@@ -312,22 +427,26 @@ u32 _down_sema(_sema *sema)
 
 
 
-void	_rwlock_init(_rwlock *prwlock)
+void	_rtw_mutex_init(_mutex *pmutex)
 {
 #ifdef PLATFORM_LINUX
 
-	//init_MUTEX(prwlock);
-	sema_init(prwlock, 1);
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37))
+	mutex_init(pmutex);
+#else
+	init_MUTEX(pmutex);
+#endif
 
 #endif
+
 #ifdef PLATFORM_OS_XP
 
-	KeInitializeMutex(prwlock, 0);
+	KeInitializeMutex(pmutex, 0);
 
 #endif
 
 #ifdef PLATFORM_OS_CE
-	*prwlock =  CreateMutex( NULL, _FALSE, NULL);
+	*pmutex =  CreateMutex( NULL, _FALSE, NULL);
 #endif
 }
 
@@ -448,12 +567,10 @@ u32	  _queue_empty(_queue	*pqueue)
 
 u32 end_of_queue_search(_list *head, _list *plist)
 {
-
 	if (head == plist)
 		return _TRUE;
 	else
 		return _FALSE;
-		
 }
 
 
@@ -461,21 +578,52 @@ u32	get_current_time(void)
 {
 	
 #ifdef PLATFORM_LINUX
-
 	return jiffies;
-
 #endif	
-	
-#ifdef PLATFORM_WINDOWS
 
+#ifdef PLATFORM_WINDOWS
 	LARGE_INTEGER	SystemTime;
 	NdisGetCurrentSystemTime(&SystemTime);
 	return (u32)(SystemTime.LowPart);// count of 100-nanosecond intervals 
+#endif
+}
 
+inline u32 systime_to_ms(u32 systime)
+{
+#ifdef PLATFORM_LINUX
+	return systime*1000/HZ;
+#endif	
+	
+#ifdef PLATFORM_WINDOWS
+	return systime /10000 ; 
+#endif
+}
+
+// the input parameter start use the same unit as returned by get_current_time
+inline s32 get_passing_time_ms(u32 start)
+{
+#ifdef PLATFORM_LINUX
+	return systime_to_ms(jiffies-start);
+#endif
+
+#ifdef PLATFORM_WINDOWS
+	LARGE_INTEGER	SystemTime;
+	NdisGetCurrentSystemTime(&SystemTime);
+	return systime_to_ms((u32)(SystemTime.LowPart) - start) ;
+#endif
+}
+
+inline s32 get_time_interval_ms(u32 start, u32 end)
+{
+#ifdef PLATFORM_LINUX
+	return systime_to_ms(end-start);
 #endif
 	
-	
+#ifdef PLATFORM_WINDOWS
+	return systime_to_ms(end-start);
+#endif
 }
+	
 
 void sleep_schedulable(int ms)	
 {
@@ -576,5 +724,173 @@ void udelay_os(int us)
 
 #endif
 
+}
+
+#define RTW_SUSPEND_LOCK_NAME "rtw_wifi"
+
+#ifdef CONFIG_WAKELOCK
+static struct wake_lock rtw_suspend_lock;
+#elif defined(CONFIG_ANDROID_POWER)
+static android_suspend_lock_t rtw_suspend_lock ={
+	.name = RTW_SUSPEND_LOCK_NAME
+};
+#endif
+
+inline void rtw_suspend_lock_init()
+{
+	#if  defined(CONFIG_WAKELOCK) || defined(CONFIG_ANDROID_POWER)
+	DBG_871X("##########%s ###########\n", __FUNCTION__);
+	#endif
+
+	#ifdef CONFIG_WAKELOCK
+	wake_lock_init(&rtw_suspend_lock, WAKE_LOCK_SUSPEND, RTW_SUSPEND_LOCK_NAME);
+	#elif defined(CONFIG_ANDROID_POWER)
+	android_init_suspend_lock(&rtw_suspend_lock);
+	#endif
+	
+}
+
+inline void rtw_suspend_lock_uninit()
+{
+
+	#if  defined(CONFIG_WAKELOCK) || defined(CONFIG_ANDROID_POWER)
+	DBG_871X("##########%s###########\n", __FUNCTION__);
+	if(rtw_suspend_lock.link.next == LIST_POISON1 || rtw_suspend_lock.link.prev == LIST_POISON2) {
+		DBG_871X("##########%s########### list poison!!\n", __FUNCTION__);
+		return;	
+	}
+	#endif
+	
+	#ifdef CONFIG_WAKELOCK
+	wake_lock_destroy(&rtw_suspend_lock);
+	#elif defined(CONFIG_ANDROID_POWER)
+	android_uninit_suspend_lock(&rtw_suspend_lock);
+	#endif
+}
+
+
+inline void rtw_lock_suspend()
+{
+
+	#if  defined(CONFIG_WAKELOCK) || defined(CONFIG_ANDROID_POWER)
+	//DBG_871X("##########%s###########\n", __FUNCTION__);
+	if(rtw_suspend_lock.link.next == LIST_POISON1 || rtw_suspend_lock.link.prev == LIST_POISON2) {
+		DBG_871X("##########%s########### list poison!!\n", __FUNCTION__);
+		return;	
+	}
+	#endif
+	
+	#ifdef CONFIG_WAKELOCK
+	wake_lock(&rtw_suspend_lock);
+	#elif defined(CONFIG_ANDROID_POWER)
+	android_lock_suspend(&rtw_suspend_lock);
+	#endif
+}
+
+inline void rtw_unlock_suspend()
+{
+	#if  defined(CONFIG_WAKELOCK) || defined(CONFIG_ANDROID_POWER)
+	//DBG_871X("##########%s###########\n", __FUNCTION__);
+	if(rtw_suspend_lock.link.next == LIST_POISON1 || rtw_suspend_lock.link.prev == LIST_POISON2) {
+		DBG_871X("##########%s########### list poison!!\n", __FUNCTION__);
+		return;	
+	}
+	#endif
+	
+	#ifdef CONFIG_WAKELOCK
+	wake_unlock(&rtw_suspend_lock);
+	#elif defined(CONFIG_ANDROID_POWER)
+	android_unlock_suspend(&rtw_suspend_lock);
+	#endif
+}
+
+
+inline void ATOMIC_SET(ATOMIC_T *v, int i)
+{
+	#ifdef PLATFORM_LINUX
+	atomic_set(v,i);
+	#elif defined(PLATFORM_WINDOWS)
+	*v=i;// other choice????
+	#endif
+}
+
+inline int ATOMIC_READ(ATOMIC_T *v)
+{
+	#ifdef PLATFORM_LINUX
+	return atomic_read(v);
+	#elif defined(PLATFORM_WINDOWS)
+	return *v; // other choice????
+	#endif
+}
+
+inline void ATOMIC_ADD(ATOMIC_T *v, int i)
+{
+	#ifdef PLATFORM_LINUX
+	atomic_add(i,v);
+	#elif defined(PLATFORM_WINDOWS)
+	InterlockedAdd(v,i);
+	#endif
+}
+inline void ATOMIC_SUB(ATOMIC_T *v, int i)
+{
+	#ifdef PLATFORM_LINUX
+	atomic_sub(i,v);
+	#elif defined(PLATFORM_WINDOWS)
+	InterlockedAdd(v,-i);
+	#endif
+}
+
+inline void ATOMIC_INC(ATOMIC_T *v)
+{
+	#ifdef PLATFORM_LINUX
+	atomic_inc(v);
+	#elif defined(PLATFORM_WINDOWS)
+	InterlockedIncrement(v);
+	#endif
+}
+
+inline void ATOMIC_DEC(ATOMIC_T *v)
+{
+	#ifdef PLATFORM_LINUX
+	atomic_dec(v);
+	#elif defined(PLATFORM_WINDOWS)
+	InterlockedDecrement(v);
+	#endif
+}
+
+inline int ATOMIC_ADD_RETURN(ATOMIC_T *v, int i)
+{
+	#ifdef PLATFORM_LINUX
+	return atomic_add_return(i,v);
+	#elif defined(PLATFORM_WINDOWS)
+	return InterlockedAdd(v,i);
+	#endif
+}
+
+inline int ATOMIC_SUB_RETURN(ATOMIC_T *v, int i)
+{
+	#ifdef PLATFORM_LINUX
+	return atomic_sub_return(i,v);
+	#elif defined(PLATFORM_WINDOWS)
+	return InterlockedAdd(v,-i);
+	#endif
+}
+
+inline int ATOMIC_INC_RETURN(ATOMIC_T *v)
+{
+	#ifdef PLATFORM_LINUX
+	return atomic_inc_return(v);
+	#elif defined(PLATFORM_WINDOWS)
+	return InterlockedIncrement(v);
+	#endif
+}
+
+inline int ATOMIC_DEC_RETURN(ATOMIC_T *v)
+{
+	#ifdef PLATFORM_LINUX
+	return atomic_dec_return(v);
+	#elif defined(PLATFORM_WINDOWS)
+	return InterlockedDecrement(v);
+	#endif
 }
 

@@ -1,6 +1,25 @@
 /******************************************************************************
+ *
+ * Copyright(c) 2007 - 2011 Realtek Corporation. All rights reserved.
+ *                                        
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
+ *
+ *
+ 
+******************************************************************************/
+/******************************************************************************
  * 
- *     (c) Copyright  2008, RealTEK Technologies Inc. All Rights Reserved.
  * 
  * Module:	rtl8192c_rf6052.c	( Source C File)
  * 
@@ -599,55 +618,66 @@ phy_RF6052_Config_ParaFile(
 	u8					eRFPath;		
 	BB_REGISTER_DEFINITION_T	*pPhyReg;	
 
-	int				rtStatus = _SUCCESS;
-	HAL_DATA_TYPE			*pHalData = GET_HAL_DATA(Adapter);
-	static u8				sz88CRadioAFile[] = RTL8188C_PHY_RADIO_A;	
-	static u8				sz88CRadioBFile[] = RTL8188C_PHY_RADIO_B;
+	int					rtStatus = _SUCCESS;
+	HAL_DATA_TYPE		*pHalData = GET_HAL_DATA(Adapter);
+	static char			sz88CRadioAFile[] = RTL8188C_PHY_RADIO_A;	
+	static char			sz88CRadioBFile[] = RTL8188C_PHY_RADIO_B;
 #if DEV_BUS_TYPE==DEV_BUS_USB_INTERFACE	
-	static u8				sz88CRadioAFile_mCard[] = RTL8188C_PHY_RADIO_A_mCard;	
-	static u8				sz88CRadioBFile_mCard[] = RTL8188C_PHY_RADIO_B_mCard;
-	static u8				sz88CRadioAFile_HP[] = RTL8188C_PHY_RADIO_A_HP;	
+	static char			sz88CRadioAFile_mCard[] = RTL8188C_PHY_RADIO_A_mCard;	
+	static char			sz88CRadioBFile_mCard[] = RTL8188C_PHY_RADIO_B_mCard;
+	static char			sz88CRadioAFile_HP[] = RTL8188C_PHY_RADIO_A_HP;	
 #endif
-	static u8				sz92CRadioAFile[] = RTL8192C_PHY_RADIO_A;	
-	static u8				sz92CRadioBFile[] = RTL8192C_PHY_RADIO_B;
-	u8					*pszRadioAFile, *pszRadioBFile;	
+	static char			sz92CRadioAFile[] = RTL8192C_PHY_RADIO_A;	
+	static char			sz92CRadioBFile[] = RTL8192C_PHY_RADIO_B;
+	static char			sz8723RadioAFile[] = RTL8723_PHY_RADIO_A;	
+	static char			sz8723RadioBFile[] = RTL8723_PHY_RADIO_B;
+	char					*pszRadioAFile, *pszRadioBFile;	
 
-	if(IS_92C_SERIAL( pHalData->VersionID))// 88c's IPA  is different from 92c's
+
+	if(IS_HARDWARE_TYPE_8192C(Adapter))
 	{
-		if(IS_NORMAL_CHIP(pHalData->VersionID))
+		if(IS_92C_SERIAL( pHalData->VersionID))// 88c's IPA  is different from 92c's
 		{
-			pszRadioAFile = sz92CRadioAFile;
-			pszRadioBFile = sz92CRadioBFile;
+			if(IS_NORMAL_CHIP(pHalData->VersionID))
+			{
+				pszRadioAFile = sz92CRadioAFile;
+				pszRadioBFile = sz92CRadioBFile;
+			}
+			else
+			{
+				rtStatus = _FAIL;
+				return rtStatus;
+			}
 		}
 		else
 		{
-			rtStatus = _FAIL;
-			return rtStatus;
+			if(IS_NORMAL_CHIP(pHalData->VersionID))
+			{
+				pszRadioAFile = sz88CRadioAFile;
+				pszRadioBFile = sz88CRadioBFile;
+#if DEV_BUS_TYPE==DEV_BUS_USB_INTERFACE
+				if( BOARD_MINICARD == pHalData->BoardType)
+				{
+					pszRadioAFile = sz88CRadioAFile_mCard;
+					pszRadioBFile = sz88CRadioBFile_mCard;
+				}
+				else if( BOARD_USB_High_PA == pHalData->BoardType)
+				{
+					pszRadioAFile = sz88CRadioAFile_HP;
+				}
+#endif	
+			}
+			else
+			{
+				rtStatus = _FAIL;
+				return rtStatus;
+			}
 		}
 	}
-	else
+	else if(IS_HARDWARE_TYPE_8723(Adapter))
 	{
-		if(IS_NORMAL_CHIP(pHalData->VersionID))
-		{
-			pszRadioAFile = sz88CRadioAFile;
-			pszRadioBFile = sz88CRadioBFile;
-#if DEV_BUS_TYPE==DEV_BUS_USB_INTERFACE
-			if( BOARD_MINICARD == pHalData->BoardType)
-			{
-				pszRadioAFile = sz88CRadioAFile_mCard;
-				pszRadioBFile = sz88CRadioBFile_mCard;
-			}
-			else if( BOARD_USB_High_PA == pHalData->BoardType)
-			{
-				pszRadioAFile = sz88CRadioAFile_HP;
-			}
-#endif	
-		}
-		else
-		{
-			rtStatus = _FAIL;
-			return rtStatus;
-		}
+		pszRadioAFile = sz8723RadioAFile;
+		pszRadioBFile = sz8723RadioBFile;	
 	}
 
 	//3//-----------------------------------------------------------------

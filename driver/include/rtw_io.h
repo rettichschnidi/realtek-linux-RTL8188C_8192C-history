@@ -1,4 +1,23 @@
-
+/******************************************************************************
+ *
+ * Copyright(c) 2007 - 2011 Realtek Corporation. All rights reserved.
+ *                                        
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
+ *
+ *
+ 
+******************************************************************************/
 #ifndef _RTW_IO_H_
 #define _RTW_IO_H_
 
@@ -150,7 +169,7 @@ struct	_io_ops {
 		
 		void (*_sync_irp_protocol_rw)(struct io_queue *pio_q);
 
-		
+
 		u32 (*_read_interrupt)(struct intf_hdl *pintfhdl, u32 addr);
 
 		u32 (*_read_port)(struct intf_hdl *pintfhdl, u32 addr, u32 cnt, u8 *pmem);
@@ -236,6 +255,7 @@ struct	intf_hdl {
 */
 	_adapter *padapter;
 	struct dvobj_priv *pintf_dev;//	pointer to &(padapter->dvobjpriv);
+	//_mutex io_mutex;
 	struct _io_ops	io_ops;
 
 };

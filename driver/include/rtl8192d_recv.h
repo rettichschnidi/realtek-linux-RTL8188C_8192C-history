@@ -1,3 +1,23 @@
+/******************************************************************************
+ *
+ * Copyright(c) 2007 - 2011 Realtek Corporation. All rights reserved.
+ *                                        
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
+ *
+ *
+ 
+******************************************************************************/
 #ifndef _RTL8192D_RECV_H_
 #define _RTL8192D_RECV_H_
 
@@ -29,19 +49,7 @@
 #define RECV_BLK_CNT 16
 #define RECV_BLK_TH RECV_BLK_CNT
 
-//#define MAX_RECVBUF_SZ 2048 // 2k
-//#define MAX_RECVBUF_SZ (8192) // 8K
-//#define MAX_RECVBUF_SZ (16384) //16K
-//#define MAX_RECVBUF_SZ (16384 + 1024) //16K + 1k
-//#define MAX_RECVBUF_SZ (30720) //30k
-//#define MAX_RECVBUF_SZ (30720 + 1024) //30k+1k
-//#define MAX_RECVBUF_SZ (32768) // 32k
-
-#if defined(CONFIG_SDIO_HCI)
-
-#define MAX_RECVBUF_SZ (50000) //30k //(2048)//(30720) //30k
-
-#elif defined(CONFIG_USB_HCI)
+#if defined(CONFIG_USB_HCI)
 
 #ifdef PLATFORM_OS_CE
 #define MAX_RECVBUF_SZ (8192+1024) // 8K+1k
@@ -52,6 +60,12 @@
 #define MAX_RECVBUF_SZ (15360) // 15k < 16k
 #endif
 
+#elif defined(CONFIG_PCI_HCI)
+#define MAX_RECVBUF_SZ (9100)
+
+#define RX_MPDU_QUEUE				0
+#define RX_CMD_QUEUE				1
+#define RX_MAX_QUEUE				2
 #endif
 
 #define RECV_BULK_IN_ADDR		0x80
@@ -122,7 +136,7 @@ typedef struct _Phy_CCK_Rx_Status_Report_8192cd
 // Rx smooth factor
 #define	Rx_Smooth_Factor (20)
 
-
+#ifdef CONFIG_USB_HCI
 typedef struct _INTERRUPT_MSG_FORMAT_EX{
 	unsigned int C2H_MSG0;
 	unsigned int C2H_MSG1;
@@ -137,9 +151,15 @@ void rtl8192du_init_recvbuf(_adapter *padapter, struct recv_buf *precvbuf);
 int	rtl8192du_init_recv_priv(_adapter * padapter);
 void	rtl8192du_free_recv_priv(_adapter * padapter);
 void rtl8192du_update_recvframe_attrib_from_recvstat(union recv_frame *precvframe, struct recv_stat *prxstat);
+#endif
+
+#ifdef CONFIG_PCI_HCI
+int	rtl8192de_init_recv_priv(_adapter * padapter);
+void rtl8192de_free_recv_priv(_adapter * padapter);
+void rtl8192de_update_recvframe_attrib_from_recvstat(union recv_frame *precvframe, struct recv_stat *prxstat);
+#endif
 
 void rtl8192d_query_rx_phy_status(union recv_frame *prframe, struct phy_stat *pphy_stat, BOOLEAN bPacketMatchBSSID);
-
 void rtl8192d_process_phy_info(_adapter *padapter, void *prframe);
 
 #endif

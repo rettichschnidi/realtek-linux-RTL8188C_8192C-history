@@ -1,20 +1,23 @@
 /******************************************************************************
-* rtl8192c_cmd.c                                                                                                                                 *
-*                                                                                                                                          *
-* Description :                                                                                                                       *
-*                                                                                                                                           *
-* Author :                                                                                                                       *
-*                                                                                                                                         *
-* History :                                                          
-*
-*                                        
-*                                                                                                                                       *
-* Copyright 2010, Realtek Corp.                                                                                                  *
-*                                                                                                                                        *
-* The contents of this file is the sole property of Realtek Corp.  It can not be                                     *
-* be used, copied or modified without written permission from Realtek Corp.                                         *
-*                                                                                                                                          *
-*******************************************************************************/
+ *
+ * Copyright(c) 2007 - 2011 Realtek Corporation. All rights reserved.
+ *                                        
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
+ *
+ *
+ 
+******************************************************************************/
 #define _RTL8192C_CMD_C_
 
 #include <drv_conf.h>
@@ -429,7 +432,7 @@ _func_exit_;
 void rtl8192c_Add_RateATid(PADAPTER pAdapter, u32 bitmap, u8 arg)
 {	
 	
-	HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(pAdapter);	
+	HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(pAdapter);
 		
 	if(pHalData->fw_ractrl == _TRUE)
 	{
@@ -589,7 +592,7 @@ void ConstructPSPoll(_adapter *padapter, u8 *pframe, u32 *pLength)
 	SetFrameSubType(pframe, WIFI_PSPOLL);
 
 	// AID.
-	SetDuration(pframe, (pmlmeinfo->aid| 0xc000));
+	SetDuration(pframe, (pmlmeinfo->aid | 0xc000));
 
 	// BSSID.
 	_memcpy(pwlanhdr->addr1, get_my_bssid(&(pmlmeinfo->network)), ETH_ALEN);
@@ -793,7 +796,7 @@ void SetFwRsvdPagePkt(PADAPTER Adapter, BOOLEAN bDLFinished)
 
 	DBG_871X("%s\n", __FUNCTION__);
 
-	ReservedPagePacket = (u8*)_malloc(1000);
+	ReservedPagePacket = (u8*)rtw_malloc(1000);
 	if(ReservedPagePacket == NULL){
 		DBG_871X("%s(): alloc ReservedPagePacket fail !!!\n", __FUNCTION__);
 		return;
@@ -919,7 +922,7 @@ void SetFwRsvdPagePkt(PADAPTER Adapter, BOOLEAN bDLFinished)
 		FillH2CCmd(Adapter, RSVD_PAGE_EID, sizeof(RsvdPageLoc), (u8 *)&RsvdPageLoc);
 	}
 
-	_mfree(ReservedPagePacket,1000);
+	rtw_mfree(ReservedPagePacket,1000);
 
 }
 
@@ -999,4 +1002,97 @@ _func_enter_;
 	
 _func_exit_;
 }
+
+#if ( P2P_INCLUDED == 1 )
+void rtl8192c_set_p2p_ps_offload_cmd(_adapter* padapter, u8 p2p_ps_state)
+{
+	HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(padapter);	
+	struct wifidirect_info	*pwdinfo = &( padapter->wdinfo );
+	struct P2P_PS_Offload_t	*p2p_ps_offload = &pHalData->p2p_ps_offload;
+	u8	i;
+	u16	ctwindow;
+
+_func_enter_;
+
+	switch(p2p_ps_state)
+	{
+		case P2P_PS_DISABLE:
+			DBG_8192C("P2P_PS_DISABLE \n");
+			_memset(p2p_ps_offload, 0 ,1);
+			break;
+		case P2P_PS_ENABLE:
+			DBG_8192C("P2P_PS_ENABLE \n");
+			// check previous p2p_ps state
+			if(pwdinfo->p2p_ps == P2P_PS_SCAN)
+			{
+				p2p_ps_offload->discovery = 0;
+			}
+			else
+			{
+				if(pwdinfo->opp_ps == 1)
+				{
+					// update CTWindow value.
+					if( pwdinfo->ctwindow > 0 )
+					{
+						p2p_ps_offload->CTWindow_En = 1;
+						ctwindow = pwdinfo->ctwindow;
+						write16(padapter, REG_ATIMWND, ctwindow);
+					}
+				}
+
+				// hw only support 2 set of NoA
+				for( i=0 ; i<pwdinfo->noa_num ; i++)
+				{
+					// To control the register setting for which NOA
+					write8(padapter, 0x5CF, (i << 4));
+					if(i == 0)
+						p2p_ps_offload->NoA0_En = 1;
+					else
+						p2p_ps_offload->NoA1_En = 1;
+
+					// config P2P NoA Descriptor Register
+					write8(padapter, 0x5EC, pwdinfo->noa_count[i]);
+
+					write32(padapter, 0x5E0, pwdinfo->noa_duration[i]);
+
+					write32(padapter, 0x5E4, pwdinfo->noa_interval[i]);
+
+					write32(padapter, 0x5E8, pwdinfo->noa_start_time[i]);
+				}
+
+				if( (pwdinfo->opp_ps == 1) || (pwdinfo->noa_num > 0) )
+				{
+					// rst p2p circuit
+					write8(padapter, REG_DUAL_TSF_RST, BIT(4));
+
+					p2p_ps_offload->Offload_En = 1;
+
+					if(pwdinfo->role == P2P_ROLE_GO)
+					{
+						p2p_ps_offload->role= 1;
+						p2p_ps_offload->AllStaSleep = 0;
+					}
+					else
+					{
+						p2p_ps_offload->role= 0;
+					}
+
+					p2p_ps_offload->discovery = 0;
+				}
+			}
+			break;
+		case P2P_PS_SCAN:
+			DBG_8192C("P2P_PS_SCAN \n");
+			p2p_ps_offload->discovery = 1;
+			break;
+		default:
+			break;
+	}
+
+	FillH2CCmd(padapter, P2P_PS_OFFLOAD_EID, 1, (u8 *)p2p_ps_offload);
+
+_func_exit_;
+
+}
+#endif
 

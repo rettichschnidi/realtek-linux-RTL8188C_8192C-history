@@ -1,3 +1,23 @@
+/******************************************************************************
+ *
+ * Copyright(c) 2007 - 2011 Realtek Corporation. All rights reserved.
+ *                                        
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
+ *
+ *
+ 
+******************************************************************************/
 #ifndef __RTW_PWRCTRL_H_
 #define __RTW_PWRCTRL_H_
 
@@ -140,6 +160,15 @@ typedef enum _rt_rf_power_state
 #define	RT_CLEAR_PS_LEVEL(ppsc, _PS_FLAG)	(ppsc->cur_ps_level &= (~(_PS_FLAG)))
 #define	RT_SET_PS_LEVEL(ppsc, _PS_FLAG)		(ppsc->cur_ps_level |= _PS_FLAG)
 
+
+enum _PS_BBRegBackup_ {
+	PSBBREG_RF0 = 0,
+	PSBBREG_RF1,
+	PSBBREG_RF2,
+	PSBBREG_AFE0,
+	PSBBREG_TOTALCNT
+};
+
 struct	pwrctrl_priv {
 	_pwrlock	lock;
 	volatile u8 rpwm; // requested power state for fw
@@ -170,18 +199,12 @@ struct	pwrctrl_priv {
 	u8	const_amdpci_aspm;
 #endif
 
-	_timer 	pwr_state_check_timer;
-
 	//u8	ips_enable;//for dbg
 	//u8	lps_enable;//for dbg
-	
-	uint 	bips_processing;
-	rt_rf_power_state	inactive_pwrstate;
-	rt_rf_power_state	change_pwrstate;
+
 	uint 	ips_enter_cnts;
 	uint 	ips_leave_cnts;
-		
-	_workitem InactivePSWorkItem;
+	
 	_timer 	ips_check_timer;
 
 
@@ -193,6 +216,25 @@ struct	pwrctrl_priv {
 
 	s32		pnp_current_pwr_state;
 	u8		pnp_bstop_trx;
+
+
+	u8		bInternalAutoSuspend;
+	u8		bSupportRemoteWakeup;	
+	_timer 	pwr_state_check_timer;
+	int		pwr_state_check_inverval;
+	u8		pwr_state_check_cnts;
+	uint 		bips_processing;
+
+	rt_rf_power_state 	current_rfpwrstate;
+	rt_rf_power_state	change_rfpwrstate;
+
+	u8		wepkeymask;
+	u8		bHWPowerdown;//if support hw power down
+	u8		bHWPwrPindetect;
+	u8		bkeepfwalive;		
+	u8		brfoffbyhw;
+	unsigned long PS_BBRegBackup[PSBBREG_TOTALCNT];
+	
 };
 
 
@@ -213,6 +255,15 @@ extern void set_rpwm(_adapter * padapter, u8 val8);
 extern void LeaveAllPowerSaveMode(PADAPTER Adapter);
 void ips_enter(_adapter * padapter);
 int ips_leave(_adapter * padapter);
+void rtw_ps_processor(_adapter*padapter);
+
+#ifdef CONFIG_AUTOSUSPEND
+int autoresume_enter(_adapter* padapter);
+#endif
+#ifdef SUPPORT_HW_RFOFF_DETECTED
+rt_rf_power_state RfOnOffDetect(IN	PADAPTER pAdapter );
+#endif
+
 
 #ifdef CONFIG_LPS
 void LPS_Enter(PADAPTER padapter);

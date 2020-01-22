@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2007 - 2010 Realtek Corporation. All rights reserved.
+ * Copyright(c) 2007 - 2011 Realtek Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -174,6 +174,7 @@ ReadEFuseByte(
 	u32	value32;
 	u8	readbyte;
 	u16	retry;
+	u32 start=get_current_time();
 
 	if(bPseudoTest)
 	{
@@ -208,6 +209,8 @@ ReadEFuseByte(
 	value32 = read32(Adapter, EFUSE_CTRL);
 	
 	*pbuf = (u8)(value32 & 0xff);
+	//MSG_8192C("ReadEFuseByte _offset:%08u, in %d ms\n",_offset ,get_passing_time_ms(start));
+	
 }
 
 
@@ -651,7 +654,7 @@ u8 efuse_map_write(PADAPTER padapter, u16 addr, u16 cnts, u8 *data)
 	if ((addr + cnts) > mapLen)
 		return _FAIL;
 
-	map = _malloc(mapLen);
+	map = rtw_zmalloc(mapLen);
 	if(map == NULL){
 		return _FAIL;
 	}
@@ -661,7 +664,7 @@ u8 efuse_map_write(PADAPTER padapter, u16 addr, u16 cnts, u8 *data)
 
 	Efuse_PowerSwitch(padapter, _TRUE, _TRUE);
 
-	offset = (addr >> 3) & 0xF;
+	offset = (addr >> 3);
 	word_en = 0xF;
 	_memset(newdata, 0xFF, PGPKT_DATA_SIZE);
 	i = addr & 0x7;	// index of one package
@@ -672,19 +675,21 @@ u8 efuse_map_write(PADAPTER padapter, u16 addr, u16 cnts, u8 *data)
 		// odd start
 		if (data[idx] != map[addr+idx]) {
 			word_en &= ~BIT(i >> 1);
-			newdata[j++] = map[addr+idx-1];
-			newdata[j++] = data[idx];
+			newdata[i-1] = map[addr+idx-1];
+			newdata[i] = data[idx];
 		}
 		i++;
 		idx++;
 	}
 	do {
-		for (; i < PGPKT_DATA_SIZE; i += 2) {
+		for (; i < PGPKT_DATA_SIZE; i += 2)
+		{
+			if (cnts == idx) break;
 			if ((cnts - idx) == 1) {
 				if (data[idx] != map[addr+idx]) {
 					word_en &= ~BIT(i >> 1);
-					newdata[j++] = data[idx];
-					newdata[j++] = map[addr+idx+1];
+					newdata[i] = data[idx];
+					newdata[i+1] = map[addr+idx+1];
 				}
 				idx++;
 				break;
@@ -693,8 +698,8 @@ u8 efuse_map_write(PADAPTER padapter, u16 addr, u16 cnts, u8 *data)
 				    (data[idx+1] != map[addr+idx+1]))
 				{
 					word_en &= ~BIT(i >> 1);
-					newdata[j++] = data[idx];
-					newdata[j++] = data[idx + 1];
+					newdata[i] = data[idx];
+					newdata[i+1] = data[idx + 1];
 				}
 				idx += 2;
 			}
@@ -703,6 +708,13 @@ u8 efuse_map_write(PADAPTER padapter, u16 addr, u16 cnts, u8 *data)
 
 		if (word_en != 0xF) {
 			ret = Efuse_PgPacketWrite(padapter, offset, word_en, newdata, _FALSE);
+			printk("offset=%x \n",offset);
+			printk("word_en=%x \n",word_en);
+
+			for(i=0;i<PGPKT_DATA_SIZE;i++)
+			{
+				printk("data=%x \t",newdata[i]);
+			}
 			if (ret == _FAIL) break;
 		}
 
@@ -719,7 +731,7 @@ u8 efuse_map_write(PADAPTER padapter, u16 addr, u16 cnts, u8 *data)
 
 exit:
 
-	_mfree(map, mapLen);
+	rtw_mfree(map, mapLen);
 
 	return ret;
 }

@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2007 - 2010 Realtek Corporation. All rights reserved.
+ * Copyright(c) 2007 - 2011 Realtek Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -2282,7 +2282,7 @@ _func_enter_;
 
 	if (poid_par_priv->information_buf_len < sizeof(PGPKT_STRUCT))
 		return NDIS_STATUS_INVALID_LENGTH;
-#if 0
+
 	ppgpkt = (PPGPKT_STRUCT)poid_par_priv->information_buf;
 
 	_irqlevel_changed_(&oldirql, LOWER);
@@ -2293,29 +2293,27 @@ _func_enter_;
 			("oid_rt_pro_rw_efuse_pgpkt_hdl: Read offset=0x%x\n",\
 			ppgpkt->offset));
 
-		if (efuse_pg_packet_read(Adapter, ppgpkt->offset, ppgpkt->data) == _TRUE)
+		Efuse_PowerSwitch(Adapter, _FALSE, _TRUE);
+		if (Efuse_PgPacketRead(Adapter, ppgpkt->offset, ppgpkt->data, _FALSE) == _TRUE)
 			*poid_par_priv->bytes_rw = poid_par_priv->information_buf_len;
 		else
 			status = NDIS_STATUS_FAILURE;
+		Efuse_PowerSwitch(Adapter, _FALSE, _FALSE);
 	} else {
 		RT_TRACE(_module_mp_, _drv_notice_,
 			("oid_rt_pro_rw_efuse_pgpkt_hdl: Write offset=0x%x word_en=0x%x\n",\
 			ppgpkt->offset, ppgpkt->word_en));
 
-		if (efuse_reg_init(Adapter) == _TRUE) {
-			if (efuse_pg_packet_write(Adapter, ppgpkt->offset, ppgpkt->word_en, ppgpkt->data) == _TRUE)
-				*poid_par_priv->bytes_rw = poid_par_priv->information_buf_len;
-			else
-				status = NDIS_STATUS_FAILURE;
-			efuse_reg_uninit(Adapter);
-		} else
+		Efuse_PowerSwitch(Adapter, _TRUE, _TRUE);
+		if (Efuse_PgPacketWrite(Adapter, ppgpkt->offset, ppgpkt->word_en, ppgpkt->data, _FALSE) == _TRUE)
+			*poid_par_priv->bytes_rw = poid_par_priv->information_buf_len;
+		else
 			status = NDIS_STATUS_FAILURE;
+		Efuse_PowerSwitch(Adapter, _TRUE, _FALSE);
 	}
 
 	_irqlevel_changed_(&oldirql, RAISE);
-#else
-	status = NDIS_STATUS_NOT_SUPPORTED;
-#endif
+
 	RT_TRACE(_module_mp_, _drv_info_,
 		 ("-oid_rt_pro_rw_efuse_pgpkt_hdl: status=0x%08X\n", status));
 

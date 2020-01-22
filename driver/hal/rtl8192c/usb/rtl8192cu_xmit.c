@@ -1,20 +1,23 @@
 /******************************************************************************
-* rtl8192cu_xmit.c                                                                                                                                 *
-*                                                                                                                                          *
-* Description :                                                                                                                       *
-*                                                                                                                                           *
-* Author :                                                                                                                       *
-*                                                                                                                                         *
-* History :									*
-*                                                                                                                                       *
-*										*
-*										*
-* Copyright 2010, Realtek Corp.							*
-*                                                                                                                                        *
-* The contents of this file is the sole property of Realtek Corp.  It can not be                                     *
-* be used, copied or modified without written permission from Realtek Corp.                                         *
-*                                                                                                                                          *
-*******************************************************************************/
+ *
+ * Copyright(c) 2007 - 2011 Realtek Corporation. All rights reserved.
+ *                                        
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
+ *
+ *
+ 
+******************************************************************************/
 #define _RTL8192C_XMIT_C_
 #include <drv_conf.h>
 #include <osdep_service.h>
@@ -82,44 +85,11 @@ u32 get_ff_hwaddr(struct xmit_frame	*pxmitframe)
 		default:
 			addr = BE_QUEUE_INX;
 			break;		
-
+			
 	}
 
 	return addr;
 
-}
-
-void count_tx_stats(_adapter *padapter, struct xmit_frame *pxmitframe, int sz)
-{
-	struct sta_info *psta = NULL;
-	struct stainfo_stats *pstats = NULL;
-	struct pkt_attrib *pattrib = &pxmitframe->attrib;
-	struct xmit_priv *pxmitpriv = &padapter->xmitpriv;
-	struct mlme_priv	*pmlmepriv = &(padapter->mlmepriv);
-
-	if((pxmitframe->frame_tag&0x0f) == DATA_FRAMETAG)
-	{
-		pxmitpriv->tx_bytes += sz;
-#ifdef USB_TX_AGGREGATION_92C
-		pmlmepriv->LinkDetectInfo.NumTxOkInPeriod += pxmitframe->agg_num;
-#else
-		pmlmepriv->LinkDetectInfo.NumTxOkInPeriod++;
-#endif
-
-		psta = pxmitframe->attrib.psta;
-
-		if(psta)
-		{
-			pstats = &psta->sta_stats;
-#ifdef USB_TX_AGGREGATION_92C
-			pstats->tx_pkts += pxmitframe->agg_num;
-#else
-			pstats->tx_pkts++;
-#endif
-			pstats->tx_bytes += sz;
-		}
-	}
-	
 }
 
 void do_queue_select(_adapter	*padapter, struct pkt_attrib *pattrib)
@@ -258,6 +228,11 @@ void fill_txdesc_vcs(struct pkt_attrib *pattrib, u32 *pdw)
 			break;		
 	}
 
+	if(pattrib->vcs_mode)
+	{
+		*pdw |= cpu_to_le32(BIT(13));//ENABLE HW RTS
+	}
+
 }
 
 void fill_txdesc_phy(struct pkt_attrib *pattrib, u32 *pdw)
@@ -279,19 +254,18 @@ void fill_txdesc_phy(struct pkt_attrib *pattrib, u32 *pdw)
 	}
 }
 
-#ifdef USB_TX_AGGREGATION_92C
+#ifdef USB_TX_AGGREGATION
 static void _update_txdesc(struct xmit_frame *pxmitframe, u8 *pmem, int sz)
 {
-	uint qsel;
-
-	_adapter		*padapter = pxmitframe->padapter;
+	uint	qsel;
+	_adapter			*padapter = pxmitframe->padapter;
 	struct ht_priv		*phtpriv = &padapter->mlmepriv.htpriv;
 	struct mlme_ext_info	*pmlmeinfo = &padapter->mlmeextpriv.mlmext_info;
-
+	HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(padapter);
+	struct dm_priv	*pdmpriv = &pHalData->dmpriv;
 	struct pkt_attrib	*pattrib = &pxmitframe->attrib;
 	sint bmcst = IS_MCAST(pattrib->ra);
-
-	struct tx_desc		*ptxdesc = (struct tx_desc*)pmem;
+	struct tx_desc	*ptxdesc = (struct tx_desc*)pmem;
 
 
 	_memset(ptxdesc, 0, sizeof(struct tx_desc));
@@ -311,7 +285,7 @@ static void _update_txdesc(struct xmit_frame *pxmitframe, u8 *pmem, int sz)
 	if (pxmitframe->pkt_offset > 0)
 		ptxdesc->txdw1 |= cpu_to_le32((pxmitframe->pkt_offset << 26) & 0x7c000000);
 
-#ifdef USB_TX_AGGREGATION_92C
+#ifdef USB_TX_AGGREGATION
 	if (pxmitframe->agg_num > 1)
 		ptxdesc->txdw5 |= cpu_to_le32((pxmitframe->agg_num << 24) & 0xff000000);
 #endif
@@ -319,8 +293,7 @@ static void _update_txdesc(struct xmit_frame *pxmitframe, u8 *pmem, int sz)
 	if (pxmitframe->frame_tag == DATA_FRAMETAG)
 	{
 		//4 offset 4
-		//ptxdesc->txdw1 |= cpu_to_le32((pattrib->mac_id-4) & 0x1f);//CAM_ID(MAC_ID)
-		ptxdesc->txdw1 |= cpu_to_le32(pattrib->mac_id&0x1f);//CAM_ID(MAC_ID)
+		ptxdesc->txdw1 |= cpu_to_le32(pattrib->mac_id&0x1f);
 
 		qsel = (uint)(pattrib->qsel & 0x0000001f);
 		ptxdesc->txdw1 |= cpu_to_le32((qsel << QSEL_SHT) & 0x00001f00);
@@ -357,7 +330,10 @@ static void _update_txdesc(struct xmit_frame *pxmitframe, u8 *pmem, int sz)
 
 			ptxdesc->txdw4 |= cpu_to_le32(0x00000008);//RTS Rate=24M
 			ptxdesc->txdw5 |= cpu_to_le32(0x0001ff00);
-			ptxdesc->txdw5 |= cpu_to_le32(0x0000000b);//DataRate - 54M
+			//ptxdesc->txdw5 |= cpu_to_le32(0x0000000b);//DataRate - 54M
+
+			//use REG_INIDATA_RATE_SEL value
+			ptxdesc->txdw5 |= cpu_to_le32(pdmpriv->INIDATA_RATE[pattrib->mac_id]);
 
 			if (0)//for driver dbg
 			{
@@ -397,8 +373,7 @@ static void _update_txdesc(struct xmit_frame *pxmitframe, u8 *pmem, int sz)
 		//printk("pxmitframe->frame_tag == MGNT_FRAMETAG\n");	
 
 		//4 offset 4
-		//ptxdesc->txdw1 |= cpu_to_le32((pattrib->mac_id-4) & 0x1f);//CAM_ID(MAC_ID)
-		ptxdesc->txdw1 |= cpu_to_le32(pattrib->mac_id&0x1f);//CAM_ID(MAC_ID)
+		ptxdesc->txdw1 |= cpu_to_le32(pattrib->mac_id&0x1f);
 
 		qsel = (uint)(pattrib->qsel&0x0000001f);
 		ptxdesc->txdw1 |= cpu_to_le32((qsel << QSEL_SHT) & 0x00001f00);
@@ -467,25 +442,31 @@ static void _update_txdesc(struct xmit_frame *pxmitframe, u8 *pmem, int sz)
 }
 #endif
 
-static s32 update_txdesc(struct xmit_frame *pxmitframe, u32 *pmem, s32 sz)
+static s32 update_txdesc(struct xmit_frame *pxmitframe, u8 *pmem, s32 sz)
 {
-	int pull=0;
-	uint qsel;
-	_adapter		*padapter = pxmitframe->padapter;
+	int	pull=0;
+	uint	qsel;
+	_adapter			*padapter = pxmitframe->padapter;
 	struct mlme_priv	*pmlmepriv = &padapter->mlmepriv;		
 	struct pkt_attrib	*pattrib = &pxmitframe->attrib;
+	HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(padapter);
+	struct dm_priv	*pdmpriv = &pHalData->dmpriv;
 	struct tx_desc	*ptxdesc = (struct tx_desc *)pmem;
-	sint bmcst = IS_MCAST(pattrib->ra);
-	struct ht_priv *phtpriv = &pmlmepriv->htpriv;
-	struct mlme_ext_info *pmlmeinfo = &padapter->mlmeextpriv.mlmext_info;
+	struct ht_priv		*phtpriv = &pmlmepriv->htpriv;
+	struct mlme_ext_info	*pmlmeinfo = &padapter->mlmeextpriv.mlmext_info;
+	sint	bmcst = IS_MCAST(pattrib->ra);
+#if ( P2P_INCLUDED == 1 )
+	struct wifidirect_info*	pwdinfo = &padapter->wdinfo;
+#endif
 
+#ifndef CONFIG_USE_USB_BUFFER_ALLOC
 	if(urb_zero_packet_chk(padapter, sz)==0)
 	{
-		ptxdesc = (struct tx_desc *)(pmem+(PACKET_OFFSET_SZ>>2));
+		ptxdesc = (struct tx_desc *)(pmem+PACKET_OFFSET_SZ);
 		pull = 1;
 	}
-	
-		
+#endif
+
 	_memset(ptxdesc, 0, sizeof(struct tx_desc));
 	
 	//offset 0
@@ -509,8 +490,7 @@ static s32 update_txdesc(struct xmit_frame *pxmitframe, u32 *pmem, s32 sz)
 		//printk("pxmitframe->frame_tag == DATA_FRAMETAG\n");			
 
 		//offset 4
-		//ptxdesc->txdw1 |= cpu_to_le32((pattrib->mac_id-4)&0x1f);//CAM_ID(MAC_ID)
-		ptxdesc->txdw1 |= cpu_to_le32(pattrib->mac_id&0x1f);//CAM_ID(MAC_ID)
+		ptxdesc->txdw1 |= cpu_to_le32(pattrib->mac_id&0x1f);
 
 		qsel = (uint)(pattrib->qsel & 0x0000001f);
 		ptxdesc->txdw1 |= cpu_to_le32((qsel << QSEL_SHT) & 0x00001f00);
@@ -545,8 +525,11 @@ static s32 update_txdesc(struct xmit_frame *pxmitframe, u32 *pmem, s32 sz)
 
 			ptxdesc->txdw4 |= cpu_to_le32(0x00000008);//RTS Rate=24M
 			ptxdesc->txdw5 |= cpu_to_le32(0x0001ff00);//
-			ptxdesc->txdw5 |= cpu_to_le32(0x0000000b);//DataRate - 54M
-				
+			//ptxdesc->txdw5 |= cpu_to_le32(0x0000000b);//DataRate - 54M
+
+			//use REG_INIDATA_RATE_SEL value
+			ptxdesc->txdw5 |= cpu_to_le32(pdmpriv->INIDATA_RATE[pattrib->mac_id]);
+
               	if(0)//for driver dbg
 			{
 				ptxdesc->txdw4 |= cpu_to_le32(BIT(8));//driver uses rate
@@ -592,8 +575,7 @@ static s32 update_txdesc(struct xmit_frame *pxmitframe, u32 *pmem, s32 sz)
 		//printk("pxmitframe->frame_tag == MGNT_FRAMETAG\n");	
 		
 		//offset 4		
-		//ptxdesc->txdw1 |= cpu_to_le32((pattrib->mac_id-4)&0x1f);//CAM_ID(MAC_ID)
-		ptxdesc->txdw1 |= cpu_to_le32(pattrib->mac_id&0x1f);//CAM_ID(MAC_ID)
+		ptxdesc->txdw1 |= cpu_to_le32(pattrib->mac_id&0x1f);
 		
 		qsel = (uint)(pattrib->qsel&0x0000001f);
 		ptxdesc->txdw1 |= cpu_to_le32((qsel<<QSEL_SHT)&0x00001f00);
@@ -613,7 +595,15 @@ static s32 update_txdesc(struct xmit_frame *pxmitframe, u32 *pmem, s32 sz)
 		//offset 20
 		ptxdesc->txdw5 |= cpu_to_le32(BIT(17));//retry limit enable
 		ptxdesc->txdw5 |= cpu_to_le32(0x00180000);//retry limit = 6
-		
+#if ( P2P_INCLUDED == 1 )
+		//	Added by Albert 2011/03/17
+		//	In the P2P mode, the driver should not support the b mode.
+		//	So, the Tx packet shouldn't use the CCK rate
+		if ( pwdinfo->p2p_state != P2P_STATE_NONE )
+		{
+			ptxdesc->txdw5 |= cpu_to_le32( 0x04 );	//	Use the 6M data rate.
+		}
+#endif
 		
 	}
 	else if((pxmitframe->frame_tag&0x0f) == TXAGG_FRAMETAG)
@@ -670,16 +660,15 @@ void dump_xframe(_adapter *padapter, struct xmit_frame *pxmitframe)
 	struct xmit_priv *pxmitpriv = &padapter->xmitpriv;
 	struct security_priv *psecuritypriv = &padapter->securitypriv;
 
-#ifndef CONFIG_AP_MODE
 	if ((pxmitframe->frame_tag == DATA_FRAMETAG) &&
 	    (pxmitframe->attrib.ether_type != 0x0806) &&
 	    (pxmitframe->attrib.ether_type != 0x888e) &&
 	    (pxmitframe->attrib.dhcp_pkt != 1))
 	{
-		issue_addbareq_cmd(padapter, pxmitframe);
-	}	
-#endif
-
+		if(padapter->mlmepriv.LinkDetectInfo.bBusyTraffic == _TRUE)
+			issue_addbareq_cmd(padapter, pxmitframe);
+	}
+	
 	mem_addr = pxmitframe->buf_addr;
 
        RT_TRACE(_module_rtl871x_xmit_c_,_drv_info_,("dump_xframe()\n"));
@@ -698,7 +687,7 @@ void dump_xframe(_adapter *padapter, struct xmit_frame *pxmitframe)
 			sz = pattrib->last_txcmdsz;
 		}
 
-		pull = update_txdesc(pxmitframe, (uint*)mem_addr, sz);
+		pull = update_txdesc(pxmitframe, mem_addr, sz);
 		
 		if(pull)
 		{
@@ -735,7 +724,7 @@ void dump_xframe(_adapter *padapter, struct xmit_frame *pxmitframe)
 }
 
 
-#ifdef USB_TX_AGGREGATION_92C
+#ifdef USB_TX_AGGREGATION
 static u32 xmitframe_need_length(struct xmit_frame *pxmitframe)
 {
 	struct pkt_attrib *pattrib = &pxmitframe->attrib;
@@ -769,13 +758,13 @@ s32 rtl8192cu_xmitframe_complete(_adapter *padapter, struct xmit_priv *pxmitpriv
 	_irqL irqL;
 	_list *xmitframe_plist = NULL, *xmitframe_phead = NULL;
 
-	u32 pbuf;	// next pkt address
-	u32 pbuf_tail;	// last pkt tail
+	u32	pbuf;	// next pkt address
+	u32	pbuf_tail;	// last pkt tail
 	u32	len;	// packet length, except TXDESC_SIZE and PKT_OFFSET
 
 	u32	bulkSize = pHalData->UsbBulkOutSize;
 	u8	descCount;
-	u32 bulkPtr;
+	u32	bulkPtr;
 
 	// dump frame variable
 	u32 ff_hwaddr;
@@ -846,14 +835,6 @@ s32 rtl8192cu_xmitframe_complete(_adapter *padapter, struct xmit_priv *pxmitpriv
 		// always return ndis_packet after xmitframe_coalesce
 		os_xmit_complete(padapter, pxmitframe);
 
-#ifndef CONFIG_AP_MODE
-		if ((pxmitframe->attrib.ether_type != 0x0806) &&
-		    (pxmitframe->attrib.ether_type != 0x888e) &&
-		    (pxmitframe->attrib.dhcp_pkt != 1))
-		{
-			issue_addbareq_cmd(padapter, pxmitframe);
-		}	
-#endif
 		break;
 	} while (1);
 
@@ -911,7 +892,6 @@ s32 rtl8192cu_xmitframe_complete(_adapter *padapter, struct xmit_priv *pxmitpriv
 		pxmitframe = LIST_CONTAINOR(xmitframe_plist, struct xmit_frame, list);
 		xmitframe_plist = get_next(xmitframe_plist);
 
-		//
 #ifdef CONFIG_AP_MODE
 		if(xmitframe_enqueue_for_sleeping_sta(padapter, pxmitframe)==_TRUE)
 		{
@@ -921,7 +901,7 @@ s32 rtl8192cu_xmitframe_complete(_adapter *padapter, struct xmit_priv *pxmitpriv
 			
 			continue;
 		}
-#endif
+#endif		
 
 		len = xmitframe_need_length(pxmitframe) + TXDESC_SIZE; // no offset
 		if (pbuf + len > MAX_XMITBUF_SZ) break;
@@ -969,17 +949,6 @@ s32 rtl8192cu_xmitframe_complete(_adapter *padapter, struct xmit_priv *pxmitpriv
 		// always return ndis_packet after xmitframe_coalesce
 		os_xmit_complete(padapter, pxmitframe);
 
-		if ((pxmitframe->attrib.ether_type != 0x0806) &&
-		    (pxmitframe->attrib.ether_type != 0x888e) &&
-		    (pxmitframe->attrib.dhcp_pkt != 1))
-		{
-#ifdef CONFIG_AP_MODE
-			struct mlme_priv *pmlmepriv = &padapter->mlmepriv;
-			if(pmlmepriv->LinkDetectInfo.bHigherBusyTraffic == _TRUE)
-#endif				
-				issue_addbareq_cmd(padapter, pxmitframe);
-		}	
-
 		// (len - TXDESC_SIZE) == pxmitframe->attrib.last_txcmdsz
 		_update_txdesc(pxmitframe, pxmitframe->buf_addr, pxmitframe->attrib.last_txcmdsz);
 
@@ -1008,6 +977,15 @@ s32 rtl8192cu_xmitframe_complete(_adapter *padapter, struct xmit_priv *pxmitpriv
 
 	_exit_critical_bh(&pxmitpriv->lock, &irqL);
 
+	if ((pfirstframe->attrib.ether_type != 0x0806) &&
+	    (pfirstframe->attrib.ether_type != 0x888e) &&
+	    (pfirstframe->attrib.dhcp_pkt != 1))
+	{
+		if(padapter->mlmepriv.LinkDetectInfo.bBusyTraffic == _TRUE)
+			issue_addbareq_cmd(padapter, pfirstframe);
+	}
+
+#ifndef CONFIG_USE_USB_BUFFER_ALLOC
 	//3 3. update first frame txdesc
 	if ((pbuf_tail % bulkSize) == 0) {
 		// remove pkt_offset
@@ -1015,6 +993,7 @@ s32 rtl8192cu_xmitframe_complete(_adapter *padapter, struct xmit_priv *pxmitpriv
 		pfirstframe->buf_addr += PACKET_OFFSET_SZ;
 		pfirstframe->pkt_offset = 0;
 	}
+#endif	
 	_update_txdesc(pfirstframe, pfirstframe->buf_addr, pfirstframe->attrib.last_txcmdsz);
 
 	//3 4. write xmit buffer to USB FIFO
@@ -1176,8 +1155,8 @@ static s32 pre_xmitframe(_adapter *padapter, struct xmit_frame *pxmitframe)
 
 		return _FALSE;
 	}
-#endif	
-
+#endif
+	
 	if (txframes_sta_ac_pending(padapter, pattrib) > 0)
 		goto enqueue;
 

@@ -1,20 +1,23 @@
 /******************************************************************************
-* sdio_intf.c                                                                                                                                 *
-*                                                                                                                                          *
-* Description :                                                                                                                       *
-*                                                                                                                                           *
-* Author :                                                                                                                       *
-*                                                                                                                                         *
-* History :                                                          
-*
-*                                        
-*                                                                                                                                       *
-* Copyright 2007, Realtek Corp.                                                                                                  *
-*                                                                                                                                        *
-* The contents of this file is the sole property of Realtek Corp.  It can not be                                     *
-* be used, copied or modified without written permission from Realtek Corp.                                         *
-*                                                                                                                                          *
-*******************************************************************************/
+ *
+ * Copyright(c) 2007 - 2011 Realtek Corporation. All rights reserved.
+ *                                        
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
+ *
+ *
+ 
+******************************************************************************/
 #define _HCI_INTF_C_
 
 #include <drv_conf.h>
@@ -123,7 +126,7 @@ _func_enter_;
 		cnt = ((cnt + 4) >> 2) << 2;
 #endif
 
-	mem = _malloc(cnt);
+	mem = rtw_malloc(cnt);
 	if (mem == NULL) {
 		RT_TRACE(_module_hci_ops_os_c_, _drv_emerg_,
 			 ("SDIO_STATUS_NO_RESOURCES - memory alloc fail\n"));
@@ -148,7 +151,7 @@ _func_enter_;
 		status = _SUCCESS;
 	}
 
-	_mfree(mem, cnt);
+	rtw_mfree(mem, cnt);
 
 _func_exit_;
 
@@ -200,10 +203,10 @@ _func_enter_;
 	if (cnt % 4)
 		cnt = ((cnt + 4) >> 2) << 2;
 	if (cnt != cnt_org) {
-		pdata = _malloc(cnt);
+		pdata = rtw_malloc(cnt);
 		if (pdata == NULL) {
 			RT_TRACE(_module_hci_ops_os_c_, _drv_emerg_,
-				 ("SDIO_STATUS_NO_RESOURCES - _malloc fail\n"));
+				 ("SDIO_STATUS_NO_RESOURCES - rtw_malloc fail\n"));
 			return _FAIL;
 		}
 		status = sdio_memcpy_fromio(func, pdata, addr&0x1FFFF, cnt);
@@ -212,7 +215,7 @@ _func_enter_;
 				 ("sdbus_write_reg_int read failed 0x%x\n "
 				  "***** Addr = %x *****\n"
 				  "***** Length = %d *****\n", status, addr, cnt));
-			_mfree(pdata, cnt);
+			rtw_mfree(pdata, cnt);
 			return _FAIL;
 		}
 		_memcpy(pdata + addr_offset, pdata_org, cnt_org);
@@ -233,7 +236,7 @@ _func_enter_;
 
 #ifdef CONFIG_IO_4B
 	if (cnt != cnt_org)
-		_mfree(pdata, cnt);
+		rtw_mfree(pdata, cnt);
 #endif
 
 _func_exit_;

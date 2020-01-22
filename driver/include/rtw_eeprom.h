@@ -1,3 +1,23 @@
+/******************************************************************************
+ *
+ * Copyright(c) 2007 - 2011 Realtek Corporation. All rights reserved.
+ *                                        
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
+ *
+ *
+ 
+******************************************************************************/
 #ifndef __RTW_EEPROM_H__
 #define __RTW_EEPROM_H__
 
@@ -65,25 +85,28 @@ typedef enum _RT_CUSTOMER_ID
 	RT_CID_DLINK = 12,
 	RT_CID_PRONET = 13,
 	RT_CID_COREGA = 14,
-	RT_CID_819x_ALPHA = 15,
-	RT_CID_819x_Sitecom = 16,
-	RT_CID_CCX = 17, // It's set under CCX logo test and isn't demanded for CCX functions, but for test behavior like retry limit and tx report. By Bruce, 2009-02-17.      
-	RT_CID_819x_Lenovo = 18,
-	RT_CID_819x_QMI = 19,
-	RT_CID_819x_Edimax_Belkin = 20,		
-	RT_CID_819x_Sercomm_Belkin = 21,			
-	RT_CID_819x_CAMEO1 = 22,
-	RT_CID_819x_MSI = 23,
-	RT_CID_819x_Acer = 24,
-	RT_CID_819x_AzWave_ASUS = 25,
-	RT_CID_819x_AzWave = 26, // For AzWave in PCIe, The ID is AzWave use and not only Asus
-	RT_CID_819x_HP = 27,
-	RT_CID_819x_WNC_COREGA = 28,
-	RT_CID_819x_Arcadyan_Belkin = 29,
-	RT_CID_819x_SAMSUNG = 30,
-	RT_CID_819x_CLEVO = 31,
-	RT_CID_819x_DELL = 32,
-	RT_CID_819x_PRONETS = 33,
+	RT_CID_CHINA_MOBILE = 15,
+	RT_CID_819x_ALPHA = 16,
+	RT_CID_819x_Sitecom = 17,
+	RT_CID_CCX = 18, // It's set under CCX logo test and isn't demanded for CCX functions, but for test behavior like retry limit and tx report. By Bruce, 2009-02-17.
+	RT_CID_819x_Lenovo = 19,	
+	RT_CID_819x_QMI = 20,
+	RT_CID_819x_Edimax_Belkin = 21,		
+	RT_CID_819x_Sercomm_Belkin = 22,			
+	RT_CID_819x_CAMEO1 = 23,
+	RT_CID_819x_MSI = 24,
+	RT_CID_819x_Acer = 25,
+	RT_CID_819x_AzWave_ASUS = 26,
+	RT_CID_819x_AzWave = 27, // For AzWave in PCIe, The ID is AzWave use and not only Asus
+	RT_CID_819x_HP = 28,
+	RT_CID_819x_WNC_COREGA = 29,
+	RT_CID_819x_Arcadyan_Belkin = 30,
+	RT_CID_819x_SAMSUNG = 31,
+	RT_CID_819x_CLEVO = 32,
+	RT_CID_819x_DELL = 33,
+	RT_CID_819x_PRONETS = 34,
+	RT_CID_819x_Edimax_ASUS = 35,
+	RT_CID_819x_CAMEO_NETGEAR = 36,
 }RT_CUSTOMER_ID, *PRT_CUSTOMER_ID;
 
 struct eeprom_priv 

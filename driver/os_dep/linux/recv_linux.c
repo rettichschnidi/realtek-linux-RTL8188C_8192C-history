@@ -1,20 +1,22 @@
 /******************************************************************************
-* recv_linux.c                                                                                                                                 *
-*                                                                                                                                          *
-* Description :                                                                                                                       *
-*                                                                                                                                           *
-* Author :                                                                                                                       *
-*                                                                                                                                         *
-* History :                                                          
-*
-*                                        
-*                                                                                                                                       *
-* Copyright 2007, Realtek Corp.                                                                                                  *
-*                                                                                                                                        *
-* The contents of this file is the sole property of Realtek Corp.  It can not be                                     *
-* be used, copied or modified without written permission from Realtek Corp.                                         *
-*                                                                                                                                          *
-*******************************************************************************/
+ *
+ * Copyright(c) 2007 - 2011 Realtek Corporation. All rights reserved.
+ *                                        
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
+ *
+ *
+ ******************************************************************************/
 #define _RECV_OSDEP_C_
 
 #include <drv_conf.h>
@@ -62,12 +64,15 @@ void os_recv_resource_free(struct recv_priv *precvpriv)
 int os_recvbuf_resource_alloc(_adapter *padapter, struct recv_buf *precvbuf)
 {
 	int res=_SUCCESS;
-		
+
 #ifdef CONFIG_USB_HCI	
+	struct dvobj_priv	*pdvobjpriv = &padapter->dvobjpriv;
+	struct usb_device	*pusbd = pdvobjpriv->pusbdev;
+
 	precvbuf->irp_pending = _FALSE;
 	precvbuf->purb = usb_alloc_urb(0, GFP_KERNEL);
-	if(precvbuf->purb == NULL){		 				
-		res = _FAIL;			
+	if(precvbuf->purb == NULL){
+		res = _FAIL;
 	}
 
 	precvbuf->pskb = NULL;
@@ -82,13 +87,26 @@ int os_recvbuf_resource_alloc(_adapter *padapter, struct recv_buf *precvbuf)
 
 	precvbuf->len = 0;
 	
+#ifdef CONFIG_USE_USB_BUFFER_ALLOC
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+	precvbuf->pallocated_buf = usb_alloc_coherent(pusbd, (size_t)precvbuf->alloc_sz, GFP_ATOMIC, &precvbuf->dma_transfer_addr);
+#else
+	precvbuf->pallocated_buf = usb_buffer_alloc(pusbd, (size_t)precvbuf->alloc_sz, GFP_ATOMIC, &precvbuf->dma_transfer_addr);
+#endif
+	precvbuf->pbuf = precvbuf->pallocated_buf;
+	if(precvbuf->pallocated_buf == NULL)
+		return _FAIL;
+
+#endif
+	
 #endif
 #ifdef CONFIG_SDIO_HCI
 	precvbuf->pskb = NULL;
 
 	precvbuf->pallocated_buf  = precvbuf->pbuf = NULL;
 
-        precvbuf->pdata = precvbuf->phead = precvbuf->ptail = precvbuf->pend = NULL;
+	precvbuf->pdata = precvbuf->phead = precvbuf->ptail = precvbuf->pend = NULL;
 
 	precvbuf->len = 0;
 #endif
@@ -100,19 +118,39 @@ int os_recvbuf_resource_alloc(_adapter *padapter, struct recv_buf *precvbuf)
 int os_recvbuf_resource_free(_adapter *padapter, struct recv_buf *precvbuf)
 {
 	int ret = _SUCCESS;
-	
-	if(precvbuf->pskb)
-		dev_kfree_skb_any(precvbuf->pskb);
 
 #ifdef CONFIG_USB_HCI
+
+#ifdef CONFIG_USE_USB_BUFFER_ALLOC
+
+	struct dvobj_priv	*pdvobjpriv = &padapter->dvobjpriv;
+	struct usb_device	*pusbd = pdvobjpriv->pusbdev;
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+	usb_free_coherent(pusbd, (size_t)precvbuf->alloc_sz, precvbuf->pallocated_buf, precvbuf->dma_transfer_addr);
+#else
+	usb_buffer_free(pusbd, (size_t)precvbuf->alloc_sz, precvbuf->pallocated_buf, precvbuf->dma_transfer_addr);
+#endif
+	precvbuf->pallocated_buf =  NULL;
+	precvbuf->dma_transfer_addr = 0;
+
+#endif
+
 	if(precvbuf->purb)
 	{
 		//usb_kill_urb(precvbuf->purb);
 		usb_free_urb(precvbuf->purb);
 	}
+	
 #endif
 
-	return ret;	
+
+	if(precvbuf->pskb)
+		dev_kfree_skb_any(precvbuf->pskb);
+	
+
+	return ret;
+
 }
 
 void handle_tkip_mic_err(_adapter *padapter,u8 bgroup)
@@ -196,7 +234,7 @@ _func_enter_;
 
 	precvpriv = &(padapter->recvpriv);	
 	pfree_recv_queue = &(precvpriv->free_recv_queue);	
-     
+
 #ifdef CONFIG_DRVEXT_MODULE		
 	if (drvext_rx_handler(padapter, precv_frame->u.hdr.rx_data, precv_frame->u.hdr.len) == _SUCCESS)
 	{		
@@ -206,75 +244,76 @@ _func_enter_;
 #endif
 
 	skb = precv_frame->u.hdr.pkt;	       
-       if(skb == NULL)
-       {        
-            RT_TRACE(_module_recv_osdep_c_,_drv_err_,("recv_indicatepkt():skb==NULL something wrong!!!!\n"));		   
-	     goto _recv_indicatepkt_drop;
+	if(skb == NULL)
+	{        
+		RT_TRACE(_module_recv_osdep_c_,_drv_err_,("recv_indicatepkt():skb==NULL something wrong!!!!\n"));		   
+		goto _recv_indicatepkt_drop;
 	}
-	   
+
 	RT_TRACE(_module_recv_osdep_c_,_drv_info_,("recv_indicatepkt():skb != NULL !!!\n"));		
 	RT_TRACE(_module_recv_osdep_c_,_drv_info_,("recv_indicatepkt():precv_frame->u.hdr.rx_head=%p  precv_frame->hdr.rx_data=%p\n", precv_frame->u.hdr.rx_head, precv_frame->u.hdr.rx_data));
 	RT_TRACE(_module_recv_osdep_c_,_drv_info_,("precv_frame->hdr.rx_tail=%p precv_frame->u.hdr.rx_end=%p precv_frame->hdr.len=%d \n", precv_frame->u.hdr.rx_tail, precv_frame->u.hdr.rx_end, precv_frame->u.hdr.len));
-		
+
 	skb->data = precv_frame->u.hdr.rx_data;
 
 #ifdef NET_SKBUFF_DATA_USES_OFFSET	
 	skb_set_tail_pointer(skb, precv_frame->u.hdr.len);
 #else
-	skb->tail = precv_frame->u.hdr.rx_tail;	
+	skb->tail = precv_frame->u.hdr.rx_tail;
 #endif
 
 	skb->len = precv_frame->u.hdr.len;
-	
+
 	RT_TRACE(_module_recv_osdep_c_,_drv_info_,("\n skb->head=%p skb->data=%p skb->tail=%p skb->end=%p skb->len=%d\n", skb->head, skb->data, skb->tail, skb->end, skb->len));
-	
+
 	if(check_fwstate(pmlmepriv, WIFI_AP_STATE) == _TRUE)	 	
-	{	 	
+	{
 	 	_pkt *pskb2=NULL;
 	 	struct sta_info *psta = NULL;
-	 	struct sta_priv *pstapriv = &padapter->stapriv;	
-		struct rx_pkt_attrib *pattrib = &precv_frame->u.hdr.attrib;	
+	 	struct sta_priv *pstapriv = &padapter->stapriv;
+		struct rx_pkt_attrib *pattrib = &precv_frame->u.hdr.attrib;
 		int bmcast = IS_MCAST(pattrib->dst);
 
 		//DBG_871X("bmcast=%d\n", bmcast);
 
-		if(_memcmp(pattrib->dst, myid(&padapter->eeprompriv), ETH_ALEN)==_FALSE)		
+		if(_memcmp(pattrib->dst, myid(&padapter->eeprompriv), ETH_ALEN)==_FALSE)
 		{
-			psta = get_stainfo(pstapriv, pattrib->dst);
-
 			//DBG_871X("not ap psta=%p, addr=%pM\n", psta, pattrib->dst);
 
 			if(bmcast)
 			{
-				pskb2 = skb_clone(skb, GFP_ATOMIC);	
+				psta = get_bcmc_stainfo(padapter);
+				pskb2 = skb_clone(skb, GFP_ATOMIC);
+			} else {
+				psta = get_stainfo(pstapriv, pattrib->dst);
 			}
 
 			if(psta)
 			{
 				//DBG_871X("directly forwarding to the xmit_entry\n");
 
-				//skb->ip_summed = CHECKSUM_NONE;	
+				//skb->ip_summed = CHECKSUM_NONE;
 				//skb->protocol = eth_type_trans(skb, pnetdev);
 
-				skb->dev = padapter->pnetdev;	
-				xmit_entry(skb, padapter->pnetdev);			
-		
-				if(bmcast == _FALSE)				
-				        goto _recv_indicatepkt_end;			
+				skb->dev = padapter->pnetdev;
+				xmit_entry(skb, padapter->pnetdev);
+
+				if(bmcast)
+					skb = pskb2;
+				else
+					goto _recv_indicatepkt_end;
 			}
 
-			if(bmcast)
-				skb = pskb2;
-			
+
 		}
 		else// to APself
 		{
 			//DBG_871X("to APSelf\n");
-		}		
+		}
 	}
-	
+
 #ifdef CONFIG_RTL8712_TCP_CSUM_OFFLOAD_RX
-        if ( (pattrib->tcpchk_valid == 1) && (pattrib->tcp_chkrpt == 1) ) {
+	if ( (pattrib->tcpchk_valid == 1) && (pattrib->tcp_chkrpt == 1) ) {
 		skb->ip_summed = CHECKSUM_UNNECESSARY;
 		//printk("CHECKSUM_UNNECESSARY \n");
 	} else {
@@ -289,7 +328,7 @@ _func_enter_;
 
 	skb->dev = padapter->pnetdev;
 	skb->protocol = eth_type_trans(skb, padapter->pnetdev);
-	
+
 	netif_rx(skb);
 
 _recv_indicatepkt_end:

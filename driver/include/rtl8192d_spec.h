@@ -1,3 +1,23 @@
+/******************************************************************************
+ *
+ * Copyright(c) 2007 - 2011 Realtek Corporation. All rights reserved.
+ *                                        
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
+ *
+ *
+ 
+******************************************************************************/
 
 #ifndef __RTL8192D_SPEC_H__
 #define __RTL8192D_SPEC_H__
@@ -138,6 +158,7 @@
 #define REG_CPWM					0x012F
 #define REG_FWIMR					0x0130
 #define REG_FWISR					0x0134
+#define REG_FTIMR					0x0138
 #define REG_PKTBUF_DBG_CTRL		0x0140
 #define REG_PKTBUF_DBG_DATA_L		0x0144
 #define REG_PKTBUF_DBG_DATA_H	0x0148
@@ -152,8 +173,8 @@
 #define REG_MBIST_DONE				0x0178
 #define REG_MBIST_FAIL				0x017C
 #define REG_C2HEVT_MSG_NORMAL	0x01A0
+#define REG_C2HEVT_CLEAR			0x01AF
 #define REG_C2HEVT_MSG_TEST		0x01B8
-#define REG_C2HEVT_CLEAR			0x01BF
 #define REG_MCUTST_1				0x01c0
 #define REG_FMETHR					0x01C8
 #define REG_HMETFR					0x01CC
@@ -796,6 +817,10 @@ Default: 00b.
 
 
 #ifdef CONFIG_PCI_HCI
+#define RT_IBSS_INT_MASKS				(IMR_BcnInt | IMR_TBDOK | IMR_TBDER)
+#define RT_AC_INT_MASKS				(IMR_VIDOK | IMR_VODOK | IMR_BEDOK|IMR_BKDOK)
+#define RT_BSS_INT_MASKS				(RT_IBSS_INT_MASKS)
+
 #define RTL8190_EEPROM_ID						0x8129	// 0-1
 #define EEPROM_HPON							0x02 // LDO settings.2-5
 #define EEPROM_CLK								0x06 // Clock settings.6-7

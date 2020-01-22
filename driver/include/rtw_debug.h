@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2007 - 2010 Realtek Corporation. All rights reserved.
+ * Copyright(c) 2007 - 2011 Realtek Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -74,11 +74,11 @@
 #if defined _RTL871X_XMIT_C_
 	#define _MODULE_DEFINE_	_module_rtl871x_xmit_c_
 #elif defined _XMIT_OSDEP_C_
-	#define _MODULE_DEFINE_	_module_xmit_osdep_c_	
+	#define _MODULE_DEFINE_	_module_xmit_osdep_c_
 #elif defined _RTL871X_RECV_C_
 	#define _MODULE_DEFINE_	_module_rtl871x_recv_c_
 #elif defined _RECV_OSDEP_C_
-	#define _MODULE_DEFINE_	_module_recv_osdep_c_	
+	#define _MODULE_DEFINE_	_module_recv_osdep_c_
 #elif defined _RTL871X_MLME_C_
 	#define _MODULE_DEFINE_	_module_rtl871x_mlme_c_
 #elif defined _MLME_OSDEP_C_
@@ -96,29 +96,29 @@
 #elif defined _OS_INTFS_C_
 	#define	_MODULE_DEFINE_	_module_os_intfs_c_
 #elif defined _RTL871X_SECURITY_C_
-	#define	_MODULE_DEFINE_	_module_rtl871x_security_c_	
+	#define	_MODULE_DEFINE_	_module_rtl871x_security_c_
 #elif defined _RTL871X_EEPROM_C_
-	#define	_MODULE_DEFINE_	_module_rtl871x_eeprom_c_	
+	#define	_MODULE_DEFINE_	_module_rtl871x_eeprom_c_
 #elif defined _HAL_INIT_C_
-	#define	_MODULE_DEFINE_	_module_hal_init_c_	
+	#define	_MODULE_DEFINE_	_module_hal_init_c_
 #elif defined _HCI_HAL_INIT_C_
 	#define	_MODULE_DEFINE_	_module_hci_hal_init_c_
 #elif defined _RTL871X_IOCTL_C_
-	#define	_MODULE_DEFINE_	_module_rtl871x_ioctl_c_	
+	#define	_MODULE_DEFINE_	_module_rtl871x_ioctl_c_
 #elif defined _RTL871X_IOCTL_SET_C_
-	#define	_MODULE_DEFINE_	_module_rtl871x_ioctl_set_c_	
+	#define	_MODULE_DEFINE_	_module_rtl871x_ioctl_set_c_
 #elif defined _RTL871X_IOCTL_QUERY_C_
-	#define	_MODULE_DEFINE_	_module_rtl871x_ioctl_query_c_		
+	#define	_MODULE_DEFINE_	_module_rtl871x_ioctl_query_c_
 #elif defined _RTL871X_PWRCTRL_C_
-	#define	_MODULE_DEFINE_	_module_rtl871x_pwrctrl_c_			
+	#define	_MODULE_DEFINE_	_module_rtl871x_pwrctrl_c_
 #elif defined _HCI_INTF_C_
 	#define	_MODULE_DEFINE_	_module_hci_intfs_c_
 #elif defined _HCI_OPS_C_
-	#define	_MODULE_DEFINE_	_module_hci_ops_c_	
+	#define	_MODULE_DEFINE_	_module_hci_ops_c_
 #elif defined _OSDEP_HCI_INTF_C_
 	#define	_MODULE_DEFINE_	_module_hci_intfs_c_
 #elif defined _OSDEP_SERVICE_C_
-	#define	_MODULE_DEFINE_	_module_osdep_service_c_		
+	#define	_MODULE_DEFINE_	_module_osdep_service_c_
 #elif defined _HCI_OPS_OS_C_
 	#define	_MODULE_DEFINE_	_module_hci_ops_os_c_
 #elif defined _RTL871X_IOCTL_LINUX_C_
@@ -142,11 +142,11 @@
 #endif
 
 #ifdef PLATFORM_OS_CE
-extern void rtl871x_cedbg(const char *fmt, ...);	
+extern void rtl871x_cedbg(const char *fmt, ...);
 #endif
-	
+
 #define RT_TRACE(_Comp, _Level, Fmt) do{}while(0)
-#define _func_enter_ {}	
+#define _func_enter_ {}
 #define _func_exit_ {}
 #define RT_PRINT_DATA(_Comp, _Level, _TitleString, _HexData, _HexDataLen) {}
 
@@ -162,11 +162,11 @@ extern void rtl871x_cedbg(const char *fmt, ...);
 #ifdef PLATFORM_WINDOWS
 
 		#ifdef PLATFORM_OS_XP
-		
+
 		#define _dbgdump	DbgPrint
 
 		#elif defined PLATFORM_OS_CE
-		
+
 		#define _dbgdump	rtl871x_cedbg
 
 		#endif
@@ -176,12 +176,12 @@ extern void rtl871x_cedbg(const char *fmt, ...);
 		#define _dbgdump	printk
 
 #endif
-	
+
 #endif /* CONFIG_DEBUG_RTL871X */
 
 
 #if	defined (_dbgdump) && defined (_MODULE_DEFINE_)
-	
+
 		#undef RT_TRACE
 		#define RT_TRACE(_Comp, _Level, Fmt)\
 		do {\
@@ -189,13 +189,13 @@ extern void rtl871x_cedbg(const char *fmt, ...);
 			_dbgdump("%s [0x%08x,%d]", RTL871X_MODULE_NAME, (unsigned int)_Comp, _Level);\
 				_dbgdump Fmt;						\
 			}\
-		}while(0)	
+		}while(0)
 
 #endif
-	
+
 
 #if	defined (_dbgdump)
-	
+
 		#undef  _func_enter_
 		#define _func_enter_ \
 		do {	\
@@ -204,7 +204,7 @@ extern void rtl871x_cedbg(const char *fmt, ...);
 				_dbgdump("\n %s : %s enters at %d\n", RTL871X_MODULE_NAME, __FUNCTION__, __LINE__);\
 			}		\
 		} while(0)
-	
+
 		#undef  _func_exit_
 		#define _func_exit_ \
 		do {	\
@@ -245,14 +245,14 @@ extern void rtl871x_cedbg(const char *fmt, ...);
 
 	#define WRN_8192C {}
 
-	#define ERR_8192C {}	
+	#define ERR_8192C {}
 	#endif
 
 	#ifdef PLATFORM_LINUX
 	#define _dbgdump	printk
 
 	#define DBG_871X(x, ...) {}
-	
+
 	#define MSG_8192C(x, ...) {}
 
 	#define DBG_8192C(x,...)  {}
@@ -278,8 +278,6 @@ extern void rtl871x_cedbg(const char *fmt, ...);
 	#define ERR_8192C _dbgdump
 
 #endif	//CONFIG_DEBUG_RTL8192C
-
-#endif	//__RTL871X_DEBUG_H__
 
 #ifdef CONFIG_PROC_DEBUG
 
@@ -316,7 +314,7 @@ extern void rtl871x_cedbg(const char *fmt, ...);
 
 	int proc_get_ht_option(char *page, char **start,
 			  off_t offset, int count,
-			  int *eof, void *data);	
+			  int *eof, void *data);
 
 	int proc_get_rf_info(char *page, char **start,
 			  off_t offset, int count,
@@ -329,19 +327,59 @@ extern void rtl871x_cedbg(const char *fmt, ...);
 	int proc_get_adapter_state(char *page, char **start,
 			  off_t offset, int count,
 			  int *eof, void *data);
-	
+
 	int proc_get_trx_info(char *page, char **start,
 			  off_t offset, int count,
 			  int *eof, void *data);
-	
-		
+
+
 #ifdef CONFIG_AP_MODE
 
 	int proc_get_all_sta_info(char *page, char **start,
 			  off_t offset, int count,
 			  int *eof, void *data);
-	
-#endif		
-	
+
 #endif
 
+#ifdef MEMORY_LEAK_DEBUG
+	int proc_get_malloc_cnt(char *page, char **start,
+			  off_t offset, int count,
+			  int *eof, void *data);
+#endif
+
+#ifdef CONFIG_FIND_BEST_CHANNEL
+	int proc_get_best_channel(char *page, char **start,
+			  off_t offset, int count,
+			  int *eof, void *data);
+#endif
+
+#endif //CONFIG_PROC_DEBUG
+
+//#define DBG_SHOW_USETKIPKEY
+
+//#define DBG_POWER_SAVING
+//#define DBG_RF_STATE
+
+//#define DBG_TX
+//#define DBG_XMIT_BUF
+//#define DBG_XMIT_FRAME
+//#define DBG_TX_SHOW_802_1X
+
+//#define DBG_RX
+//#define DBG_RECV_BUF
+//#define DBG_RECV_FRAME
+//#define DBG_RX_DECRYPTOR 		// 3.0qc
+//#define DBG_RX_DROP_FRAME
+//#define DBG_RX_DATA_TOGGLE
+//#define DBG_RX_SHOW_802_1X
+
+//#define DBG_SETTING_RCR
+//#define DBG_SET_NETYPE0_MSR
+
+//#define DBG_CMD
+//#define DBG_EVENT
+
+//#define DBG_IOCTL
+//#define DBG_HAL_INIT_PROFILING
+
+#endif	//__RTW_DEBUG_H__
