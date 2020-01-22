@@ -610,9 +610,7 @@ void	rtw_init_pwrctrl_priv(_adapter *padapter)
 {
 	struct pwrctrl_priv *pwrctrlpriv = &padapter->pwrctrlpriv;
 
-_func_enter_;
-
-	_rtw_memset((unsigned char *)pwrctrlpriv, 0, sizeof(struct pwrctrl_priv));
+_func_enter_;	
 
 #ifdef PLATFORM_WINDOWS
 	pwrctrlpriv->pnp_current_pwr_state=NdisDeviceStateD0;

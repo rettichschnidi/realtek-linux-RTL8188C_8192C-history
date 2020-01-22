@@ -2157,9 +2157,9 @@ _func_enter_;
 
 	// 2010/08/09 MH We need to check if we need to turnon or off RF after detecting
 	// HW GPIO pin. Before PHY_RFConfig8192C.
-	HalDetectPwrDownMode(Adapter);
+	//HalDetectPwrDownMode(Adapter);
 	// 2010/08/26 MH If Efuse does not support sective suspend then disable the function.
-	HalDetectSelectiveSuspendMode(Adapter);
+	//HalDetectSelectiveSuspendMode(Adapter);
 
 	// Set RF type for BB/RF configuration	
 	_InitRFType(Adapter);//->_ReadRFType()
