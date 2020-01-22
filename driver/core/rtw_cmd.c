@@ -630,7 +630,7 @@ rtw_sitesurvey_cmd(~)
 	### NOTE:#### (!!!!)
 	MUST TAKE CARE THAT BEFORE CALLING THIS FUNC, YOU SHOULD HAVE LOCKED pmlmepriv->lock
 */
-u8 rtw_sitesurvey_cmd(_adapter  *padapter, NDIS_802_11_SSID *pssid)
+u8 rtw_sitesurvey_cmd(_adapter  *padapter, NDIS_802_11_SSID *pssid, int ssid_max_num)
 {
 	u8 res = _FAIL;
 	struct cmd_obj		*ph2c;
@@ -671,11 +671,18 @@ _func_enter_;
 
 	psurveyPara->bsslimit = cpu_to_le32(48);
 	psurveyPara->scan_mode = cpu_to_le32(pmlmepriv->scan_mode);
-	psurveyPara->ss_ssidlen= cpu_to_le32(0);// pssid->SsidLength;
-	_rtw_memset(psurveyPara->ss_ssid, 0, IW_ESSID_MAX_SIZE + 1);
-	if ((pssid != NULL) && (pssid->SsidLength)) {
-		_rtw_memcpy(psurveyPara->ss_ssid, pssid->Ssid, pssid->SsidLength);
-		psurveyPara->ss_ssidlen = cpu_to_le32(pssid->SsidLength);
+
+	_rtw_memset(psurveyPara->ssid, 0, sizeof(NDIS_802_11_SSID)*RTW_SSID_SCAN_AMOUNT);
+
+	if(pssid){
+		int i;
+		for(i=0; i<ssid_max_num && i< RTW_SSID_SCAN_AMOUNT; i++){
+			if(pssid[i].SsidLength){
+				_rtw_memcpy(&psurveyPara->ssid[i], &pssid[i], sizeof(NDIS_802_11_SSID));
+				//DBG_871X("%s scan for specific ssid: %s, %d\n", __FUNCTION__
+				//	, psurveyPara->ssid[i].Ssid, psurveyPara->ssid[i].SsidLength);
+			}
+		}
 	}
 
 	set_fwstate(pmlmepriv, _FW_UNDER_SURVEY);
@@ -1613,6 +1620,12 @@ u8 rtw_set_chplan_cmd(_adapter*padapter, u8 chplan, u8 enqueue)
 _func_enter_;
 
 	RT_TRACE(_module_rtl871x_cmd_c_, _drv_notice_, ("+rtw_set_chplan_cmd\n"));
+
+	//check input parameter
+	if(!rtw_is_channel_plan_valid(chplan)) {
+		res = _FAIL;
+		goto exit;
+	}
 
 	//prepare cmd parameter
 	setChannelPlan_param = (struct	SetChannelPlan_param *)rtw_zmalloc(sizeof(struct SetChannelPlan_param));

@@ -1055,6 +1055,8 @@ void rtw_unregister_early_suspend(struct pwrctrl_priv *pwrpriv)
 {
 	DBG_871X("%s\n", __FUNCTION__);
 
+	pwrpriv->do_late_resume = _FALSE;
+
 	if (pwrpriv->early_suspend.suspend) 
 		unregister_early_suspend(&pwrpriv->early_suspend);
 
@@ -1105,6 +1107,8 @@ void rtw_register_early_suspend(struct pwrctrl_priv *pwrpriv)
 void rtw_unregister_early_suspend(struct pwrctrl_priv *pwrpriv)
 {
 	DBG_871X("%s\n", __FUNCTION__);
+
+	pwrpriv->do_late_resume = _FALSE;
 
 	if (pwrpriv->early_suspend.suspend) 
 		android_unregister_early_suspend(&pwrpriv->early_suspend);

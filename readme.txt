@@ -28,7 +28,7 @@
 		2.14 RTL8192D_operation_mode.pdf
 
 	3. driver/ 
-		3.1 rtl8188C_8192C_8192D_usb_linux_v3.3.1_3083.20111213.tar.gz
+		3.1 rtl8188C_8192C_8192D_usb_linux_v3.3.2_3192.20120103.tar.gz
 			Naming rule: rtlCHIPS_linux_vM.N.P_ssss.yyyymmdd.tar.gz
 			where:
 				CHIPS: supported chips
@@ -52,12 +52,16 @@
 		4.2 wpa_0_8.conf
 			 Configure file sample for wpa_supplicant-0.8
 		
-		4.3	rtl_hostapd_2G.conf / rtl_hostapd_5G.conf
-			 Configure file for Soft-AP mode  
+		4.3 rtl_hostapd_2G.conf
+		4.4 rtl_hostapd_5G.conf
+			 Configure files for Soft-AP mode 2.4G/5G
+			 
+		4.5 p2p_hostapd.conf
+			 Configure file for hostapd for Wi-Fi Direct (P2P)
 
-		4.4 wpa_supplicant-0.6.9_wps_patch_20100201_1.zip
+		4.6 wpa_supplicant-0.6.9_wps_patch_20100201_1.zip
 		
-		4.5 wpa_0_6_9.conf
+		4.7 wpa_0_6_9.conf
 			 Configure file sample for wpa_supplicant-0.6.9
 		
 	5. wireless_tools/
@@ -70,7 +74,14 @@
 		6.2 realtek_wifi_SDK_for_android.txt
 			Guide for porting Realtek wifi onto your Android system
 			
-	7. install.sh 
+	7. android_reference_codes_ICS/
+		7.1 realtek_wifi_SDK_for_android_ICS_20111229.tar.gz
+			This tar ball includes our android wifi reference codes for Android 4.x (ICS)
+			
+		7.2 Realtek_Wi-Fi_SDK_for_Android_ICS.pdf
+			Guide for porting Realtek wifi onto your Android 4.x (ICS) system
+			
+	8. install.sh 
 		Script to compile and install WiFi driver easily in PC-Linux
 	
 ==================================================================================================================
@@ -105,4 +116,5 @@
 ==================================================================================================================
 		User Guide for Applying Wi-Fi solution onto Andriod System
 ==================================================================================================================
-			(*) Please refer to android_reference_codes/realtek_wifi_SDK_for_android.txt
+			(*) For Android 1.6 ~ 2.3, Please refer to android_reference_codes/realtek_wifi_SDK_for_android.txt
+			(*) For Android 4.x (ICS), please refer to android_reference_codes_ICS/Realtek_Wi-Fi_SDK_for_Android_ICS.pdf

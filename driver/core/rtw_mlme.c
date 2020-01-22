@@ -1162,7 +1162,7 @@ _func_enter_;
 				#ifdef CONFIG_LAYER2_ROAMING
 				if(pmlmepriv->to_roaming!=0) {
 					if( --pmlmepriv->to_roaming == 0
-						|| _SUCCESS != rtw_sitesurvey_cmd(adapter, &pmlmepriv->assoc_ssid)
+						|| _SUCCESS != rtw_sitesurvey_cmd(adapter, &pmlmepriv->assoc_ssid, 1)
 					) {
 						pmlmepriv->to_roaming = 0;
 						rtw_free_assoc_resources(adapter, 1);
@@ -2835,6 +2835,33 @@ static int SecIsInPMKIDList(_adapter *Adapter, u8 *bssid)
 	
 }
 
+//
+// Check the RSN IE length
+// If the RSN IE length <= 20, the RSN IE didn't include the PMKID information
+// 0-11th element in the array are the fixed IE
+// 12th element in the array is the IE
+// 13th element in the array is the IE length  
+//
+
+static int rtw_append_pmkid(_adapter *Adapter,int iEntry, u8 *ie, uint ie_len)
+{
+	struct security_priv *psecuritypriv=&Adapter->securitypriv;
+
+	if(ie[13]<=20){	
+		// The RSN IE didn't include the PMK ID, append the PMK information 
+			ie[ie_len]=1;
+			ie_len++;
+			ie[ie_len]=0;	//PMKID count = 0x0100
+			ie_len++;
+			_rtw_memcpy(	&ie[ie_len], &psecuritypriv->PMKIDList[iEntry].PMKID, 16);
+		
+			ie_len+=16;
+			ie[13]+=18;//PMKID length = 2+16
+
+	}
+	return (ie_len);
+	
+}
 sint rtw_restruct_sec_ie(_adapter *adapter,u8 *in_ie, u8 *out_ie, uint in_len)
 {
 	u8 authmode, securitytype, match;
@@ -2857,6 +2884,11 @@ _func_enter_;
 	//copy fixed ie only
 	_rtw_memcpy(out_ie, in_ie,12);
 	ielength=12;
+
+	if((ndisauthmode==Ndis802_11AuthModeWPA)||(ndisauthmode==Ndis802_11AuthModeWPAPSK))
+			authmode=_WPA_IE_ID_;
+	if((ndisauthmode==Ndis802_11AuthModeWPA2)||(ndisauthmode==Ndis802_11AuthModeWPA2PSK))
+			authmode=_WPA2_IE_ID_;
 
 	if(psecuritypriv->wps_phase == _TRUE)
 	{
@@ -2892,6 +2924,7 @@ _func_enter_;
 	{
 		if(authmode == _WPA2_IE_ID_)
 		{
+#if 0		
 			out_ie[ielength]=1;
 			ielength++;
 			out_ie[ielength]=0;	//PMKID count = 0x0100
@@ -2900,6 +2933,8 @@ _func_enter_;
 		
 			ielength+=16;
 			out_ie[13]+=18;//PMKID length = 2+16
+#endif			
+			ielength=rtw_append_pmkid(adapter, iEntry, out_ie, ielength);
 		}
 	}
 
