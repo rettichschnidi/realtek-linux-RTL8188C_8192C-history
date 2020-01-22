@@ -32,14 +32,14 @@
 
 //if mode ==0, then the sta is allowed once the addr is hit.
 //if mode ==1, then the sta is rejected once the addr is non-hit.
-struct wlan_acl_node {
+struct rtw_wlan_acl_node {
         _list		        list;
         u8       addr[ETH_ALEN];
         u8       mode;
 };
 
 struct wlan_acl_pool {
-        struct wlan_acl_node aclnode[NUM_ACL];
+        struct rtw_wlan_acl_node aclnode[NUM_ACL];
 };
 
 typedef struct _RSSI_STA{
@@ -59,6 +59,13 @@ struct	stainfo_stats	{
 	u64  tx_drops;
 
 };
+
+#ifdef CONFIG_TDLS
+struct TDLS_PeerKey {
+	u8 kck[16]; /* TPK-KCK */
+	u8 tk[16]; /* TPK-TK; only CCMP will be used */
+} ;
+#endif
 
 struct sta_info {
 
@@ -102,6 +109,28 @@ struct sta_info {
 	u8 	init_rate;
 
 	struct stainfo_stats sta_stats;
+
+#ifdef CONFIG_TDLS
+	u8	SNonce[32];
+	u8	ANonce[32];
+	u32	TDLS_PeerKey_Lifetime;
+	u16	TPK_count;
+	_timer	TPK_timer;
+	struct TDLS_PeerKey	tpk;
+	_adapter *padapter;
+	u8	cam_entry;
+	u16	stat_code;
+	u8	off_ch;
+	u16	ch_switch_time;
+	u16	ch_switch_timeout;
+	u8	option;
+	_workitem	option_workitem;
+	_timer	option_timer;
+	_workitem	base_ch_workitem;
+	_timer	base_ch_timer;
+	_workitem	off_ch_workitem;
+	_timer	off_ch_timer;
+#endif
 
 	//for A-MPDU TX, ADDBA timeout check	
 	_timer addba_retry_timer;
@@ -168,7 +197,7 @@ struct sta_info {
 	u8 has_legacy_ac;
 	unsigned int sleepq_ac_len;
 
-#if ( P2P_INCLUDED == 1 )
+#ifdef CONFIG_P2P
 	//p2p priv data
 	u8 is_p2p_device;
 	u8 p2p_status_code;
@@ -250,14 +279,14 @@ __inline static u32 wifi_mac_hash(u8 *mac)
 }
 
 
-extern u32	_init_sta_priv(struct sta_priv *pstapriv);
-extern u32	_free_sta_priv(struct sta_priv *pstapriv);
-extern struct sta_info *alloc_stainfo(struct	sta_priv *pstapriv, u8 *hwaddr);
-extern u32	free_stainfo(_adapter *padapter , struct sta_info *psta);
-extern void free_all_stainfo(_adapter *padapter);
-extern struct sta_info *get_stainfo(struct sta_priv *pstapriv, u8 *hwaddr);
-extern u32 init_bcmc_stainfo(_adapter* padapter);
-extern struct sta_info* get_bcmc_stainfo(_adapter* padapter);
-extern u8 access_ctrl(struct wlan_acl_pool* pacl_list, u8 * mac_addr);
+extern u32	_rtw_init_sta_priv(struct sta_priv *pstapriv);
+extern u32	_rtw_free_sta_priv(struct sta_priv *pstapriv);
+extern struct sta_info *rtw_alloc_stainfo(struct	sta_priv *pstapriv, u8 *hwaddr);
+extern u32	rtw_free_stainfo(_adapter *padapter , struct sta_info *psta);
+extern void rtw_free_all_stainfo(_adapter *padapter);
+extern struct sta_info *rtw_get_stainfo(struct sta_priv *pstapriv, u8 *hwaddr);
+extern u32 rtw_init_bcmc_stainfo(_adapter* padapter);
+extern struct sta_info* rtw_get_bcmc_stainfo(_adapter* padapter);
+extern u8 rtw_access_ctrl(struct wlan_acl_pool* pacl_list, u8 * mac_addr);
 
 #endif //_STA_INFO_H_

@@ -33,7 +33,7 @@
 #include "rtl8192c_sreset.h"
 #endif
 
-#if (DEV_BUS_TYPE == DEV_BUS_PCI_INTERFACE)
+#ifdef CONFIG_PCI_HCI
 
 	#include "Hal8192CEHWImg.h"
 
@@ -110,7 +110,7 @@
 	#define Rtl819XPHY_REG_Array_PG 			Rtl8192CEPHY_REG_Array_PG
 	#define Rtl819XPHY_REG_Array_MP 			Rtl8192CEPHY_REG_Array_MP
 
-#elif (DEV_BUS_TYPE == DEV_BUS_USB_INTERFACE)
+#elif defined(CONFIG_USB_HCI)
 
 	#include "Hal8192CUHWImg.h"
 
@@ -247,7 +247,7 @@ typedef struct _RT_8192C_FIRMWARE_HDR {//8-byte alinment required
 #define DRIVER_EARLY_INT_TIME		0x05
 #define BCN_DMA_ATIME_INT_TIME		0x02
 
-#ifdef USB_RX_AGGREGATION
+#ifdef CONFIG_USB_RX_AGGREGATION
 
 typedef enum _USB_RX_AGG_MODE{
 	USB_RX_AGG_DISABLE,
@@ -634,7 +634,7 @@ struct hal_data_8192ce
 
 	u16	EfuseUsedBytes;
 	
-#if ( P2P_INCLUDED == 1 )
+#ifdef CONFIG_P2P
 	struct P2P_PS_Offload_t	p2p_ps_offload;
 #endif
 };
@@ -811,11 +811,11 @@ struct hal_data_8192cu
 
 	u8	Queue2EPNum[8];//for out endpoint number mapping
 
-#ifdef USB_TX_AGGREGATION
+#ifdef CONFIG_USB_TX_AGGREGATION
 	u8	UsbTxAggMode;
 	u8	UsbTxAggDescNum;
 #endif
-#ifdef USB_RX_AGGREGATION
+#ifdef CONFIG_USB_RX_AGGREGATION
 	u16	HwRxPageSize;				// Hardware setting
 	u32	MaxUsbRxAggBlock;
 
@@ -835,7 +835,7 @@ struct hal_data_8192cu
 
 	u16	EfuseUsedBytes;
 
-#if ( P2P_INCLUDED == 1 )
+#ifdef CONFIG_P2P
 	struct P2P_PS_Offload_t	p2p_ps_offload;
 #endif
 };

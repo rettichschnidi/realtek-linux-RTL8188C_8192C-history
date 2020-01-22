@@ -172,10 +172,10 @@ _func_enter_;
 	
 
 
-		_spinlock(&precvpriv->lock);
+		_rtw_spinlock(&precvpriv->lock);
 		precvpriv->rx_pending_cnt++;
 		precvbuf->irp_pending = _TRUE;
-		_spinunlock(&precvpriv->lock);
+		_rtw_spinunlock(&precvpriv->lock);
 
 
 		//translate DMA FIFO addr to pipehandle
@@ -260,10 +260,10 @@ DWORD usb_read_port_complete( PVOID context )
 _func_enter_;
 
 
-	_spinlock_ex(&precvpriv->lock);
+	_rtw_spinlock_ex(&precvpriv->lock);
 	precvbuf->irp_pending=_FALSE;
 	precvpriv->rx_pending_cnt --;
-	_spinunlock_ex(&precvpriv->lock);	
+	_rtw_spinunlock_ex(&precvpriv->lock);	
 
 
 #if 1
@@ -289,7 +289,7 @@ _func_enter_;
 		{
 			RT_TRACE(_module_hci_ops_os_c_,_drv_err_,
 				("\n usb_read_port_complete: (pbulkurb->TransferBufferLength > MAX_RECVBUF_SZ) || (pbulkurb->TransferBufferLength < RXDESC_SIZE): %d\n",dwBytesTransferred));
-			read_port(adapter, precvpriv->ff_hwaddr, 0, (unsigned char *)precvbuf);
+			rtw_read_port(adapter, precvpriv->ff_hwaddr, 0, (unsigned char *)precvbuf);
 
     	    //usb_read_port(pintfhdl, 0, 0, (unsigned char *)precvframe);
     	}
@@ -305,14 +305,14 @@ _func_enter_;
 					("\n usb_read_port_complete: get a event\n"));
 				rxcmd_event_hdl(adapter, pbuf);//rx c2h events
 
-				read_port(adapter, precvpriv->ff_hwaddr, 0, (unsigned char *)precvbuf);
+				rtw_read_port(adapter, precvpriv->ff_hwaddr, 0, (unsigned char *)precvbuf);
 			}
 			else
 			{
 				if(recvbuf2recvframe(adapter, precvbuf)==_FAIL)//rx packets
 				{
 					//precvbuf->reuse = _TRUE;		
-					read_port(adapter, precvpriv->ff_hwaddr, 0, (unsigned char *)precvbuf);
+					rtw_read_port(adapter, precvpriv->ff_hwaddr, 0, (unsigned char *)precvbuf);
 				}
 			}
 	    }
@@ -362,12 +362,12 @@ _func_enter_;
 	
 
 	//free irp in processing list...	
-	while(is_list_empty(head) != _TRUE)
+	while(rtw_is_list_empty(head) != _TRUE)
 	{
 		plist = get_next(head);	
-		list_delete(plist);
+		rtw_list_delete(plist);
 		pio_req = LIST_CONTAINOR(plist, struct io_req, list);
-		_up_sema(&pio_req->sema);
+		_rtw_up_sema(&pio_req->sema);
 	}
 
 	_exit_critical_bh(&(pio_q->lock), &irqL);
@@ -437,7 +437,7 @@ _func_enter_;
 
 
 	// insert the io_request into processing io_queue
-	list_insert_tail(&(pio_req->list),&(pio_queue->processing));
+	rtw_list_insert_tail(&(pio_req->list),&(pio_queue->processing));
 	
 	
 	if((adapter->bDriverStopped) || (adapter->bSurpriseRemoved) ||(adapter->pwrctrlpriv.pnp_bstop_trx)) 
@@ -478,7 +478,7 @@ _func_enter_;
 			RT_TRACE( _module_hci_ops_os_c_, _drv_err_, 
 				("usb_write_mem not yet finished %X\n", 
 				pio_req->usb_transfer_write_mem));
-			msleep_os(10);
+			rtw_msleep_os(10);
 		}
 		
 	}
@@ -486,13 +486,13 @@ _func_enter_;
 #endif
 
 
-//	_down_sema(&pio_req->sema);	
+//	_rtw_down_sema(&pio_req->sema);	
 
 	RT_TRACE( _module_hci_ops_os_c_, _drv_info_, ("-usb_write_mem(%X)\n",pio_req->usb_transfer_write_mem));
 
 	_exit_critical_bh(&(pio_queue->lock), &irqL);
 
-	_down_sema(&pio_req->sema); 
+	_rtw_down_sema(&pio_req->sema); 
 	free_ioreq(pio_req, pio_queue);
 
 exit:
@@ -750,10 +750,10 @@ _func_enter_;
 	{
 		if(pxmitframe->bpending[i] == _FALSE)
 		{
-			_spinlock(&pxmitpriv->lock);	
+			_rtw_spinlock(&pxmitpriv->lock);	
 			pxmitpriv->txirp_cnt++;
 			pxmitframe->bpending[i]  = _TRUE;
-			_spinunlock(&pxmitpriv->lock);
+			_rtw_spinunlock(&pxmitpriv->lock);
 			
 			pxmitframe->sz[i] = cnt;
 			pxmitframe->ac_tag[i] = ac_tag;
@@ -859,18 +859,18 @@ _func_enter_;
 
 	RT_TRACE(_module_hci_ops_os_c_,_drv_info_,("+usb_write_port_complete\n"));
 
-	_spinlock_ex(&pxmitpriv->lock);	
+	_rtw_spinlock_ex(&pxmitpriv->lock);	
 	pxmitpriv->txirp_cnt--;
-	_spinunlock_ex(&pxmitpriv->lock);
+	_rtw_spinunlock_ex(&pxmitpriv->lock);
 
 	if(pxmitpriv->txirp_cnt==0){
 		RT_TRACE(_module_hci_ops_os_c_,_drv_err_,("usb_write_port_complete: txirp_cnt== 0, set allrxreturnevt!\n"));		
-		_up_sema(&(pxmitpriv->tx_retevt));
+		_rtw_up_sema(&(pxmitpriv->tx_retevt));
 	}
 
 
 	//not to consider tx fragment
-	free_xmitframe_ex(pxmitpriv, pxmitframe);		
+	rtw_free_xmitframe_ex(pxmitpriv, pxmitframe);		
 
 
 #if 1
@@ -947,7 +947,7 @@ _func_enter_;
 	RT_TRACE( _module_hci_ops_os_c_, _drv_info_, ("%s(%u)\n",__FUNCTION__, __LINE__));
 	if(CIRC_CNT(psb->head,psb->tail,SCSI_BUFFER_NUMBER)==0){
 		RT_TRACE( _module_hci_ops_os_c_, _drv_info_, ("write_txcmd_scsififo_callback: up_sema\n"));
-		_up_sema(&pxmitpriv->xmit_sema);
+		_rtw_up_sema(&pxmitpriv->xmit_sema);
 	}
 
 	RT_TRACE( _module_hci_ops_os_c_, _drv_info_, ("%s(%u)\n",__FUNCTION__, __LINE__));
@@ -1051,7 +1051,7 @@ void usb_unload_intf_priv(struct intf_priv *pintfpriv)
 #ifndef PLATFORM_OS_CE
 
 	rtw_mfree((u8 *)(pintfpriv->allocated_io_rwmem), pintfpriv->max_iosz+4);
-    rtw_mfree((u8 *)(pintfpriv->allocated_io_r_mem), pintfpriv->max_iosz+4);
+	rtw_mfree((u8 *)(pintfpriv->allocated_io_r_mem), pintfpriv->max_iosz+4);
 #endif
 
 	RT_TRACE( _module_hci_ops_os_c_, _drv_info_, ("%s(%u)\n",__FUNCTION__, __LINE__));
@@ -1067,9 +1067,9 @@ void usb_write_port_cancel(_adapter *padapter)
 	struct xmit_priv *pxmitpriv=&padapter->xmitpriv;
 	struct xmit_frame *pxmitframe;
 
-	_spinlock(&pxmitpriv->lock);
+	_rtw_spinlock(&pxmitpriv->lock);
 	pxmitpriv->txirp_cnt--; //decrease 1 for Initialize ++
-	_spinunlock(&pxmitpriv->lock);
+	_rtw_spinunlock(&pxmitpriv->lock);
 	
 	if (pxmitpriv->txirp_cnt) 
 	{
@@ -1091,7 +1091,7 @@ void usb_write_port_cancel(_adapter *padapter)
 			pxmitframe++;
 		}
 
-		_down_sema(&(pxmitpriv->tx_retevt));
+		_rtw_down_sema(&(pxmitpriv->tx_retevt));
 		
 	}
 
@@ -1164,7 +1164,7 @@ int usbctrl_vendorreq(struct intf_priv *pintfpriv, u8 request, u16 value, u16 in
 							transfer_flags, &usb_device_req, pdata, 0);
 #endif
 
-//	usleep_os(10);
+//	rtw_usleep_os(10);
 
 	if ( usbTrans )
 	{

@@ -109,24 +109,24 @@ typedef _sema _pwrlock;
 
 __inline static void _init_pwrlock(_pwrlock *plock)
 {
-	_init_sema(plock, 1);
+	_rtw_init_sema(plock, 1);
 }
 
 __inline static void _free_pwrlock(_pwrlock *plock)
 {
-	_free_sema(plock);
+	_rtw_free_sema(plock);
 }
 
 
 __inline static void _enter_pwrlock(_pwrlock *plock)
 {
-	_down_sema(plock);
+	_rtw_down_sema(plock);
 }
 
 
 __inline static void _exit_pwrlock(_pwrlock *plock)
 {
-	_up_sema(plock);
+	_rtw_up_sema(plock);
 }
 
 #define LPS_DELAY_TIME	1*HZ // 1 sec
@@ -175,9 +175,9 @@ struct	pwrctrl_priv {
 	volatile u8 cpwm; // fw current power state. updated when 1. read from HCPWM 2. driver lowers power level
 	volatile u8 tog; // toggling
 	volatile u8 cpwm_tog; // toggling
-	uint pwr_mode;
-	uint smart_ps;
-	uint alives;
+	u8	pwr_mode;
+	u8	smart_ps;
+	uint	alives;
 
 	u8	b_hw_radio_off;
 	u8	reg_rfoff;
@@ -239,19 +239,19 @@ struct	pwrctrl_priv {
 
 
 
-extern void init_pwrctrl_priv(_adapter *adapter);
-extern void free_pwrctrl_priv(_adapter * adapter);
-extern sint register_tx_alive(_adapter *padapter);
-extern void unregister_tx_alive(_adapter *padapter);
-extern sint register_rx_alive(_adapter *padapter);
-extern void unregister_rx_alive(_adapter *padapter);
-extern sint register_cmd_alive(_adapter *padapter);
-extern void unregister_cmd_alive(_adapter *padapter);
-extern sint register_evt_alive(_adapter *padapter);
-extern void unregister_evt_alive(_adapter *padapter);
+extern void rtw_init_pwrctrl_priv(_adapter *adapter);
+extern void rtw_free_pwrctrl_priv(_adapter * adapter);
+extern sint rtw_register_tx_alive(_adapter *padapter);
+extern void rtw_unregister_tx_alive(_adapter *padapter);
+extern sint rtw_register_rx_alive(_adapter *padapter);
+extern void rtw_unregister_rx_alive(_adapter *padapter);
+extern sint rtw_register_cmd_alive(_adapter *padapter);
+extern void rtw_unregister_cmd_alive(_adapter *padapter);
+extern sint rtw_register_evt_alive(_adapter *padapter);
+extern void rtw_unregister_evt_alive(_adapter *padapter);
 extern void cpwm_int_hdl(_adapter *padapter, struct reportpwrstate_parm *preportpwrstate);
-extern void set_ps_mode(_adapter * padapter, uint ps_mode, uint smart_ps);
-extern void set_rpwm(_adapter * padapter, u8 val8);
+extern void rtw_set_ps_mode(_adapter * padapter, u8 ps_mode, u8 smart_ps);
+extern void rtw_set_rpwm(_adapter * padapter, u8 val8);
 extern void LeaveAllPowerSaveMode(PADAPTER Adapter);
 void ips_enter(_adapter * padapter);
 int ips_leave(_adapter * padapter);

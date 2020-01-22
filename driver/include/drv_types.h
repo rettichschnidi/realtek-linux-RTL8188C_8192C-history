@@ -173,6 +173,9 @@ struct registry_priv
 	u8		hwpdn_mode;//0:disable,1:enable,2:deside by EFUSE config
 	u8		hwpwrp_detect;//0:disable,1:enable
 	  
+#ifdef CONFIG_ADAPTOR_INFO_CACHING_FILE
+	char	adaptor_info_caching_file_path[PATH_LENGTH_MAX];
+#endif
 };
 
 
@@ -359,7 +362,7 @@ struct _ADAPTER{
 	struct	hostapd_priv	*phostapdpriv;		
 #endif
 
-#if ( P2P_INCLUDED == 1 )
+#ifdef CONFIG_P2P
 	struct wifidirect_info	wdinfo;
 #endif
 

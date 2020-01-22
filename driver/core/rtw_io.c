@@ -42,7 +42,7 @@ Compiler Flag Option:
    b. USE_SYNC_IRP: Only sync operations are provided.
 
 
-Only sync read/write_mem operations are provided.
+Only sync read/rtw_write_mem operations are provided.
 
 jackson@realtek.com.tw
 
@@ -72,7 +72,7 @@ jackson@realtek.com.tw
 #endif
 
 
-u8 read8(_adapter *adapter, u32 addr)
+u8 rtw_read8(_adapter *adapter, u32 addr)
 {
 	u8 r_val;
 	//struct	io_queue  	*pio_queue = (struct io_queue *)adapter->pio_queue;
@@ -87,7 +87,7 @@ u8 read8(_adapter *adapter, u32 addr)
 	return r_val;
 }
 
-u16 read16(_adapter *adapter, u32 addr)
+u16 rtw_read16(_adapter *adapter, u32 addr)
 {
 	u16 r_val;
 	//struct	io_queue  	*pio_queue = (struct io_queue *)adapter->pio_queue;
@@ -102,7 +102,7 @@ u16 read16(_adapter *adapter, u32 addr)
 	return r_val;
 }
 	
-u32 read32(_adapter *adapter, u32 addr)
+u32 rtw_read32(_adapter *adapter, u32 addr)
 {
 	u32 r_val;
 	//struct	io_queue  	*pio_queue = (struct io_queue *)adapter->pio_queue;
@@ -118,7 +118,7 @@ u32 read32(_adapter *adapter, u32 addr)
 
 }
 
-void write8(_adapter *adapter, u32 addr, u8 val)
+void rtw_write8(_adapter *adapter, u32 addr, u8 val)
 {
 	//struct	io_queue  	*pio_queue = (struct io_queue *)adapter->pio_queue;
 	struct io_priv *pio_priv = &adapter->iopriv;
@@ -129,7 +129,7 @@ void write8(_adapter *adapter, u32 addr, u8 val)
 
 	_write8(pintfhdl, addr, val);
 }
-void write16(_adapter *adapter, u32 addr, u16 val)
+void rtw_write16(_adapter *adapter, u32 addr, u16 val)
 {
 	//struct	io_queue  	*pio_queue = (struct io_queue *)adapter->pio_queue;
 	struct io_priv *pio_priv = &adapter->iopriv;
@@ -142,7 +142,7 @@ void write16(_adapter *adapter, u32 addr, u16 val)
 	_func_exit_;
 
 }
-void write32(_adapter *adapter, u32 addr, u32 val)
+void rtw_write32(_adapter *adapter, u32 addr, u32 val)
 {
 	//struct	io_queue  	*pio_queue = (struct io_queue *)adapter->pio_queue;
 	struct io_priv *pio_priv = &adapter->iopriv;
@@ -155,7 +155,7 @@ void write32(_adapter *adapter, u32 addr, u32 val)
 	_func_exit_;
 
 }
-void writeN(_adapter *adapter, u32 addr ,u32 length , u8 *pdata)
+void rtw_writeN(_adapter *adapter, u32 addr ,u32 length , u8 *pdata)
 {
 	//struct	io_queue  	*pio_queue = (struct io_queue *)adapter->pio_queue;
 	struct io_priv *pio_priv = &adapter->iopriv;
@@ -168,7 +168,7 @@ void writeN(_adapter *adapter, u32 addr ,u32 length , u8 *pdata)
 	_func_exit_;
 
 }
-void write8_async(_adapter *adapter, u32 addr, u8 val)
+void rtw_write8_async(_adapter *adapter, u32 addr, u8 val)
 {
 	//struct	io_queue  	*pio_queue = (struct io_queue *)adapter->pio_queue;
 	struct io_priv *pio_priv = &adapter->iopriv;
@@ -181,7 +181,7 @@ void write8_async(_adapter *adapter, u32 addr, u8 val)
 	_func_exit_;
 
 }
-void write16_async(_adapter *adapter, u32 addr, u16 val)
+void rtw_write16_async(_adapter *adapter, u32 addr, u16 val)
 {
 	//struct	io_queue  	*pio_queue = (struct io_queue *)adapter->pio_queue;
 	struct io_priv *pio_priv = &adapter->iopriv;
@@ -194,7 +194,7 @@ void write16_async(_adapter *adapter, u32 addr, u16 val)
 	_func_exit_;
 
 }
-void write32_async(_adapter *adapter, u32 addr, u32 val)
+void rtw_write32_async(_adapter *adapter, u32 addr, u32 val)
 {
 	//struct	io_queue  	*pio_queue = (struct io_queue *)adapter->pio_queue;
 	struct io_priv *pio_priv = &adapter->iopriv;
@@ -207,7 +207,7 @@ void write32_async(_adapter *adapter, u32 addr, u32 val)
 	_func_exit_;
 
 }
-void read_mem(_adapter *adapter, u32 addr, u32 cnt, u8 *pmem)
+void rtw_read_mem(_adapter *adapter, u32 addr, u32 cnt, u8 *pmem)
 {
 	void (*_read_mem)(struct intf_hdl *pintfhdl, u32 addr, u32 cnt, u8 *pmem);	
 	//struct	io_queue  	*pio_queue = (struct io_queue *)adapter->pio_queue;
@@ -218,7 +218,7 @@ void read_mem(_adapter *adapter, u32 addr, u32 cnt, u8 *pmem)
 
 	if( (adapter->bDriverStopped ==_TRUE) || (adapter->bSurpriseRemoved == _TRUE))
 	{
-	     RT_TRACE(_module_rtl871x_io_c_, _drv_info_, ("read_mem:bDriverStopped(%d) OR bSurpriseRemoved(%d)", adapter->bDriverStopped, adapter->bSurpriseRemoved));	    
+	     RT_TRACE(_module_rtl871x_io_c_, _drv_info_, ("rtw_read_mem:bDriverStopped(%d) OR bSurpriseRemoved(%d)", adapter->bDriverStopped, adapter->bSurpriseRemoved));	    
 	     return;
 	}	
 	
@@ -230,7 +230,7 @@ void read_mem(_adapter *adapter, u32 addr, u32 cnt, u8 *pmem)
 	
 }
 
-void write_mem(_adapter *adapter, u32 addr, u32 cnt, u8 *pmem)
+void rtw_write_mem(_adapter *adapter, u32 addr, u32 cnt, u8 *pmem)
 {	
 	void (*_write_mem)(struct intf_hdl *pintfhdl, u32 addr, u32 cnt, u8 *pmem);	
 	//struct	io_queue  	*pio_queue = (struct io_queue *)adapter->pio_queue;
@@ -247,7 +247,7 @@ void write_mem(_adapter *adapter, u32 addr, u32 cnt, u8 *pmem)
 	
 }
 
-void read_port(_adapter *adapter, u32 addr, u32 cnt, u8 *pmem)
+void rtw_read_port(_adapter *adapter, u32 addr, u32 cnt, u8 *pmem)
 {	
 	u32 (*_read_port)(struct intf_hdl *pintfhdl, u32 addr, u32 cnt, u8 *pmem);	
 	//struct	io_queue  	*pio_queue = (struct io_queue *)adapter->pio_queue;
@@ -258,7 +258,7 @@ void read_port(_adapter *adapter, u32 addr, u32 cnt, u8 *pmem)
 
 	if( (adapter->bDriverStopped ==_TRUE) || (adapter->bSurpriseRemoved == _TRUE))
 	{
-	     RT_TRACE(_module_rtl871x_io_c_, _drv_info_, ("read_port:bDriverStopped(%d) OR bSurpriseRemoved(%d)", adapter->bDriverStopped, adapter->bSurpriseRemoved));	    
+	     RT_TRACE(_module_rtl871x_io_c_, _drv_info_, ("rtw_read_port:bDriverStopped(%d) OR bSurpriseRemoved(%d)", adapter->bDriverStopped, adapter->bSurpriseRemoved));	    
 	     return;
 	}	
 
@@ -283,7 +283,7 @@ void read_port_cancel(_adapter *adapter)
 			
 }
 
-void write_port(_adapter *adapter, u32 addr, u32 cnt, u8 *pmem)
+void rtw_write_port(_adapter *adapter, u32 addr, u32 cnt, u8 *pmem)
 {	
 	u32 (*_write_port)(struct intf_hdl *pintfhdl, u32 addr, u32 cnt, u8 *pmem);
 	//struct	io_queue  	*pio_queue = (struct io_queue *)adapter->pio_queue;
@@ -314,7 +314,7 @@ void write_port_cancel(_adapter *adapter)
 }
 
 
-void attrib_read(_adapter *adapter, u32 addr, u32 cnt, u8 *pmem){
+void rtw_attrib_read(_adapter *adapter, u32 addr, u32 cnt, u8 *pmem){
 #ifdef CONFIG_SDIO_HCI
 	void (*_attrib_read)(struct intf_hdl *pintfhdl, u32 addr, u32 cnt, u8 *pmem);
 	
@@ -332,7 +332,7 @@ void attrib_read(_adapter *adapter, u32 addr, u32 cnt, u8 *pmem){
 #endif
 }
 
-void attrib_write(_adapter *adapter, u32 addr, u32 cnt, u8 *pmem){
+void rtw_attrib_write(_adapter *adapter, u32 addr, u32 cnt, u8 *pmem){
 #ifdef CONFIG_SDIO_HCI
 	void (*_attrib_write)(struct intf_hdl *pintfhdl, u32 addr, u32 cnt, u8 *pmem);
 	

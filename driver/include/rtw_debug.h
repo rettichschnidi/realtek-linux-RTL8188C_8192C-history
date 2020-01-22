@@ -232,7 +232,11 @@ extern void rtl871x_cedbg(const char *fmt, ...);
 #endif
 
 
-#ifdef CONFIG_DEBUG_RTL8192C
+#ifndef CONFIG_DEBUG_RTL8192C
+	#ifdef PLATFORM_LINUX
+	#define printk(x, ...) {} 
+	#endif
+#endif	//CONFIG_DEBUG_RTL8192C
 
 	#ifdef PLATFORM_WINDOWS
 	#define _dbgdump	DbgPrint
@@ -277,7 +281,7 @@ extern void rtl871x_cedbg(const char *fmt, ...);
 	#undef ERR_8192C
 	#define ERR_8192C _dbgdump
 
-#endif	//CONFIG_DEBUG_RTL8192C
+
 
 #ifdef CONFIG_PROC_DEBUG
 
@@ -383,3 +387,4 @@ extern void rtl871x_cedbg(const char *fmt, ...);
 //#define DBG_HAL_INIT_PROFILING
 
 #endif	//__RTW_DEBUG_H__
+

@@ -51,13 +51,13 @@
 #define IQK_BB_REG_NUM			9
 #define HP_THERMAL_NUM		8
 
-#if (DEV_BUS_TYPE == DEV_BUS_PCI_INTERFACE)
+#ifdef CONFIG_PCI_HCI
 #define MAX_AGGR_NUM	0x0A0A
 #else
 #define MAX_AGGR_NUM	0x0909
 #endif
 
-#if (DEV_BUS_TYPE == DEV_BUS_PCI_INTERFACE)
+#ifdef CONFIG_PCI_HCI
 #define	SET_RTL8192SE_RF_SLEEP(_pAdapter)							\
 {																	\
 	u1Byte		u1bTmp;												\

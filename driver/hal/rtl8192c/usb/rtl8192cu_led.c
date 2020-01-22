@@ -129,18 +129,18 @@ SwLedOn(
 		(BOARD_USB_SOLO == pHalData->BoardType)||
 		(BOARD_USB_COMBO == pHalData->BoardType))
 	{
-		LedCfg = read8(padapter, REG_LEDCFG2);
+		LedCfg = rtw_read8(padapter, REG_LEDCFG2);
 		switch(pLed->LedPin)
 		{	
 			case LED_PIN_GPIO0:
 				break;
 
 			case LED_PIN_LED0:
-				write8(padapter, REG_LEDCFG2, (LedCfg&0xf0)|BIT5|BIT6); // SW control led0 on.
+				rtw_write8(padapter, REG_LEDCFG2, (LedCfg&0xf0)|BIT5|BIT6); // SW control led0 on.
 				break;
 
 			case LED_PIN_LED1:
-				write8(padapter, REG_LEDCFG2, (LedCfg&0x0f)|BIT5); // SW control led1 on.
+				rtw_write8(padapter, REG_LEDCFG2, (LedCfg&0x0f)|BIT5); // SW control led1 on.
 				break;
 
 			default:
@@ -159,22 +159,22 @@ SwLedOn(
 #ifdef CONFIG_ANTENNA_DIVERSITY
 				if(pHalData->AntDivCfg)
 				{
-					LedCfg = read8(padapter, REG_LEDCFG2);
-					write8(padapter, REG_LEDCFG2, (LedCfg&0xe0)|BIT7|BIT6|BIT5); // SW control led0 on.
+					LedCfg = rtw_read8(padapter, REG_LEDCFG2);
+					rtw_write8(padapter, REG_LEDCFG2, (LedCfg&0xe0)|BIT7|BIT6|BIT5); // SW control led0 on.
 					//RT_TRACE(COMP_LED, DBG_LOUD, ("SwLedOn LED0 0x%x\n", PlatformEFIORead4Byte(Adapter, REG_LEDCFG2)));
 				}
 				else
 #endif
 				{
-					LedCfg = read8(padapter, REG_LEDCFG0);
-					write8(padapter,REG_LEDCFG0, LedCfg&0x70); // SW control led0 on.
+					LedCfg = rtw_read8(padapter, REG_LEDCFG0);
+					rtw_write8(padapter,REG_LEDCFG0, LedCfg&0x70); // SW control led0 on.
 					//RT_TRACE(COMP_LED, DBG_LOUD, ("SwLedOn LED0 0x%lx\n", PlatformEFIORead4Byte(Adapter, REG_LEDCFG0)));
 				}
 				break;
 
 			case LED_PIN_LED1:
-				LedCfg = read8(padapter,(REG_LEDCFG1));
-				write8(padapter,(REG_LEDCFG1), LedCfg&0x70); // SW control led1 on.
+				LedCfg = rtw_read8(padapter,(REG_LEDCFG1));
+				rtw_write8(padapter,(REG_LEDCFG1), LedCfg&0x70); // SW control led1 on.
 				//RT_TRACE(COMP_LED, DBG_LOUD, ("SwLedOn LED1 0x%lx\n", PlatformEFIORead4Byte(Adapter, REG_LEDCFG0)));
 			
 				break;
@@ -210,7 +210,7 @@ SwLedOff(
 		(BOARD_USB_SOLO == pHalData->BoardType)||
 		(BOARD_USB_COMBO == pHalData->BoardType))
 	{
-		LedCfg = read8(padapter, REG_LEDCFG2);//0x4E
+		LedCfg = rtw_read8(padapter, REG_LEDCFG2);//0x4E
 
 		switch(pLed->LedPin)
 		{
@@ -222,24 +222,24 @@ SwLedOff(
 				if(BOARD_USB_COMBO == pHalData->BoardType)
 				{
 					LedCfg &= 0x90; // Set to software control.				
-					write8(padapter, REG_LEDCFG2, (LedCfg|BIT3));				
-					LedCfg = read8(padapter, REG_MAC_PINMUX_CFG);
+					rtw_write8(padapter, REG_LEDCFG2, (LedCfg|BIT3));				
+					LedCfg = rtw_read8(padapter, REG_MAC_PINMUX_CFG);
 					LedCfg &= 0xFE;
-					write8(padapter, REG_MAC_PINMUX_CFG, LedCfg);									
+					rtw_write8(padapter, REG_MAC_PINMUX_CFG, LedCfg);									
 				}
 				else
 				{
 					LedCfg &= 0xf0; // Set to software control.
 					if(pHalData->bLedOpenDrain == _TRUE) // Open-drain arrangement for controlling the LED
-						write8(padapter, REG_LEDCFG2, (LedCfg|BIT1|BIT5|BIT6));
+						rtw_write8(padapter, REG_LEDCFG2, (LedCfg|BIT1|BIT5|BIT6));
 					else
-						write8(padapter, REG_LEDCFG2, (LedCfg|BIT3|BIT5|BIT6));
+						rtw_write8(padapter, REG_LEDCFG2, (LedCfg|BIT3|BIT5|BIT6));
 				}
 				break;
 
 			case LED_PIN_LED1:
 				LedCfg &= 0x0f; // Set to software control.
-				write8(padapter, REG_LEDCFG2, (LedCfg|BIT3));
+				rtw_write8(padapter, REG_LEDCFG2, (LedCfg|BIT3));
 				break;
 
 			default:
@@ -257,25 +257,25 @@ SwLedOff(
 #ifdef CONFIG_ANTENNA_DIVERSITY
 				if(pHalData->AntDivCfg)
 				{
-					LedCfg = read8(padapter, REG_LEDCFG2);
+					LedCfg = rtw_read8(padapter, REG_LEDCFG2);
 					LedCfg &= 0xe0; // Set to software control. 			
-					write8(padapter, REG_LEDCFG2, (LedCfg|BIT3|BIT7|BIT6|BIT5));
+					rtw_write8(padapter, REG_LEDCFG2, (LedCfg|BIT3|BIT7|BIT6|BIT5));
 					//RT_TRACE(COMP_LED, DBG_LOUD, ("SwLedOff LED0 0x%x\n", PlatformEFIORead4Byte(Adapter, REG_LEDCFG2)));
 				}
 				else
 #endif
 				{
-					LedCfg = read8(padapter, REG_LEDCFG0);
+					LedCfg = rtw_read8(padapter, REG_LEDCFG0);
 					LedCfg &= 0x70; // Set to software control. 			
-					write8(padapter, REG_LEDCFG0, (LedCfg|BIT3));
+					rtw_write8(padapter, REG_LEDCFG0, (LedCfg|BIT3));
 					//RT_TRACE(COMP_LED, DBG_LOUD, ("SwLedOff LED0 0x%lx\n", PlatformEFIORead4Byte(Adapter, REG_LEDCFG0)));
 				}
 				break;
 
 			case LED_PIN_LED1:
-				LedCfg = read8(padapter, (REG_LEDCFG1));
+				LedCfg = rtw_read8(padapter, (REG_LEDCFG1));
 				LedCfg &= 0x70; // Set to software control.
-				write8(padapter,  (REG_LEDCFG1), (LedCfg|BIT3));
+				rtw_write8(padapter,  (REG_LEDCFG1), (LedCfg|BIT3));
 				//RT_TRACE(COMP_LED, DBG_LOUD, ("SwLedOff LED1 0x%lx\n", PlatformEFIORead4Byte(Adapter, REG_LEDCFG0)));
 				break;
 

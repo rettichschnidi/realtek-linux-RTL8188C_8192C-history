@@ -187,10 +187,12 @@ struct mp_tx
 	u8 stop;
 	u32 count, sended;
 	u8 payload;
-	struct xmit_frame xmitframe;
+	struct pkt_attrib attrib;
+	struct tx_desc desc;
+	u8 *pallocated_buf;
 	u8 *buf;
 	u32 buf_size, write_size;
-	_workitem workitem;
+	_thread_hdl_	PktTxThread;
 };
 
 //#if (MP_DRIVER == 1)
@@ -615,6 +617,7 @@ extern void	SetSingleCarrierTx(PADAPTER pAdapter, u8 bStart);
 extern void	SetSingleToneTx(PADAPTER pAdapter, u8 bStart);
 extern void	SetCarrierSuppressionTx(PADAPTER pAdapter, u8 bStart);
 
+extern void	fill_txdesc_for_mp(PADAPTER padapter, struct tx_desc *ptxdesc);
 extern void	SetPacketTx(PADAPTER padapter);
 
 extern void	ResetPhyRxPktCount(PADAPTER pAdapter);

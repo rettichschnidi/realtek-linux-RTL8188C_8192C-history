@@ -116,7 +116,7 @@ __inline static void _exit_hwio_critical(_rwlock *prwlock, _irqL *pirqL)
 	ReleaseMutex(*prwlock);
 }
 
-__inline static void list_delete(_list *plist)
+__inline static void rtw_list_delete(_list *plist)
 {
 	RemoveEntryList(plist);
 	InitializeListHead(plist);

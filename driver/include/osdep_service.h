@@ -69,7 +69,7 @@
 	#include <linux/delay.h>
 	#include <linux/proc_fs.h>	// Necessary because we use the proc fs
 
-#ifdef CONFIG_RTL8712_TCP_CSUM_OFFLOAD_TX
+#ifdef CONFIG_TCP_CSUM_OFFLOAD_TX
 	#include <linux/in.h>
 	#include <linux/ip.h>
 	#include <linux/udp.h>
@@ -209,7 +209,7 @@ __inline static void _exit_critical_mutex(_mutex *pmutex, _irqL *pirqL)
 #endif
 }
 
-__inline static void list_delete(_list *plist)
+__inline static void rtw_list_delete(_list *plist)
 {
 	list_del_init(plist);
 }
@@ -376,7 +376,7 @@ __inline static _exit_critical_mutex(_mutex *pmutex, _irqL *pirqL)
 }
 
 
-__inline static void list_delete(_list *plist)
+__inline static void rtw_list_delete(_list *plist)
 {
 	RemoveEntryList(plist);
 	InitializeListHead(plist);	
@@ -442,8 +442,8 @@ __inline static void _set_workitem(_workitem *pwork)
 	#define BIT(x)	( 1 << (x))
 #endif
 
-#define DBG_MEM_ALLOC
 #ifdef DBG_MEM_ALLOC
+void rtw_dump_mem_stat (void);
 extern u8* dbg_rtw_vmalloc(u32 sz, const char *func, int line);
 extern u8* dbg_rtw_zvmalloc(u32 sz, const char *func, int line);
 extern void dbg_rtw_vmfree(u8 *pbuf, u32 sz, const char *func, int line);
@@ -471,42 +471,42 @@ extern void	_rtw_mfree(u8 *pbuf, u32 sz);
 #define rtw_mfree(pbuf, sz)		_rtw_mfree((pbuf), (sz))
 #endif
 
-extern void	_memcpy(void* dec, void* sour, u32 sz);
-extern int	_memcmp(void *dst, void *src, u32 sz);
-extern void	_memset(void *pbuf, int c, u32 sz);
+extern void	_rtw_memcpy(void* dec, void* sour, u32 sz);
+extern int	_rtw_memcmp(void *dst, void *src, u32 sz);
+extern void	_rtw_memset(void *pbuf, int c, u32 sz);
 
-extern void	_init_listhead(_list *list);
-extern u32	is_list_empty(_list *phead);
-extern void	list_insert_tail(_list *plist, _list *phead);
-extern void	list_delete(_list *plist);
+extern void	_rtw_init_listhead(_list *list);
+extern u32	rtw_is_list_empty(_list *phead);
+extern void	rtw_list_insert_tail(_list *plist, _list *phead);
+extern void	rtw_list_delete(_list *plist);
 
-extern void	_init_sema(_sema *sema, int init_val);
-extern void	_free_sema(_sema	*sema);
-extern void	_up_sema(_sema	*sema);
-extern u32	_down_sema(_sema *sema);
+extern void	_rtw_init_sema(_sema *sema, int init_val);
+extern void	_rtw_free_sema(_sema	*sema);
+extern void	_rtw_up_sema(_sema	*sema);
+extern u32	_rtw_down_sema(_sema *sema);
 extern void	_rtw_mutex_init(_mutex *pmutex);
-extern void	_spinlock_init(_lock *plock);
-extern void	_spinlock_free(_lock *plock);
-extern void	_spinlock(_lock	*plock);
-extern void	_spinunlock(_lock	*plock);
-extern void	_spinlock_ex(_lock	*plock);
-extern void	_spinunlock_ex(_lock	*plock);
+extern void	_rtw_spinlock_init(_lock *plock);
+extern void	_rtw_spinlock_free(_lock *plock);
+extern void	_rtw_spinlock(_lock	*plock);
+extern void	_rtw_spinunlock(_lock	*plock);
+extern void	_rtw_spinlock_ex(_lock	*plock);
+extern void	_rtw_spinunlock_ex(_lock	*plock);
 
-extern void	_init_queue(_queue	*pqueue);
-extern u32	_queue_empty(_queue	*pqueue);
-extern u32	end_of_queue_search(_list *queue, _list *pelement);
+extern void	_rtw_init_queue(_queue	*pqueue);
+extern u32	_rtw_queue_empty(_queue	*pqueue);
+extern u32	rtw_end_of_queue_search(_list *queue, _list *pelement);
 
-extern u32	get_current_time(void);
-extern u32	systime_to_ms(u32 systime);
-extern s32	get_passing_time_ms(u32 start);
-extern s32	get_time_interval_ms(u32 start, u32 end);
+extern u32	rtw_get_current_time(void);
+extern u32	rtw_systime_to_ms(u32 systime);
+extern s32	rtw_get_passing_time_ms(u32 start);
+extern s32	rtw_get_time_interval_ms(u32 start, u32 end);
 
-extern void	sleep_schedulable(int ms);
+extern void	rtw_sleep_schedulable(int ms);
 
-extern void	msleep_os(int ms);
-extern void	usleep_os(int us);
-extern void	mdelay_os(int ms);
-extern void	udelay_os(int us);
+extern void	rtw_msleep_os(int ms);
+extern void	rtw_usleep_os(int us);
+extern void	rtw_mdelay_os(int ms);
+extern void	rtw_udelay_os(int us);
 
 
 
@@ -679,6 +679,28 @@ extern int ATOMIC_SUB_RETURN(ATOMIC_T *v, int i);
 extern int ATOMIC_INC_RETURN(ATOMIC_T *v);
 extern int ATOMIC_DEC_RETURN(ATOMIC_T *v);
 
+//File operation APIs, just for linux now
+#ifdef PLATFORM_LINUX
+extern int openFile(struct file **fpp, char *path,int flag,int mode);
+extern int closeFile(struct file *fp);
+extern int readFile(struct file *fp,char *buf,int len);
+extern int writeFile(struct file *fp,char *buf,int len);
+#endif
+
+
+#ifdef MEM_ALLOC_REFINE_ADAPTOR
+struct rtw_netdev_priv_indicator {
+	void *priv;
+	u32 sizeof_priv;
+};
+extern struct net_device * rtw_alloc_etherdev(int sizeof_priv);
+#define rtw_netdev_priv(netdev) ( ((struct rtw_netdev_priv_indicator *)netdev_priv(netdev))->priv )
+extern void rtw_free_netdev(struct net_device * netdev);
+#else
+#define rtw_alloc_etherdev(sizeof_priv) alloc_etherdev((sizeof_priv))
+#define rtw_netdev_priv(netdev) netdev_priv((netdev))
+#define rtw_free_netdev(netdev) free_netdev((netdev))
+#endif
 
 #endif
 

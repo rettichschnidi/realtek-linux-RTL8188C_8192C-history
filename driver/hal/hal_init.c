@@ -43,11 +43,13 @@ void intf_read_chip_info(_adapter *padapter)
 	if(padapter->HalFunc.read_adapter_info)
 		padapter->HalFunc.read_adapter_info(padapter);
 }
+
 void intf_read_chip_version(_adapter *padapter)
 {
 	if(padapter->HalFunc.read_chip_version)
 		padapter->HalFunc.read_chip_version(padapter);
 }
+
 void	rtw_dm_init(_adapter *padapter)
 {
 	if(padapter->HalFunc.dm_init)

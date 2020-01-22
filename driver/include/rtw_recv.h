@@ -41,6 +41,7 @@ static u8 SNAP_ETH_TYPE_IPX[2] = {0x81, 0x37};
 
 static u8 SNAP_ETH_TYPE_APPLETALK_AARP[2] = {0x80, 0xf3};
 static u8 SNAP_ETH_TYPE_APPLETALK_DDP[2] = {0x80, 0x9b};
+static u8 SNAP_ETH_TYPE_TDLS[2] = {0x89, 0x0d};
 static u8 SNAP_HDR_APPLETALK_DDP[3] = {0x08, 0x00, 0x07}; // Datagram Delivery Protocol
 
 static u8 oui_8021h[] = {0x00, 0x00, 0xf8};
@@ -121,7 +122,7 @@ struct rx_pkt_attrib	{
 	u8 	ta[ETH_ALEN];
 	u8 	ra[ETH_ALEN];
 	u8 	bssid[ETH_ALEN];
-#ifdef CONFIG_RTL8712_TCP_CSUM_OFFLOAD_RX
+#ifdef CONFIG_TCP_CSUM_OFFLOAD_RX
 	u8	tcpchk_valid; // 0: invalid, 1: valid
 	u8	ip_chkrpt; //0: incorrect, 1: correct
 	u8	tcp_chkrpt; //0: incorrect, 1: correct
@@ -186,7 +187,7 @@ struct rtw_rx_ring {
 #endif
 
 /*
-accesser of recv_priv: recv_entry(dispatch / passive level); recv_thread(passive) ; returnpkt(dispatch)
+accesser of recv_priv: rtw_recv_entry(dispatch / passive level); recv_thread(passive) ; returnpkt(dispatch)
 ; halt(passive) ;
 
 using enter_critical section to protect
@@ -424,17 +425,17 @@ union recv_frame{
 };
 
 
-extern union recv_frame *alloc_recvframe (_queue *pfree_recv_queue);  //get a free recv_frame from pfree_recv_queue
-extern void init_recvframe(union recv_frame *precvframe ,struct recv_priv *precvpriv);
-extern int	 free_recvframe(union recv_frame *precvframe, _queue *pfree_recv_queue);  
-extern union recv_frame *dequeue_recvframe (_queue *queue);
-extern int	enqueue_recvframe(union recv_frame *precvframe, _queue *queue);
-extern void free_recvframe_queue(_queue *pframequeue,  _queue *pfree_recv_queue);  
+extern union recv_frame *rtw_alloc_recvframe (_queue *pfree_recv_queue);  //get a free recv_frame from pfree_recv_queue
+extern void rtw_init_recvframe(union recv_frame *precvframe ,struct recv_priv *precvpriv);
+extern int	 rtw_free_recvframe(union recv_frame *precvframe, _queue *pfree_recv_queue);  
+extern union recv_frame *rtw_dequeue_recvframe (_queue *queue);
+extern int	rtw_enqueue_recvframe(union recv_frame *precvframe, _queue *queue);
+extern void rtw_free_recvframe_queue(_queue *pframequeue,  _queue *pfree_recv_queue);  
 
-sint enqueue_recvbuf(struct recv_buf *precvbuf, _queue *queue);
-struct recv_buf *dequeue_recvbuf (_queue *queue);
+sint rtw_enqueue_recvbuf(struct recv_buf *precvbuf, _queue *queue);
+struct recv_buf *rtw_dequeue_recvbuf (_queue *queue);
 
-void reordering_ctrl_timeout_handler(void *pcontext);
+void rtw_reordering_ctrl_timeout_handler(void *pcontext);
 
 __inline static u8 *get_rxmem(union recv_frame *precvframe)
 {
@@ -667,7 +668,7 @@ __inline static s32 translate_percentage_to_dbm(u32 SignalStrengthIndex)
 
 struct sta_info;
 
-extern void _init_sta_recv_priv(struct sta_recv_priv *psta_recvpriv);
+extern void _rtw_init_sta_recv_priv(struct sta_recv_priv *psta_recvpriv);
 
 extern void  mgt_dispatcher(_adapter *padapter, union recv_frame *precv_frame);
 

@@ -21,7 +21,7 @@
 #include <rtl8192c_sreset.h>
 #include <rtl8192c_hal.h>
 #ifdef SILENT_RESET_FOR_SPECIFIC_PLATFOM
-extern void cancel_all_timer(_adapter *padapter);
+extern void rtw_cancel_all_timer(_adapter *padapter);
 
 void rtl8192c_sreset_init_value(_adapter *padapter)
 {
@@ -54,8 +54,8 @@ static void _restore_security_setting(_adapter *padapter)
 	struct mlme_ext_info	*pmlmeinfo = &padapter->mlmeextpriv.mlmext_info;
 
 	(pmlmeinfo->auth_algo == dot11AuthAlgrthm_8021X)
-		? write8(padapter, REG_SECCFG, 0xcc)
-		: write8(padapter, REG_SECCFG, 0xcf);
+		? rtw_write8(padapter, REG_SECCFG, 0xcc)
+		: rtw_write8(padapter, REG_SECCFG, 0xcf);
 	
 	if (	( padapter->securitypriv.dot11PrivacyAlgrthm == _WEP40_ ) ||
 		( padapter->securitypriv.dot11PrivacyAlgrthm == _WEP104_ ))		
@@ -63,23 +63,23 @@ static void _restore_security_setting(_adapter *padapter)
 
 		for(EntryId=0; EntryId<4; EntryId++)
 		{				
-			set_key(padapter,&padapter->securitypriv, EntryId);				
+			rtw_set_key(padapter,&padapter->securitypriv, EntryId);				
 		}	
 
 	}
 	else if((padapter->securitypriv.dot11PrivacyAlgrthm == _TKIP_) ||
 		(padapter->securitypriv.dot11PrivacyAlgrthm == _AES_))
 	{
-		psta = get_stainfo(pstapriv, get_bssid(pmlmepriv));				
+		psta = rtw_get_stainfo(pstapriv, get_bssid(pmlmepriv));				
 		if (psta == NULL) {
 			//DEBUG_ERR( ("Set wpa_set_encryption: Obtain Sta_info fail \n"));
 		}
 		else
 		{			
 			//pairwise key
-			setstakey_cmd(padapter, (unsigned char *)psta, _TRUE);
+			rtw_setstakey_cmd(padapter, (unsigned char *)psta, _TRUE);
 			//group key			
-			set_key(padapter,&padapter->securitypriv,padapter->securitypriv.dot118021XGrpKeyid);
+			rtw_set_key(padapter,&padapter->securitypriv,padapter->securitypriv.dot118021XGrpKeyid);
 		}
 	}
 	
@@ -100,37 +100,37 @@ static void _restore_network_status(_adapter *padapter)
 	//set MSR to nolink		
 	Set_NETYPE0_MSR(padapter, _HW_STATE_NOLINK_);		
 	// reject all data frame
-	write16(padapter, REG_RXFLTMAP2,0x00);		
+	rtw_write16(padapter, REG_RXFLTMAP2,0x00);		
 	//reset TSF
-	write8(padapter, REG_DUAL_TSF_RST, (BIT(0)|BIT(1)));
+	rtw_write8(padapter, REG_DUAL_TSF_RST, (BIT(0)|BIT(1)));
 
 	//disable update TSF
 	if(IS_NORMAL_CHIP(pHalData->VersionID))
-		write8(padapter, REG_BCN_CTRL, read8(padapter, REG_BCN_CTRL)|BIT(4));		
+		rtw_write8(padapter, REG_BCN_CTRL, rtw_read8(padapter, REG_BCN_CTRL)|BIT(4));		
 	else	
-		write8(padapter, REG_BCN_CTRL, read8(padapter, REG_BCN_CTRL)|BIT(4)|BIT(5));					
+		rtw_write8(padapter, REG_BCN_CTRL, rtw_read8(padapter, REG_BCN_CTRL)|BIT(4)|BIT(5));					
 
 	//=======================================================
-	joinbss_reset(padapter);
+	rtw_joinbss_reset(padapter);
 	set_channel_bwmode(padapter, pmlmeext->cur_channel, pmlmeext->cur_ch_offset, pmlmeext->cur_bwmode);
 	//pmlmeinfo->assoc_AP_vendor = maxAP;
 	
 	if (padapter->registrypriv.wifi_spec) {
 		// for WiFi test, follow WMM test plan spec
-		write32(padapter, REG_EDCA_VO_PARAM, 0x002F431C);
-		write32(padapter, REG_EDCA_VI_PARAM, 0x005E541C);
-		write32(padapter, REG_EDCA_BE_PARAM, 0x0000A525);
-		write32(padapter, REG_EDCA_BK_PARAM, 0x0000A549);
+		rtw_write32(padapter, REG_EDCA_VO_PARAM, 0x002F431C);
+		rtw_write32(padapter, REG_EDCA_VI_PARAM, 0x005E541C);
+		rtw_write32(padapter, REG_EDCA_BE_PARAM, 0x0000A525);
+		rtw_write32(padapter, REG_EDCA_BK_PARAM, 0x0000A549);
 	
                 // for WiFi test, mixed mode with intel STA under bg mode throughput issue
 	        if (padapter->mlmepriv.htpriv.ht_option == 0)
-		     write32(padapter, REG_EDCA_BE_PARAM, 0x00004320);
+		     rtw_write32(padapter, REG_EDCA_BE_PARAM, 0x00004320);
 
 	} else {
-		write32(padapter, REG_EDCA_VO_PARAM, 0x002F3217);
-		write32(padapter, REG_EDCA_VI_PARAM, 0x005E4317);
-		write32(padapter, REG_EDCA_BE_PARAM, 0x00105320);
-		write32(padapter, REG_EDCA_BK_PARAM, 0x0000A444);
+		rtw_write32(padapter, REG_EDCA_VO_PARAM, 0x002F3217);
+		rtw_write32(padapter, REG_EDCA_VI_PARAM, 0x005E4317);
+		rtw_write32(padapter, REG_EDCA_BE_PARAM, 0x00105320);
+		rtw_write32(padapter, REG_EDCA_BK_PARAM, 0x0000A444);
 	}
 	
 	//disable dynamic functions, such as high power, DIG
@@ -138,7 +138,7 @@ static void _restore_network_status(_adapter *padapter)
 #endif
 	mlmeext_joinbss_event_callback(padapter);
 	//restore Sequence No.
-	write8(padapter,0x4dc,padapter->xmitpriv.nqos_ssn);	
+	rtw_write8(padapter,0x4dc,padapter->xmitpriv.nqos_ssn);	
 }
 void rtl8192c_silentreset_for_specific_platform(_adapter *padapter)
 {
@@ -155,7 +155,7 @@ void rtl8192c_silentreset_for_specific_platform(_adapter *padapter)
 	if (!netif_queue_stopped(padapter->pnetdev))
 		netif_stop_queue(padapter->pnetdev);
 		
-	cancel_all_timer(padapter);	
+	rtw_cancel_all_timer(padapter);	
 	tasklet_kill(&pxmitpriv->xmit_tasklet);	
 
 	_enter_critical_mutex(&psrtpriv->silentreset_mutex, &irqL);
@@ -195,14 +195,14 @@ void rtl8192c_sreset_xmit_status_check(_adapter *padapter)
 	struct xmit_priv	*pxmitpriv = &padapter->xmitpriv;
 	unsigned int diff_time;
 	
-	if(read32(padapter, REG_TXDMA_STATUS) !=0x00){
+	if(rtw_read32(padapter, REG_TXDMA_STATUS) !=0x00){
 		rtl8192c_silentreset_for_specific_platform(padapter);						
 	}
 	
 	//total xmit irp = 4
-	//printk("==>%s free_xmitbuf_cnt(%d),txirp_cnt(%d)\n",__FUNCTION__,pxmitpriv->free_xmitbuf_cnt,pxmitpriv->txirp_cnt);
+	//DBG_8192C("==>%s free_xmitbuf_cnt(%d),txirp_cnt(%d)\n",__FUNCTION__,pxmitpriv->free_xmitbuf_cnt,pxmitpriv->txirp_cnt);
 	//if(pxmitpriv->txirp_cnt == NR_XMITBUFF+1)
-	current_time = get_current_time();
+	current_time = rtw_get_current_time();
 	if(0==pxmitpriv->free_xmitbuf_cnt)
 	{
 		diff_time = jiffies_to_msecs(current_time - psrtpriv->last_tx_time);
@@ -215,7 +215,7 @@ void rtl8192c_sreset_xmit_status_check(_adapter *padapter)
 				diff_time = jiffies_to_msecs(current_time - psrtpriv->last_tx_complete_time);
 				if(diff_time > 4000){
 					//padapter->Wifi_Error_Status = WIFI_TX_HANG;
-					printk("tx hang...start reset\n");
+					DBG_8192C("tx hang...start reset\n");
 					rtl8192c_silentreset_for_specific_platform(padapter);	
 				}
 			}
@@ -225,10 +225,10 @@ void rtl8192c_sreset_xmit_status_check(_adapter *padapter)
 void rtl8192c_sreset_linked_status_check(_adapter *padapter)
 {
 	u32 regc50,regc58,reg824,reg800;
-	regc50 = read32(padapter,0xc50);
-	regc58 = read32(padapter,0xc58);
-	reg824 = read32(padapter,0x824);
-	reg800 = read32(padapter,0x800);	
+	regc50 = rtw_read32(padapter,0xc50);
+	regc58 = rtw_read32(padapter,0xc58);
+	reg824 = rtw_read32(padapter,0x824);
+	reg800 = rtw_read32(padapter,0x800);	
 	if(	((regc50&0xFFFFFF00)!= 0x69543400)||
 		((regc58&0xFFFFFF00)!= 0x69543400)||
 		(((reg824&0xFFFFFF00)!= 0x00390000)&&(((reg824&0xFFFFFF00)!= 0x80390000)))||
@@ -251,21 +251,21 @@ u8 rtl8192c_sreset_get_wifi_status(_adapter *padapter)
         {
 		return status;
 	}
-	val32 =read32(padapter,REG_TXDMA_STATUS);
+	val32 =rtw_read32(padapter,REG_TXDMA_STATUS);
 	if(val32==0xeaeaeaea){
 		psrtpriv->Wifi_Error_Status = WIFI_IF_NOT_EXIST;
 	}
 	else if(val32!=0){
-		printk("txdmastatu(%x)\n",val32);
+		DBG_8192C("txdmastatu(%x)\n",val32);
 		psrtpriv->Wifi_Error_Status = WIFI_MAC_TXDMA_ERROR;
 	}	
 
 	if(WIFI_STATUS_SUCCESS !=psrtpriv->Wifi_Error_Status)
 	{
-		printk("==>%s error_status(0x%x) \n",__FUNCTION__,psrtpriv->Wifi_Error_Status);
+		DBG_8192C("==>%s error_status(0x%x) \n",__FUNCTION__,psrtpriv->Wifi_Error_Status);
 		status = (psrtpriv->Wifi_Error_Status &( ~(USB_READ_PORT_FAIL|USB_WRITE_PORT_FAIL)));
 	}
-	printk("==> %s wifi_status(0x%x)\n",__FUNCTION__,status);
+	DBG_8192C("==> %s wifi_status(0x%x)\n",__FUNCTION__,status);
 
 	//status restore 
 	psrtpriv->Wifi_Error_Status = WIFI_STATUS_SUCCESS;

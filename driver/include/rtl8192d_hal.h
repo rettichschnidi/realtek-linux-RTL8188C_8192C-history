@@ -30,7 +30,7 @@
 #include "rtl8192d_xmit.h"
 #include "rtl8192d_cmd.h"
 
-#if (DEV_BUS_TYPE == DEV_BUS_PCI_INTERFACE)
+#ifdef CONFIG_PCI_HCI
 	#include <pci_ops.h>
 	#include "Hal8192DEHWImg.h"
 	#include "Hal8192DETestHWImg.h"
@@ -85,7 +85,7 @@
 	#define Rtl819XAGCTAB_2TArray				Rtl8192DEAGCTAB_2TArray
 	#define Rtl819XAGCTAB_1TArray				Rtl8192DEAGCTAB_1TArray
 
-#elif (DEV_BUS_TYPE == DEV_BUS_USB_INTERFACE)
+#elif defined(CONFIG_USB_HCI)
 
 	#include "Hal8192DUHWImg.h"
 	#include "Hal8192DUTestHWImg.h"
@@ -157,9 +157,7 @@
 									(_pFwHdr->Signature&0xFFFF) == 0x92D3 )
 
 #define FW_8192D_SIZE				0x8000
-#define FW_8192C_SIZE				0x4000
-#define FW_8192C_START_ADDRESS	0x1000
-#define FW_8192C_END_ADDRESS		0x3FFF
+#define FW_8192D_START_ADDRESS	0x1000
 
 #define MAX_PAGE_SIZE				4096	// @ page : 4k bytes
 
@@ -170,7 +168,11 @@ typedef enum _FIRMWARE_SOURCE{
 
 typedef struct _RT_FIRMWARE{
 	FIRMWARE_SOURCE	eFWSource;
+	#ifdef CONFIG_EMBEDDED_FWIMG
+	u8*			szFwBuffer;
+	#else
 	u8			szFwBuffer[FW_8192D_SIZE];
+	#endif
 	u32			ulFwLength;
 }RT_FIRMWARE, *PRT_FIRMWARE, RT_FIRMWARE_92D, *PRT_FIRMWARE_92D;
 
@@ -266,7 +268,7 @@ typedef struct _IQK_MATRIX_REGS_SETTING{
 #endif	
 }IQK_MATRIX_REGS_SETTING,*PIQK_MATRIX_REGS_SETTING;
 
-#ifdef USB_RX_AGGREGATION
+#ifdef CONFIG_USB_RX_AGGREGATION
 
 typedef enum _USB_RX_AGG_MODE{
 	USB_RX_AGG_DISABLE,
@@ -800,11 +802,11 @@ struct hal_data_8192du
 
 	u8	Queue2EPNum[8];//for out endpoint number mapping
 
-#ifdef USB_TX_AGGREGATION
+#ifdef CONFIG_USB_TX_AGGREGATION
 	u8	UsbTxAggMode;
 	u8	UsbTxAggDescNum;
 #endif
-#ifdef USB_RX_AGGREGATION
+#ifdef CONFIG_USB_RX_AGGREGATION
 	u16	HwRxPageSize;				// Hardware setting
 	u32	MaxUsbRxAggBlock;
 

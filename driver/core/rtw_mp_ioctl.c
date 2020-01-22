@@ -700,8 +700,8 @@ _func_enter_;
 		struct mp_priv *pmp_priv = &Adapter->mppriv;
 		if (pmp_priv->tx.stop == 0) {
 			pmp_priv->tx.stop = 1;
-			printk("%s: pkt tx is running...\n", __func__);
-			msleep_os(5);
+			DBG_8192C("%s: pkt tx is running...\n", __func__);
+			rtw_msleep_os(5);
 		}
 		pmp_priv->tx.stop = 0;
 		pmp_priv->tx.count = 1;
@@ -736,8 +736,8 @@ _func_enter_;
 		struct mp_priv *pmp_priv = &Adapter->mppriv;
 		if (pmp_priv->tx.stop == 0) {
 			pmp_priv->tx.stop = 1;
-			printk("%s: pkt tx is running...\n", __func__);
-			msleep_os(5);
+			DBG_8192C("%s: pkt tx is running...\n", __func__);
+			rtw_msleep_os(5);
 		}
 		pmp_priv->tx.stop = 0;
 		pmp_priv->tx.count = 1;
@@ -772,8 +772,8 @@ _func_enter_;
 		struct mp_priv *pmp_priv = &Adapter->mppriv;
 		if (pmp_priv->tx.stop == 0) {
 			pmp_priv->tx.stop = 1;
-			printk("%s: pkt tx is running...\n", __func__);
-			msleep_os(5);
+			DBG_8192C("%s: pkt tx is running...\n", __func__);
+			rtw_msleep_os(5);
 		}
 		pmp_priv->tx.stop = 0;
 		pmp_priv->tx.count = 1;
@@ -903,14 +903,14 @@ _func_enter_;
 
 	switch (width) {
 		case 1:
-			RegRWStruct->value = read8(Adapter, offset);
+			RegRWStruct->value = rtw_read8(Adapter, offset);
 			break;
 		case 2:
-			RegRWStruct->value = read16(Adapter, offset);
+			RegRWStruct->value = rtw_read16(Adapter, offset);
 			break;
 		default:
 			width = 4;
-			RegRWStruct->value = read32(Adapter, offset);
+			RegRWStruct->value = rtw_read32(Adapter, offset);
 			break;
 	}
 	RT_TRACE(_module_mp_, _drv_notice_,
@@ -959,17 +959,17 @@ _func_enter_;
 				status = NDIS_STATUS_NOT_ACCEPTED;
 				break;
 			}
-			write8(padapter, offset, (u8)value);
+			rtw_write8(padapter, offset, (u8)value);
 			break;
 		case 2:
 			if (value > 0xFFFF) {
 				status = NDIS_STATUS_NOT_ACCEPTED;
 				break;
 			}
-			write16(padapter, offset, (u16)value);
+			rtw_write16(padapter, offset, (u16)value);
 			break;
 		case 4:
-			write32(padapter, offset, value);
+			rtw_write32(padapter, offset, value);
 			break;
 		default:
 			status = NDIS_STATUS_NOT_ACCEPTED;
@@ -1006,7 +1006,7 @@ _func_enter_;
 	pBstRwReg = (pBurst_RW_Reg)poid_par_priv->information_buf;
 
 	_irqlevel_changed_(&oldirql, LOWER);
-	read_mem(Adapter, pBstRwReg->offset, (u32)pBstRwReg->len, pBstRwReg->Data);
+	rtw_read_mem(Adapter, pBstRwReg->offset, (u32)pBstRwReg->len, pBstRwReg->Data);
 	_irqlevel_changed_(&oldirql,RAISE);
 
 	*poid_par_priv->bytes_rw = poid_par_priv->information_buf_len;
@@ -1037,7 +1037,7 @@ _func_enter_;
 	pBstRwReg = (pBurst_RW_Reg)poid_par_priv->information_buf;
 
 	_irqlevel_changed_(&oldirql, LOWER);
-	write_mem(Adapter, pBstRwReg->offset, (u32)pBstRwReg->len, pBstRwReg->Data);
+	rtw_write_mem(Adapter, pBstRwReg->offset, (u32)pBstRwReg->len, pBstRwReg->Data);
 	_irqlevel_changed_(&oldirql, RAISE);
 #endif
 	RT_TRACE(_module_mp_, _drv_info_, ("-oid_rt_pro_burst_write_register_hdl\n"));
@@ -1074,8 +1074,8 @@ _func_enter_;
 
 	_irqlevel_changed_(&oldirql, LOWER);
 
-	write32(Adapter, TxCmd_Info->offset + 0, (unsigned int)TxCmd_Info->TxCMD.value[0]);
-	write32(Adapter, TxCmd_Info->offset + 4, (unsigned int)TxCmd_Info->TxCMD.value[1]);
+	rtw_write32(Adapter, TxCmd_Info->offset + 0, (unsigned int)TxCmd_Info->TxCMD.value[0]);
+	rtw_write32(Adapter, TxCmd_Info->offset + 4, (unsigned int)TxCmd_Info->TxCMD.value[1]);
 
 	_irqlevel_changed_(&oldirql, RAISE);
 */
@@ -1174,7 +1174,7 @@ _func_enter_;
 
 	pwi_param = (struct mp_wiparam *)poid_par_priv->information_buf;
 
-	_memcpy(pwi_param, &Adapter->mppriv.workparam, sizeof(struct mp_wiparam));
+	_rtw_memcpy(pwi_param, &Adapter->mppriv.workparam, sizeof(struct mp_wiparam));
 	Adapter->mppriv.act_in_progress = _FALSE;
 //	RT_TRACE(_module_mp_, _drv_info_, ("rf:%x\n", pwiparam->IoValue));
 	*poid_par_priv->bytes_rw = poid_par_priv->information_buf_len;
@@ -1316,7 +1316,7 @@ _func_enter_;
 
 	_irqlevel_changed_(&oldirql, LOWER);
 
-	if (setrfintfs_cmd(Adapter, *(unsigned char*)poid_par_priv->information_buf) == _FAIL)
+	if (rtw_setrfintfs_cmd(Adapter, *(unsigned char*)poid_par_priv->information_buf) == _FAIL)
 		status = NDIS_STATUS_NOT_ACCEPTED;
 
 	_irqlevel_changed_(&oldirql, RAISE);
@@ -1341,7 +1341,7 @@ _func_enter_;
 	if (poid_par_priv->type_of_oid != QUERY_OID)
 		return NDIS_STATUS_NOT_ACCEPTED;
 
-	_memcpy(poid_par_priv->information_buf, (unsigned char*)&Adapter->mppriv.rxstat, sizeof(struct recv_stat));
+	_rtw_memcpy(poid_par_priv->information_buf, (unsigned char*)&Adapter->mppriv.rxstat, sizeof(struct recv_stat));
 	*poid_par_priv->bytes_rw = poid_par_priv->information_buf_len;
 
 _func_exit_;
@@ -1416,7 +1416,7 @@ _func_enter_;
 
 	_irqlevel_changed_(&oldirql, LOWER);
 
-	if (setdatarate_cmd(Adapter, poid_par_priv->information_buf) !=_SUCCESS)
+	if (rtw_setdatarate_cmd(Adapter, poid_par_priv->information_buf) !=_SUCCESS)
 		status = NDIS_STATUS_NOT_ACCEPTED;
 
 	_irqlevel_changed_(&oldirql, RAISE);
@@ -1485,7 +1485,7 @@ _func_enter_;
 
 	_irqlevel_changed_(&oldirql, LOWER);
 
-	if (!gettssi_cmd(Adapter,0, (u8*)&Adapter->mppriv.workparam.io_value))
+	if (!rtw_gettssi_cmd(Adapter,0, (u8*)&Adapter->mppriv.workparam.io_value))
 		status = NDIS_STATUS_NOT_ACCEPTED;
 
 	_irqlevel_changed_(&oldirql, RAISE);
@@ -1562,7 +1562,7 @@ _func_enter_;
 
 	_irqlevel_changed_(&oldirql, LOWER);
 
-	if (setbasicrate_cmd(Adapter, datarates) != _SUCCESS)
+	if (rtw_setbasicrate_cmd(Adapter, datarates) != _SUCCESS)
 		status = NDIS_STATUS_NOT_ACCEPTED;
 
 	_irqlevel_changed_(&oldirql, RAISE);
@@ -1591,7 +1591,7 @@ _func_enter_;
 		return NDIS_STATUS_INVALID_LENGTH;
 
 	*poid_par_priv->bytes_rw = 8;
-	_memcpy(poid_par_priv->information_buf, &(Adapter->pwrctrlpriv.pwr_mode), 8);
+	_rtw_memcpy(poid_par_priv->information_buf, &(Adapter->pwrctrlpriv.pwr_mode), 8);
 	*poid_par_priv->bytes_rw = poid_par_priv->information_buf_len;
 
 	RT_TRACE(_module_mp_, _drv_notice_,
@@ -1664,7 +1664,7 @@ _func_enter_;
 	prate_table = (struct setratable_parm*)poid_par_priv->information_buf;
 
 	_irqlevel_changed_(&oldirql, LOWER);
-	res = setrttbl_cmd(Adapter, prate_table);
+	res = rtw_setrttbl_cmd(Adapter, prate_table);
 	_irqlevel_changed_(&oldirql, RAISE);
 
 	if (res == _FAIL)
@@ -1708,7 +1708,7 @@ _func_enter_;
 				pmp_wi_cntx->param.bytes_cnt=sizeof(struct getratable_rsp);
 				pmp_wi_cntx->param.io_value=0xffffffff;
 
-				res=getrttbl_cmd(Adapter,(struct getratable_rsp *)pmp_wi_cntx->param.data);
+				res=rtw_getrttbl_cmd(Adapter,(struct getratable_rsp *)pmp_wi_cntx->param.data);
 				*poid_par_priv->bytes_rw = poid_par_priv->information_buf_len;
 				if(res != _SUCCESS)
 				{
@@ -1857,10 +1857,10 @@ NDIS_STATUS oid_rt_pro_add_sta_info_hdl(struct oid_par_priv *poid_par_priv)
 
 	_irqlevel_changed_(&oldirql, LOWER);
 
-	psta = get_stainfo(&Adapter->stapriv, macaddr);
+	psta = rtw_get_stainfo(&Adapter->stapriv, macaddr);
 
 	if (psta == NULL) { // the sta have been in sta_info_queue => do nothing
-		psta = alloc_stainfo(&Adapter->stapriv, macaddr);
+		psta = rtw_alloc_stainfo(&Adapter->stapriv, macaddr);
 
 		if (psta == NULL) {
 			RT_TRACE(_module_rtl871x_ioctl_c_,_drv_err_,("Can't alloc sta_info when OID_RT_PRO_ADD_STA_INFO\n"));
@@ -1903,10 +1903,10 @@ NDIS_STATUS oid_rt_pro_dele_sta_info_hdl(struct oid_par_priv *poid_par_priv)
 		 ("+OID_RT_PRO_ADD_STA_INFO: addr=%02x:%02x:%02x:%02x:%02x:%02x\n",
 		  macaddr[0], macaddr[1], macaddr[2], macaddr[3], macaddr[4], macaddr[5]));
 
-	psta = get_stainfo(&Adapter->stapriv, macaddr);
+	psta = rtw_get_stainfo(&Adapter->stapriv, macaddr);
 	if (psta != NULL) {
 		_enter_critical(&(Adapter->stapriv.sta_hash_lock), &irqL);
-		free_stainfo(Adapter, psta);
+		rtw_free_stainfo(Adapter, psta);
 		_exit_critical(&(Adapter->stapriv.sta_hash_lock), &irqL);
 	}
 
@@ -1924,7 +1924,7 @@ u32 mp_query_drv_var(_adapter *padapter, u8 offset, u32 var)
 
 	if (offset == 1) {
 		u16 tmp_blk_num;
-		tmp_blk_num = read16(padapter, SDIO_RX0_RDYBLK_NUM);
+		tmp_blk_num = rtw_read16(padapter, SDIO_RX0_RDYBLK_NUM);
 		RT_TRACE(_module_mp_, _drv_err_, ("Query Information, mp_query_drv_var  SDIO_RX0_RDYBLK_NUM=0x%x   padapter->dvobjpriv.rxblknum=0x%x\n", tmp_blk_num, padapter->dvobjpriv.rxblknum));
 		if (padapter->dvobjpriv.rxblknum != tmp_blk_num) {
 			RT_TRACE(_module_mp_,_drv_err_, ("Query Information, mp_query_drv_var  call recv rx\n"));
@@ -2153,8 +2153,8 @@ NDIS_STATUS oid_rt_pro_rx_packet_type_hdl(struct oid_par_priv *poid_par_priv)
 		RT_TRACE(_module_rtl871x_ioctl_c_,_drv_err_, ("Query Information, OID_RT_PRO_RX_PACKET_TYPE:%d \n",\
 												Adapter->mppriv.rx_with_status));
 
-		//*(u32 *)&Adapter->eeprompriv.mac_addr[0]=read32(Adapter, 0x10250050);
-		//*(u16 *)&Adapter->eeprompriv.mac_addr[4]=read16(Adapter, 0x10250054);
+		//*(u32 *)&Adapter->eeprompriv.mac_addr[0]=rtw_read32(Adapter, 0x10250050);
+		//*(u16 *)&Adapter->eeprompriv.mac_addr[4]=rtw_read16(Adapter, 0x10250054);
 		RT_TRACE(_module_rtl871x_ioctl_c_,_drv_err_,("MAC addr=0x%x:0x%x:0x%x:0x%x:0x%x:0x%x  \n",
 			Adapter->eeprompriv.mac_addr[0],Adapter->eeprompriv.mac_addr[1],Adapter->eeprompriv.mac_addr[2],\
 			Adapter->eeprompriv.mac_addr[3],Adapter->eeprompriv.mac_addr[4],Adapter->eeprompriv.mac_addr[5]));
@@ -2167,8 +2167,8 @@ NDIS_STATUS oid_rt_pro_rx_packet_type_hdl(struct oid_par_priv *poid_par_priv)
 		RT_TRACE(_module_rtl871x_ioctl_c_,_drv_err_, ("Query Information, OID_RT_PRO_RX_PACKET_TYPE:%d \n", \
 												Adapter->mppriv.rx_with_status));
 
-		//*(u32 *)&Adapter->eeprompriv.mac_addr[0]=read32(Adapter, 0x10250050);
-		//*(u16 *)&Adapter->eeprompriv.mac_addr[4]=read16(Adapter, 0x10250054);
+		//*(u32 *)&Adapter->eeprompriv.mac_addr[0]=rtw_read32(Adapter, 0x10250050);
+		//*(u16 *)&Adapter->eeprompriv.mac_addr[4]=rtw_read16(Adapter, 0x10250054);
 		RT_TRACE(_module_rtl871x_ioctl_c_,_drv_err_,("MAC addr=0x%x:0x%x:0x%x:0x%x:0x%x:0x%x  \n",
 			Adapter->eeprompriv.mac_addr[0],Adapter->eeprompriv.mac_addr[1],Adapter->eeprompriv.mac_addr[2],\
 			Adapter->eeprompriv.mac_addr[3],Adapter->eeprompriv.mac_addr[4],Adapter->eeprompriv.mac_addr[5]));
@@ -2212,8 +2212,8 @@ _func_enter_;
 	}
 
 	_irqlevel_changed_(&oldirql, LOWER);
-	if (efuse_access(Adapter, _FALSE, addr, cnts, data) == _FAIL) {
-		RT_TRACE(_module_mp_, _drv_err_, ("!oid_rt_pro_read_efuse_hdl: efuse_access FAIL!\n"));
+	if (rtw_efuse_access(Adapter, _FALSE, addr, cnts, data) == _FAIL) {
+		RT_TRACE(_module_mp_, _drv_err_, ("!oid_rt_pro_read_efuse_hdl: rtw_efuse_access FAIL!\n"));
 		status = NDIS_STATUS_FAILURE;
 	} else
 		*poid_par_priv->bytes_rw = poid_par_priv->information_buf_len;
@@ -2257,7 +2257,7 @@ _func_enter_;
 	}
 
 	_irqlevel_changed_(&oldirql, LOWER);
-	if (efuse_access(Adapter, _TRUE, addr, cnts, data) == _FAIL)
+	if (rtw_efuse_access(Adapter, _TRUE, addr, cnts, data) == _FAIL)
 		status = NDIS_STATUS_FAILURE;
 	_irqlevel_changed_(&oldirql, RAISE);
 
@@ -2426,7 +2426,7 @@ _func_enter_;
 		RT_TRACE(_module_mp_, _drv_info_,
 			("oid_rt_pro_efuse_map_hdl: READ\n"));
 
-		if (efuse_map_read(Adapter, 0, mapLen, data) == _SUCCESS)
+		if (rtw_efuse_map_read(Adapter, 0, mapLen, data) == _SUCCESS)
 			*poid_par_priv->bytes_rw = mapLen;
 		else {
 			RT_TRACE(_module_mp_, _drv_err_,
@@ -2438,7 +2438,7 @@ _func_enter_;
 		RT_TRACE(_module_mp_, _drv_info_,
 			("oid_rt_pro_efuse_map_hdl: WRITE\n"));
 
-		if (efuse_map_write(Adapter, 0, mapLen, data) == _SUCCESS)
+		if (rtw_efuse_map_write(Adapter, 0, mapLen, data) == _SUCCESS)
 			*poid_par_priv->bytes_rw = mapLen;
 		else {
 			RT_TRACE(_module_mp_, _drv_err_,
@@ -2515,7 +2515,7 @@ _func_enter_;
 #if 0
 	_irqlevel_changed_(&oldirql, LOWER);
 #if 0
-	rcr_val8 = read8(Adapter, 0x10250048);//RCR
+	rcr_val8 = rtw_read8(Adapter, 0x10250048);//RCR
 	rcr_val8 &= ~(RCR_AB|RCR_AM|RCR_APM|RCR_AAP);
 
 	if(rx_pkt_type == RX_PKT_BROADCAST){
@@ -2530,9 +2530,9 @@ _func_enter_;
 	else{
 		rcr_val8 &= ~(RCR_AAP|RCR_APM|RCR_AM|RCR_AB|RCR_ACRC32);
 	}
-	write8(Adapter, 0x10250048,rcr_val8);
+	rtw_write8(Adapter, 0x10250048,rcr_val8);
 #else
-	rcr_val32 = read32(Adapter, RCR);//RCR = 0x10250048
+	rcr_val32 = rtw_read32(Adapter, RCR);//RCR = 0x10250048
 	rcr_val32 &= ~(RCR_CBSSID|RCR_AB|RCR_AM|RCR_APM|RCR_AAP);
 #if 0
 	if(rx_pkt_type == RX_PKT_BROADCAST){
@@ -2572,7 +2572,7 @@ _func_enter_;
 		Adapter->mppriv.check_mp_pkt = 0;
 	}
 #endif
-	write32(Adapter, RCR, rcr_val32);
+	rtw_write32(Adapter, RCR, rcr_val32);
 
 #endif
 	_irqlevel_changed_(&oldirql, RAISE);
@@ -2679,9 +2679,9 @@ unsigned int mp_ioctl_xmit_packet_hdl(struct oid_par_priv *poid_par_priv)
 			pmp_priv->tx.stop = 0;
 			pmp_priv->tx.count = pparm->count;
 			pmp_priv->tx.payload = pparm->payload_type;
-			pattrib = &pmp_priv->tx.xmitframe.attrib;
+			pattrib = &pmp_priv->tx.attrib;
 			pattrib->pktlen = pparm->length;
-			_memcpy(pattrib->dst, pparm->da, ETH_ALEN);
+			_rtw_memcpy(pattrib->dst, pparm->da, ETH_ALEN);
 			SetPacketTx(padapter);
 		} else
 			return NDIS_STATUS_FAILURE;
@@ -2703,7 +2703,7 @@ unsigned int mp_ioctl_xmit_packet_hdl(struct oid_par_priv *poid_par_priv)
 	struct mp_xmit_packet *pmp_xmitpkt = (struct mp_xmit_packet*)param;
 	u8 addr3[] = {0x02, 0xE0, 0x4C, 0x87, 0x66, 0x55};
 
-//	printk("+mp_ioctl_xmit_packet_hdl\n");
+//	DBG_8192C("+mp_ioctl_xmit_packet_hdl\n");
 
 	pxframe = alloc_mp_xmitframe(&padapter->mppriv);
 	if (pxframe == NULL)
@@ -2717,10 +2717,10 @@ unsigned int mp_ioctl_xmit_packet_hdl(struct oid_par_priv *poid_par_priv)
 	pmp_pkt = (unsigned char*)pmp_xmitpkt->mem;
 	pethhdr = (struct ethhdr *)pmp_pkt;
 
-	//printk("payload_len=%d, pkt_mem=0x%x\n", pmp_xmitpkt->len, (void*)pmp_xmitpkt->mem);
+	//DBG_8192C("payload_len=%d, pkt_mem=0x%x\n", pmp_xmitpkt->len, (void*)pmp_xmitpkt->mem);
 
-	//printk("pxframe=0x%x\n", (void*)pxframe);
-	//printk("pxframe->mem=0x%x\n", (void*)pxframe->mem);
+	//DBG_8192C("pxframe=0x%x\n", (void*)pxframe);
+	//DBG_8192C("pxframe->mem=0x%x\n", (void*)pxframe->mem);
 
 	//update attribute
 	pattrib = &pxframe->attrib;
@@ -2749,10 +2749,10 @@ unsigned int mp_ioctl_xmit_packet_hdl(struct oid_par_priv *poid_par_priv)
 	*(fctrl) = 0;
 	SetFrameSubType(pframe, WIFI_DATA);
 
-	_memcpy(pwlanhdr->addr1, pethhdr->h_dest, ETH_ALEN);
-	_memcpy(pwlanhdr->addr2, pethhdr->h_source, ETH_ALEN);
+	_rtw_memcpy(pwlanhdr->addr1, pethhdr->h_dest, ETH_ALEN);
+	_rtw_memcpy(pwlanhdr->addr2, pethhdr->h_source, ETH_ALEN);
 
-	_memcpy(pwlanhdr->addr3, addr3, ETH_ALEN);
+	_rtw_memcpy(pwlanhdr->addr3, addr3, ETH_ALEN);
 
 	pwlanhdr->seq_ctl = 0;
 	pframe += pattrib->hdrlen;
@@ -2760,7 +2760,7 @@ unsigned int mp_ioctl_xmit_packet_hdl(struct oid_par_priv *poid_par_priv)
 	llc_sz= rtw_put_snap(pframe, pattrib->ether_type);
 	pframe += llc_sz;
 
-	_memcpy(pframe, (void*)(pmp_pkt+14),  payload_len);
+	_rtw_memcpy(pframe, (void*)(pmp_pkt+14),  payload_len);
 
 	pattrib->last_txcmdsz = pattrib->hdrlen + llc_sz + payload_len;
 

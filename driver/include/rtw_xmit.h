@@ -31,7 +31,7 @@
 #define NR_XMITBUFF	(16)
 
 #elif defined (CONFIG_USB_HCI)
-#ifdef USB_TX_AGGREGATION
+#ifdef CONFIG_USB_TX_AGGREGATION
 #define MAX_XMITBUF_SZ	20480	// 20k
 #else
 #define MAX_XMITBUF_SZ	(2048)
@@ -67,7 +67,7 @@
 #ifdef CONFIG_PCI_HCI
 #define TXDESC_NUM						64
 //#define TXDESC_NUM						128
-#define TXDESC_NUM_BE_QUEUE			256
+#define TXDESC_NUM_BE_QUEUE			128
 #endif
 
 #define WEP_IV(pattrib_iv, dot11txpn, keyidx)\
@@ -277,7 +277,7 @@ struct pkt_attrib
 	u16	seqnum;
 
 	struct sta_info * psta;
-#ifdef CONFIG_RTL8712_TCP_CSUM_OFFLOAD_TX
+#ifdef CONFIG_TCP_CSUM_OFFLOAD_TX
 	u8	hw_tcp_csum;
 #endif	
 };
@@ -324,7 +324,7 @@ struct pkt_attrib
 	u8	eosp;
 
 	struct sta_info * psta;
-#ifdef CONFIG_RTL8712_TCP_CSUM_OFFLOAD_TX
+#ifdef CONFIG_TCP_CSUM_OFFLOAD_TX
 	u8	hw_tcp_csum;
 #endif	
 };
@@ -431,7 +431,7 @@ struct xmit_frame
 #endif
 
 #ifdef CONFIG_USB_HCI
-#ifdef USB_TX_AGGREGATION
+#ifdef CONFIG_USB_TX_AGGREGATION
 	u8	agg_num;
 #endif
 	u8	pkt_offset;
@@ -594,46 +594,55 @@ struct	xmit_priv	{
         u16 nqos_ssn;
 };
 
-extern struct xmit_buf *alloc_xmitbuf_ext(struct xmit_priv *pxmitpriv);
+extern struct xmit_buf *rtw_alloc_xmitbuf_ext(struct xmit_priv *pxmitpriv);
+extern s32 rtw_free_xmitbuf_ext(struct xmit_priv *pxmitpriv, struct xmit_buf *pxmitbuf);
 
-extern s32 free_xmitbuf(struct xmit_priv *pxmitpriv, struct xmit_buf *pxmitbuf);
-extern struct xmit_buf *alloc_xmitbuf(struct xmit_priv *pxmitpriv);
+extern struct xmit_buf *rtw_alloc_xmitbuf(struct xmit_priv *pxmitpriv);
+extern s32 rtw_free_xmitbuf(struct xmit_priv *pxmitpriv, struct xmit_buf *pxmitbuf);
 
-void count_tx_stats(_adapter *padapter, struct xmit_frame *pxmitframe, int sz);
-extern void update_protection(_adapter *padapter, u8 *ie, uint ie_len);
-extern s32 make_wlanhdr(_adapter *padapter, u8 *hdr, struct pkt_attrib *pattrib);
+void rtw_count_tx_stats(_adapter *padapter, struct xmit_frame *pxmitframe, int sz);
+extern void rtw_update_protection(_adapter *padapter, u8 *ie, uint ie_len);
+extern s32 rtw_make_wlanhdr(_adapter *padapter, u8 *hdr, struct pkt_attrib *pattrib);
 extern s32 rtw_put_snap(u8 *data, u16 h_proto);
 
-extern struct xmit_frame *alloc_xmitframe(struct xmit_priv *pxmitpriv);
-extern s32 free_xmitframe(struct xmit_priv *pxmitpriv, struct xmit_frame *pxmitframe);
-extern void free_xmitframe_queue(struct xmit_priv *pxmitpriv, _queue *pframequeue);
-struct tx_servq *get_sta_pending(_adapter *padapter, struct sta_info *psta, sint up, u8 *ac);
-extern s32 xmitframe_enqueue(_adapter *padapter, struct xmit_frame *pxmitframe);
-extern struct xmit_frame* dequeue_xframe(struct xmit_priv *pxmitpriv, struct hw_xmit *phwxmit_i, sint entry);
+extern struct xmit_frame *rtw_alloc_xmitframe(struct xmit_priv *pxmitpriv);
+extern s32 rtw_free_xmitframe(struct xmit_priv *pxmitpriv, struct xmit_frame *pxmitframe);
+extern void rtw_free_xmitframe_queue(struct xmit_priv *pxmitpriv, _queue *pframequeue);
+struct tx_servq *rtw_get_sta_pending(_adapter *padapter, struct sta_info *psta, sint up, u8 *ac);
+extern s32 rtw_xmitframe_enqueue(_adapter *padapter, struct xmit_frame *pxmitframe);
+extern struct xmit_frame* rtw_dequeue_xframe(struct xmit_priv *pxmitpriv, struct hw_xmit *phwxmit_i, sint entry);
 
-extern s32 xmit_classifier(_adapter *padapter, struct xmit_frame *pxmitframe);
-extern thread_return xmit_thread(thread_context context);
-extern s32 xmitframe_coalesce(_adapter *padapter, _pkt *pkt, struct xmit_frame *pxmitframe);
-
-s32 _init_hw_txqueue(struct hw_txqueue* phw_txqueue, u8 ac_tag);
-void _init_sta_xmit_priv(struct sta_xmit_priv *psta_xmitpriv);
-
-
-s32 txframes_pending(_adapter *padapter);
-s32 txframes_sta_ac_pending(_adapter *padapter, struct pkt_attrib *pattrib);
-void init_hwxmits(struct hw_xmit *phwxmit, sint entry);
-
-
-s32 _init_xmit_priv(struct xmit_priv *pxmitpriv, _adapter *padapter);
-void _free_xmit_priv (struct xmit_priv *pxmitpriv);
+extern s32 rtw_xmit_classifier(_adapter *padapter, struct xmit_frame *pxmitframe);
+extern thread_return rtw_xmit_thread(thread_context context);
+extern s32 rtw_xmitframe_coalesce(_adapter *padapter, _pkt *pkt, struct xmit_frame *pxmitframe);
+#ifdef CONFIG_TDLS
+extern void fill_tdls_dis_rsp_frbody(_adapter * padapter, struct xmit_frame * pxmitframe, u8 *pframe);
+extern s32 xmit_tdls_coalesce(_adapter *padapter, struct xmit_frame *pxmitframe, u8 action);
+void rtw_dump_xframe(_adapter *padapter, struct xmit_frame *pxmitframe);
+#endif
+s32 _rtw_init_hw_txqueue(struct hw_txqueue* phw_txqueue, u8 ac_tag);
+void _rtw_init_sta_xmit_priv(struct sta_xmit_priv *psta_xmitpriv);
 
 
-void alloc_hwxmits(_adapter *padapter);
-void free_hwxmits(_adapter *padapter);
+s32 rtw_txframes_pending(_adapter *padapter);
+s32 rtw_txframes_sta_ac_pending(_adapter *padapter, struct pkt_attrib *pattrib);
+void rtw_init_hwxmits(struct hw_xmit *phwxmit, sint entry);
 
-s32 free_xmitframe_ex(struct xmit_priv *pxmitpriv, struct xmit_frame *pxmitframe);
+
+s32 _rtw_init_xmit_priv(struct xmit_priv *pxmitpriv, _adapter *padapter);
+void _rtw_free_xmit_priv (struct xmit_priv *pxmitpriv);
+
+
+void rtw_alloc_hwxmits(_adapter *padapter);
+void rtw_free_hwxmits(_adapter *padapter);
+
+s32 rtw_free_xmitframe_ex(struct xmit_priv *pxmitpriv, struct xmit_frame *pxmitframe);
 
 s32 rtw_xmit(_adapter *padapter, _pkt *pkt);
+
+#ifdef CONFIG_TDLS
+sint xmit_tdls_enqueue_for_sleeping_sta(_adapter *padapter, struct xmit_frame *pxmitframe);
+#endif
 
 #ifdef CONFIG_AP_MODE
 sint xmitframe_enqueue_for_sleeping_sta(_adapter *padapter, struct xmit_frame *pxmitframe);

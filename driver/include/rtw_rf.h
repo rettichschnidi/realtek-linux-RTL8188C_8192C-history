@@ -130,8 +130,8 @@ typedef	enum _RT_RF_TYPE_DEFINITION
 }RT_RF_TYPE_DEF_E;
 
 
-u32 ch2freq(u32 ch);
-u32 freq2ch(u32 freq);
+u32 rtw_ch2freq(u32 ch);
+u32 rtw_freq2ch(u32 freq);
 
 
 #endif //_RTL8711_RF_H_

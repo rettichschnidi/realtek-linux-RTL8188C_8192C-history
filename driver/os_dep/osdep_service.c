@@ -69,7 +69,7 @@ inline u8* _rtw_zvmalloc(u32 sz)
 #endif
 
 	return pbuf;	
-	}
+}
 
 inline void _rtw_vmfree(u8 *pbuf, u32 sz)
 {
@@ -167,48 +167,193 @@ void	_rtw_mfree(u8 *pbuf, u32 sz)
 
 
 #ifdef DBG_MEM_ALLOC
+
+struct rtw_dbg_mem_stat {
+	ATOMIC_T vir_alloc; // the memory bytes we allocate now
+	ATOMIC_T vir_peak; // the peak memory bytes we allocate 
+	ATOMIC_T vir_alloc_err; // the error times we fail to allocate memory
+	
+	ATOMIC_T phy_alloc;
+	ATOMIC_T phy_peak;
+	ATOMIC_T phy_alloc_err;
+} rtw_dbg_mem_stat;
+
+enum {
+	MEM_STAT_VIR_ALLOC_SUCCESS,
+	MEM_STAT_VIR_ALLOC_FAIL,
+	MEM_STAT_VIR_FREE,
+	MEM_STAT_PHY_ALLOC_SUCCESS,
+	MEM_STAT_PHY_ALLOC_FAIL,
+	MEM_STAT_PHY_FREE
+};
+
+void rtw_dump_mem_stat (void)
+{
+	int vir_alloc, vir_peak, vir_alloc_err, phy_alloc, phy_peak, phy_alloc_err;
+	
+	vir_alloc=ATOMIC_READ(&rtw_dbg_mem_stat.vir_alloc);
+	vir_peak=ATOMIC_READ(&rtw_dbg_mem_stat.vir_peak);
+	vir_alloc_err=ATOMIC_READ(&rtw_dbg_mem_stat.vir_alloc_err);
+
+	phy_alloc=ATOMIC_READ(&rtw_dbg_mem_stat.phy_alloc);
+	phy_peak=ATOMIC_READ(&rtw_dbg_mem_stat.phy_peak);
+	phy_alloc_err=ATOMIC_READ(&rtw_dbg_mem_stat.phy_alloc_err);
+
+	DBG_871X("vir_alloc:%d, vir_peak:%d,vir_alloc_err:%d, phy_alloc:%d, phy_peak:%d, phy_alloc_err:%d\n"
+		, vir_alloc, vir_peak, vir_alloc_err
+		, phy_alloc, phy_peak, phy_alloc_err
+	);
+}
+
+void rtw_update_mem_stat(u8 flag, u32 sz)
+{
+	static u32 update_time = 0;
+	int peak, alloc;
+
+	if(!update_time) {
+		ATOMIC_SET(&rtw_dbg_mem_stat.vir_alloc,0);
+		ATOMIC_SET(&rtw_dbg_mem_stat.vir_peak,0);
+		ATOMIC_SET(&rtw_dbg_mem_stat.vir_alloc_err,0);
+		ATOMIC_SET(&rtw_dbg_mem_stat.phy_alloc,0);
+		ATOMIC_SET(&rtw_dbg_mem_stat.phy_peak,0);
+		ATOMIC_SET(&rtw_dbg_mem_stat.phy_alloc_err,0);
+	}
+		
+	switch(flag) {
+		case MEM_STAT_VIR_ALLOC_SUCCESS:
+			alloc = ATOMIC_ADD_RETURN(&rtw_dbg_mem_stat.vir_alloc, sz);
+			peak=ATOMIC_READ(&rtw_dbg_mem_stat.vir_peak);
+			if (peak<alloc)
+				ATOMIC_SET(&rtw_dbg_mem_stat.vir_peak, alloc);
+			break;
+			
+		case MEM_STAT_VIR_ALLOC_FAIL:
+			ATOMIC_INC(&rtw_dbg_mem_stat.vir_alloc_err);
+			break;
+			
+		case MEM_STAT_VIR_FREE:
+			alloc = ATOMIC_SUB_RETURN(&rtw_dbg_mem_stat.vir_alloc, sz);
+			break;
+			
+		case MEM_STAT_PHY_ALLOC_SUCCESS:
+			alloc = ATOMIC_ADD_RETURN(&rtw_dbg_mem_stat.phy_alloc, sz);
+			peak=ATOMIC_READ(&rtw_dbg_mem_stat.phy_peak);
+			if (peak<alloc)
+				ATOMIC_SET(&rtw_dbg_mem_stat.phy_peak, alloc);
+			break;
+
+		case MEM_STAT_PHY_ALLOC_FAIL:
+			ATOMIC_INC(&rtw_dbg_mem_stat.phy_alloc_err);
+			break;
+		
+		case MEM_STAT_PHY_FREE:
+			alloc = ATOMIC_SUB_RETURN(&rtw_dbg_mem_stat.phy_alloc, sz);
+			
+	};
+
+	if (rtw_get_passing_time_ms(update_time) > 5000) {
+		rtw_dump_mem_stat();
+		update_time=rtw_get_current_time();
+	}
+	
+	
+}
+
+
 inline u8* dbg_rtw_vmalloc(u32 sz, const char *func, int line)
 {
+	u8  *p;
 	DBG_871X("DBG_MEM_ALLOC %s:%d %s(%d)\n", func,  line, __FUNCTION__, (sz));
-	return _rtw_vmalloc((sz));
+	
+	p=_rtw_vmalloc((sz));
+
+	rtw_update_mem_stat(
+		p ? MEM_STAT_VIR_ALLOC_SUCCESS : MEM_STAT_VIR_ALLOC_FAIL
+		, sz
+	);
+	
+	return p;
 }
 
 inline u8* dbg_rtw_zvmalloc(u32 sz, const char *func, int line)
 {
+	u8 *p;
 	DBG_871X("DBG_MEM_ALLOC %s:%d %s(%d)\n", func, line, __FUNCTION__, (sz)); 
-	return _rtw_zvmalloc((sz)); 
+	
+	p=_rtw_zvmalloc((sz)); 
+
+	rtw_update_mem_stat(
+		p ? MEM_STAT_VIR_ALLOC_SUCCESS : MEM_STAT_VIR_ALLOC_FAIL
+		, sz
+	);
+
+	return p;
 }
 
 inline void dbg_rtw_vmfree(u8 *pbuf, u32 sz, const char *func, int line)
 {
 	DBG_871X("DBG_MEM_ALLOC %s:%d %s(%p,%d)\n",  func, line, __FUNCTION__, (pbuf), (sz));
+	
 	_rtw_vmfree((pbuf), (sz)); 
+
+	rtw_update_mem_stat(
+		MEM_STAT_VIR_FREE
+		, sz
+	);
+
 }
 
 inline u8* dbg_rtw_malloc(u32 sz, const char *func, int line) 
 {
+	u8 *p;
+	
 	if((sz)>4096) 
 		DBG_871X("DBG_MEM_ALLOC !!!!!!!!!!!!!! %s:%d %s(%d)\n", func, line, __FUNCTION__, (sz)); 
-	return _rtw_malloc((sz)); 
+
+	p=_rtw_malloc((sz));
+	
+	rtw_update_mem_stat(
+		p ? MEM_STAT_PHY_ALLOC_SUCCESS : MEM_STAT_PHY_ALLOC_FAIL
+		, sz
+	);
+
+	return p;
 }
 
 inline u8* dbg_rtw_zmalloc(u32 sz, const char *func, int line)
 {
+	u8 *p;
+
 	if((sz)>4096)
 		DBG_871X("DBG_MEM_ALLOC !!!!!!!!!!!!!! %s:%d %s(%d)\n", func, line, __FUNCTION__, (sz));
-	return _rtw_zmalloc((sz));
+
+	p = _rtw_zmalloc((sz));
+
+	rtw_update_mem_stat(
+		p ? MEM_STAT_PHY_ALLOC_SUCCESS : MEM_STAT_PHY_ALLOC_FAIL
+		, sz
+	);
+
+	return p;
+		
 }
 
 inline void dbg_rtw_mfree(u8 *pbuf, u32 sz, const char *func, int line)
 {
 	if((sz)>4096)
 		DBG_871X("DBG_MEM_ALLOC !!!!!!!!!!!!!! %s:%d %s(%p,%d)\n", func, line, __FUNCTION__, (pbuf), (sz));
+	
 	_rtw_mfree((pbuf), (sz));
+
+	rtw_update_mem_stat(
+		MEM_STAT_PHY_FREE
+		, sz
+	);
 }
 #endif
 
 
-void _memcpy(void* dst, void* src, u32 sz)
+void _rtw_memcpy(void* dst, void* src, u32 sz)
 {
 
 #ifdef PLATFORM_LINUX
@@ -225,7 +370,7 @@ void _memcpy(void* dst, void* src, u32 sz)
 
 }
 
-int	_memcmp(void *dst, void *src, u32 sz)
+int	_rtw_memcmp(void *dst, void *src, u32 sz)
 {
 
 #ifdef PLATFORM_LINUX
@@ -252,7 +397,7 @@ int	_memcmp(void *dst, void *src, u32 sz)
 	
 }
 
-void _memset(void *pbuf, int c, u32 sz)
+void _rtw_memset(void *pbuf, int c, u32 sz)
 {
 
 #ifdef PLATFORM_LINUX
@@ -272,7 +417,7 @@ void _memset(void *pbuf, int c, u32 sz)
 
 }
 
-void _init_listhead(_list *list)
+void _rtw_init_listhead(_list *list)
 {
 
 #ifdef PLATFORM_LINUX
@@ -295,7 +440,7 @@ For the following list_xxx operations,
 caller must guarantee the atomic context.
 Otherwise, there will be racing condition.
 */
-u32	is_list_empty(_list *phead)
+u32	rtw_is_list_empty(_list *phead)
 {
 
 #ifdef PLATFORM_LINUX
@@ -321,7 +466,7 @@ u32	is_list_empty(_list *phead)
 }
 
 
-void list_insert_tail(_list *plist, _list *phead)
+void rtw_list_insert_tail(_list *plist, _list *phead)
 {
 
 #ifdef PLATFORM_LINUX	
@@ -341,12 +486,12 @@ void list_insert_tail(_list *plist, _list *phead)
 
 /*
 
-Caller must check if the list is empty before calling list_delete
+Caller must check if the list is empty before calling rtw_list_delete
 
 */
 
 
-void _init_sema(_sema	*sema, int init_val)
+void _rtw_init_sema(_sema	*sema, int init_val)
 {
 
 #ifdef PLATFORM_LINUX
@@ -368,7 +513,7 @@ void _init_sema(_sema	*sema, int init_val)
 
 }
 
-void _free_sema(_sema	*sema)
+void _rtw_free_sema(_sema	*sema)
 {
 
 #ifdef PLATFORM_OS_CE
@@ -377,7 +522,7 @@ void _free_sema(_sema	*sema)
 
 }
 
-void _up_sema(_sema	*sema)
+void _rtw_up_sema(_sema	*sema)
 {
 
 #ifdef PLATFORM_LINUX
@@ -397,7 +542,7 @@ void _up_sema(_sema	*sema)
 #endif
 }
 
-u32 _down_sema(_sema *sema)
+u32 _rtw_down_sema(_sema *sema)
 {
 
 #ifdef PLATFORM_LINUX
@@ -451,7 +596,7 @@ void	_rtw_mutex_init(_mutex *pmutex)
 }
 
 
-void	_spinlock_init(_lock *plock)
+void	_rtw_spinlock_init(_lock *plock)
 {
 
 #ifdef PLATFORM_LINUX
@@ -468,7 +613,7 @@ void	_spinlock_init(_lock *plock)
 	
 }
 
-void	_spinlock_free(_lock *plock)
+void	_rtw_spinlock_free(_lock *plock)
 {
 
 	
@@ -481,7 +626,7 @@ void	_spinlock_free(_lock *plock)
 }
 
 
-void	_spinlock(_lock	*plock)
+void	_rtw_spinlock(_lock	*plock)
 {
 
 #ifdef PLATFORM_LINUX
@@ -498,7 +643,7 @@ void	_spinlock(_lock	*plock)
 	
 }
 
-void	_spinunlock(_lock *plock)
+void	_rtw_spinunlock(_lock *plock)
 {
 
 #ifdef PLATFORM_LINUX
@@ -515,7 +660,7 @@ void	_spinunlock(_lock *plock)
 }
 
 
-void	_spinlock_ex(_lock	*plock)
+void	_rtw_spinlock_ex(_lock	*plock)
 {
 
 #ifdef PLATFORM_LINUX
@@ -532,7 +677,7 @@ void	_spinlock_ex(_lock	*plock)
 	
 }
 
-void	_spinunlock_ex(_lock *plock)
+void	_rtw_spinunlock_ex(_lock *plock)
 {
 
 #ifdef PLATFORM_LINUX
@@ -550,22 +695,22 @@ void	_spinunlock_ex(_lock *plock)
 
 
 
-void	_init_queue(_queue	*pqueue)
+void	_rtw_init_queue(_queue	*pqueue)
 {
 
-	_init_listhead(&(pqueue->queue));
+	_rtw_init_listhead(&(pqueue->queue));
 
-	_spinlock_init(&(pqueue->lock));
+	_rtw_spinlock_init(&(pqueue->lock));
 
 }
 
-u32	  _queue_empty(_queue	*pqueue)
+u32	  _rtw_queue_empty(_queue	*pqueue)
 {
-	return (is_list_empty(&(pqueue->queue)));
+	return (rtw_is_list_empty(&(pqueue->queue)));
 }
 
 
-u32 end_of_queue_search(_list *head, _list *plist)
+u32 rtw_end_of_queue_search(_list *head, _list *plist)
 {
 	if (head == plist)
 		return _TRUE;
@@ -574,7 +719,7 @@ u32 end_of_queue_search(_list *head, _list *plist)
 }
 
 
-u32	get_current_time(void)
+u32	rtw_get_current_time(void)
 {
 	
 #ifdef PLATFORM_LINUX
@@ -588,7 +733,7 @@ u32	get_current_time(void)
 #endif
 }
 
-inline u32 systime_to_ms(u32 systime)
+inline u32 rtw_systime_to_ms(u32 systime)
 {
 #ifdef PLATFORM_LINUX
 	return systime*1000/HZ;
@@ -599,33 +744,33 @@ inline u32 systime_to_ms(u32 systime)
 #endif
 }
 
-// the input parameter start use the same unit as returned by get_current_time
-inline s32 get_passing_time_ms(u32 start)
+// the input parameter start use the same unit as returned by rtw_get_current_time
+inline s32 rtw_get_passing_time_ms(u32 start)
 {
 #ifdef PLATFORM_LINUX
-	return systime_to_ms(jiffies-start);
+	return rtw_systime_to_ms(jiffies-start);
 #endif
 
 #ifdef PLATFORM_WINDOWS
 	LARGE_INTEGER	SystemTime;
 	NdisGetCurrentSystemTime(&SystemTime);
-	return systime_to_ms((u32)(SystemTime.LowPart) - start) ;
+	return rtw_systime_to_ms((u32)(SystemTime.LowPart) - start) ;
 #endif
 }
 
-inline s32 get_time_interval_ms(u32 start, u32 end)
+inline s32 rtw_get_time_interval_ms(u32 start, u32 end)
 {
 #ifdef PLATFORM_LINUX
-	return systime_to_ms(end-start);
+	return rtw_systime_to_ms(end-start);
 #endif
 	
 #ifdef PLATFORM_WINDOWS
-	return systime_to_ms(end-start);
+	return rtw_systime_to_ms(end-start);
 #endif
 }
 	
 
-void sleep_schedulable(int ms)	
+void rtw_sleep_schedulable(int ms)	
 {
 
 #ifdef PLATFORM_LINUX
@@ -653,7 +798,7 @@ void sleep_schedulable(int ms)
 }
 
 
-void msleep_os(int ms)
+void rtw_msleep_os(int ms)
 {
 
 #ifdef PLATFORM_LINUX
@@ -670,7 +815,7 @@ void msleep_os(int ms)
 
 
 }
-void usleep_os(int us)
+void rtw_usleep_os(int us)
 {
 
 #ifdef PLATFORM_LINUX
@@ -692,7 +837,7 @@ void usleep_os(int us)
 
 }
 
-void mdelay_os(int ms)
+void rtw_mdelay_os(int ms)
 {
 
 #ifdef PLATFORM_LINUX
@@ -709,7 +854,7 @@ void mdelay_os(int ms)
 
 
 }
-void udelay_os(int us)
+void rtw_udelay_os(int us)
 {
 
 #ifdef PLATFORM_LINUX
@@ -893,4 +1038,116 @@ inline int ATOMIC_DEC_RETURN(ATOMIC_T *v)
 	return InterlockedDecrement(v);
 	#endif
 }
+
+
+#ifdef PLATFORM_LINUX
+int openFile(struct file **fpp, char *path,int flag,int mode) 
+{ 
+	struct file *fp; 
+ 
+	fp=filp_open(path, flag, mode); 
+	if(IS_ERR(fp)) {
+		*fpp=NULL;
+		return PTR_ERR(fp);
+	}
+	else {
+		*fpp=fp; 
+		return 0;
+	}	
+}
+
+int closeFile(struct file *fp) 
+{ 
+	filp_close(fp,NULL); 
+	return 0; 
+}
+
+int readFile(struct file *fp,char *buf,int len) 
+{ 
+	int rlen=0, sum=0;
+	
+	if (!fp->f_op || !fp->f_op->read) 
+		return -EPERM;
+
+	while(sum<len) {
+		rlen=fp->f_op->read(fp,buf+sum,len-sum, &fp->f_pos);
+		if(rlen>0)
+			sum+=rlen;
+		else if(0 != rlen)
+			return rlen;
+		else
+			break;
+	}
+	
+	return  sum;
+
+}
+
+int writeFile(struct file *fp,char *buf,int len) 
+{ 
+	int wlen=0, sum=0;
+	
+	if (!fp->f_op || !fp->f_op->write) 
+		return -EPERM; 
+
+	while(sum<len) {
+		wlen=fp->f_op->write(fp,buf+sum,len-sum, &fp->f_pos);
+		if(wlen>0)
+			sum+=wlen;
+		else if(0 != wlen)
+			return wlen;
+		else
+			break;
+	}
+
+	return sum;
+
+}
+#endif
+
+#ifdef MEM_ALLOC_REFINE_ADAPTOR
+#ifdef PLATFORM_LINUX
+struct net_device *rtw_alloc_etherdev(int sizeof_priv)
+{
+	struct net_device *pnetdev;
+	struct rtw_netdev_priv_indicator *pnpi;
+	
+	pnetdev = alloc_etherdev(sizeof(struct rtw_netdev_priv_indicator));
+	if (!pnetdev)
+		goto RETURN;
+	
+	pnpi = netdev_priv(pnetdev);
+	
+	pnpi->priv = rtw_zvmalloc(sizeof_priv);
+	if (!pnpi->priv) {
+		free_netdev(pnetdev);
+		pnetdev = NULL;
+		goto RETURN;
+	}
+	
+	pnpi->sizeof_priv=sizeof_priv;
+RETURN:
+	return pnetdev;
+}
+
+void rtw_free_netdev(struct net_device * netdev)
+{
+	struct rtw_netdev_priv_indicator *pnpi;
+	
+	if(!netdev)
+		goto RETURN;
+	
+	pnpi = netdev_priv(netdev);
+
+	if(!pnpi->priv)
+		goto RETURN;
+
+	rtw_vmfree(pnpi->priv, pnpi->sizeof_priv);
+	free_netdev(netdev);
+
+RETURN:
+	return;
+}
+#endif
+#endif //MEM_ALLOC_REFINE_ADAPTOR
 

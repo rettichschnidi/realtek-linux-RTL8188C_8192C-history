@@ -43,6 +43,7 @@ CONFIG_PLATFORM_ARM_TCC8900	=	n
 CONFIG_PLATFORM_ARM_RK2818	=	n
 CONFIG_PLATFORM_MIPS_JZ4760	=	n
 CONFIG_PLATFORM_DMP_PHILIPS = n
+CONFIG_PLATFORM_TI_DM365	=	n
 
 CONFIG_DRVEXT_MODULE = n
 
@@ -193,14 +194,13 @@ EXTRA_CFLAGS += -DCONFIG_USB_AUTOSUSPEND
 endif
 endif
 
-#ifeq ($(CONFIG_BEST_BATTERYLIFE), y)
-#EXTRA_CFLAGS += -DCONFIG_BEST_BATTERYLIFE
-#endif
-
 ifeq ($(CONFIG_POWER_SAVING), y)
 EXTRA_CFLAGS += -DCONFIG_POWER_SAVING
 endif
 
+ifeq ($(CONFIG_USB_AUTOSUSPEND), y)
+EXTRA_CFLAGS += -DCONFIG_USB_AUTOSUSPEND
+endif
 
 ifeq ($(CONFIG_HW_PWRP_DETECTION), y)
 EXTRA_CFLAGS += -DCONFIG_HW_PWRP_DETECTION
@@ -213,7 +213,6 @@ endif
 ifeq ($(CONFIG_RTL8192CU_REDEFINE_1X1), y)
 EXTRA_CFLAGS += -DRTL8192C_RECONFIG_TO_1T1R
 endif 
-
 
 ifeq ($(CONFIG_PLATFORM_I386_PC), y)
 EXTRA_CFLAGS += -DCONFIG_LITTLE_ENDIAN
@@ -335,6 +334,14 @@ ARCH := mips
 CROSS_COMPILE := /home/cnsd4/project/actions/tools-2.6.27/bin/mipsel-linux-gnu-
 KVER  := 2.6.27
 KSRC := /home/cnsd4/project/actions/linux-2.6.27.28
+endif
+
+ifeq ($(CONFIG_PLATFORM_TI_DM365), y)
+EXTRA_CFLAGS += -DCONFIG_LITTLE_ENDIAN -DCONFIG_PLATFORM_TI_DM365
+ARCH := arm
+CROSS_COMPILE := /home/cnsd4/Appro/mv_pro_5.0/montavista/pro/devkit/arm/v5t_le/bin/arm_v5t_le-
+KVER  := 2.6.18
+KSRC := /home/cnsd4/Appro/mv_pro_5.0/montavista/pro/devkit/lsp/ti-davinci/linux-dm365
 endif
 
 ifeq ($(CONFIG_PLATFORM_ARM_TCC8900), y)

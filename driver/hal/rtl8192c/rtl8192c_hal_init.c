@@ -36,6 +36,87 @@
 #include <pci_hal.h>
 #endif
 
+#ifdef PLATFORM_LINUX
+#ifdef CONFIG_ADAPTOR_INFO_CACHING_FILE
+#include <rtw_eeprom.h>
+
+ int isAdaptorInfoFileValid(void)
+{
+	return 1;
+}
+
+int storeAdaptorInfoFile(struct eeprom_priv * eeprom_priv, char *path)
+{
+	int ret =0;
+	mm_segment_t oldfs;
+	struct file *fp;
+	if(eeprom_priv) {
+		
+		if( 0 == (ret=openFile(&fp, path, O_CREAT|O_WRONLY, 0666)) ) {
+			DBG_8192C("%s openFile path:%s fp=%p\n",__FUNCTION__, path ,fp);
+
+			oldfs = get_fs(); set_fs(get_ds());
+			if( EEPROM_MAX_SIZE==(ret=writeFile(fp, eeprom_priv->efuse_eeprom_data, EEPROM_MAX_SIZE)) ) {
+				DBG_8192C("%s writeFile OK\n",__FUNCTION__);
+				ret = 0;		
+			} else {
+				DBG_8192C("%s writeFile Fail, ret:%d\n",__FUNCTION__, ret);
+			}
+			set_fs(oldfs);
+
+			closeFile(fp);
+		} else {
+			DBG_8192C("%s openFile path:%s Fail, ret:%d\n",__FUNCTION__, path, ret);
+		}
+		
+	} else {
+		DBG_8192C("%s NULL pointer\n",__FUNCTION__);
+		ret =  -EINVAL;
+	}
+	return ret;
+}
+
+int retriveAdaptorInfoFile(struct eeprom_priv * eeprom_priv, char *path)
+{
+	int ret =-1;
+	mm_segment_t oldfs;
+	struct file *fp;
+	
+	if(eeprom_priv) {
+		
+		if( 0 == (ret=openFile(&fp,path, O_RDONLY, 0)) ){
+			DBG_8192C("%s openFile path:%s fp=%p\n",__FUNCTION__, path ,fp);
+
+			oldfs = get_fs(); set_fs(get_ds());
+			if( EEPROM_MAX_SIZE==(ret=readFile(fp, eeprom_priv->efuse_eeprom_data, EEPROM_MAX_SIZE)) ) {
+				DBG_8192C("%s readFile OK\n",__FUNCTION__);
+				ret = 0;		
+			} else {
+				DBG_8192C("%s readFile Fai, ret:%dl\n",__FUNCTION__, ret);
+			}
+			set_fs(oldfs);
+
+			closeFile(fp);
+		} else {
+			DBG_8192C("%s openFile path:%s Fail, ret:%d\n",__FUNCTION__, path, ret);
+		}
+
+		#if 0
+		if(isAdaptorInfoFileValid()) {	
+			return 0;
+		} else {
+			return -ENODATA;
+		}
+		#endif
+	} else {
+		DBG_8192C("%s NULL pointer\n",__FUNCTION__);
+		ret = -EINVAL;
+	}
+	return ret;
+}
+#endif //CONFIG_ADAPTOR_INFO_CACHING_FILE
+#endif //PLATFORM_LINUX
+
 static BOOLEAN
 hal_EfusePgPacketWrite2ByteHeader(
 	IN	PADAPTER		pAdapter,
@@ -76,25 +157,25 @@ _FWDownloadEnable(
 	if(enable)
 	{
 		// 8051 enable
-		tmp = read8(Adapter, REG_SYS_FUNC_EN+1);
-		write8(Adapter, REG_SYS_FUNC_EN+1, tmp|0x04);
+		tmp = rtw_read8(Adapter, REG_SYS_FUNC_EN+1);
+		rtw_write8(Adapter, REG_SYS_FUNC_EN+1, tmp|0x04);
 
 		// MCU firmware download enable.
-		tmp = read8(Adapter, REG_MCUFWDL);
-		write8(Adapter, REG_MCUFWDL, tmp|0x01);
+		tmp = rtw_read8(Adapter, REG_MCUFWDL);
+		rtw_write8(Adapter, REG_MCUFWDL, tmp|0x01);
 
 		// 8051 reset
-		tmp = read8(Adapter, REG_MCUFWDL+2);
-		write8(Adapter, REG_MCUFWDL+2, tmp&0xf7);
+		tmp = rtw_read8(Adapter, REG_MCUFWDL+2);
+		rtw_write8(Adapter, REG_MCUFWDL+2, tmp&0xf7);
 	}
 	else
 	{
 		// MCU firmware download enable.
-		tmp = read8(Adapter, REG_MCUFWDL);
-		write8(Adapter, REG_MCUFWDL, tmp&0xfe);
+		tmp = rtw_read8(Adapter, REG_MCUFWDL);
+		rtw_write8(Adapter, REG_MCUFWDL, tmp&0xfe);
 
 		// Reserved for fw extension.
-		write8(Adapter, REG_MCUFWDL+1, 0x00);
+		rtw_write8(Adapter, REG_MCUFWDL+1, 0x00);
 	}
 }
 
@@ -109,7 +190,7 @@ _BlockWrite(
 	IN		u32			size
 	)
 {
-#if DEV_BUS_TYPE==DEV_BUS_PCI_INTERFACE
+#ifdef CONFIG_PCI_HCI
 	u32			blockSize	= sizeof(u32);	// Use 4-byte write to download FW
 	u8			*bufferPtr	= (u8 *)buffer;
 	u32			*pu4BytePtr	= (u32 *)buffer;
@@ -120,7 +201,7 @@ _BlockWrite(
 
 	for(i = 0 ; i < blockCount ; i++){
 		offset = i * blockSize;
-		write32(Adapter, (FW_8192C_START_ADDRESS + offset), *(pu4BytePtr + i));
+		rtw_write32(Adapter, (FW_8192C_START_ADDRESS + offset), *(pu4BytePtr + i));
 	}
 
 	if(remainSize){
@@ -128,7 +209,7 @@ _BlockWrite(
 		bufferPtr += offset;
 		
 		for(i = 0 ; i < remainSize ; i++){
-			write8(Adapter, (FW_8192C_START_ADDRESS + offset + i), *(bufferPtr + i));
+			rtw_write8(Adapter, (FW_8192C_START_ADDRESS + offset + i), *(bufferPtr + i));
 		}
 	}
 #else
@@ -150,9 +231,9 @@ _BlockWrite(
 	for(i = 0 ; i < blockCount ; i++){
 		offset = i * blockSize;
 		#ifdef SUPPORTED_BLOCK_IO
-		writeN(Adapter, (FW_8192C_START_ADDRESS + offset), blockSize, (bufferPtr + offset));
+		rtw_writeN(Adapter, (FW_8192C_START_ADDRESS + offset), blockSize, (bufferPtr + offset));
 		#else
-		write32(Adapter, (FW_8192C_START_ADDRESS + offset), le32_to_cpu(*(pu4BytePtr + i)));
+		rtw_write32(Adapter, (FW_8192C_START_ADDRESS + offset), le32_to_cpu(*(pu4BytePtr + i)));
 		#endif
 	}
 
@@ -164,9 +245,9 @@ _BlockWrite(
 		for(i = 0 ; i < blockCount ; i++){
 			offset = offset2 + i * blockSize2;
 			#ifdef SUPPORTED_BLOCK_IO
-			writeN(Adapter, (FW_8192C_START_ADDRESS + offset), blockSize2, (bufferPtr + offset));
+			rtw_writeN(Adapter, (FW_8192C_START_ADDRESS + offset), blockSize2, (bufferPtr + offset));
 			#else
-			write8(Adapter, (FW_8192C_START_ADDRESS + offset ), *(bufferPtr + offset));
+			rtw_write8(Adapter, (FW_8192C_START_ADDRESS + offset ), *(bufferPtr + offset));
 			#endif
 		}		
 
@@ -176,7 +257,7 @@ _BlockWrite(
 			bufferPtr += offset;
 			
 			for(i = 0 ; i < remainSize2 ; i++){
-				write8(Adapter, (FW_8192C_START_ADDRESS + offset + i), *(bufferPtr + i));
+				rtw_write8(Adapter, (FW_8192C_START_ADDRESS + offset + i), *(bufferPtr + i));
 			}
 		}
 	}
@@ -194,8 +275,8 @@ _PageWrite(
 	u8 value8;
 	u8 u8Page = (u8) (page & 0x07) ;
 
-	value8 = (read8(Adapter, REG_MCUFWDL+2)& 0xF8 ) | u8Page ;
-	write8(Adapter, REG_MCUFWDL+2,value8);
+	value8 = (rtw_read8(Adapter, REG_MCUFWDL+2)& 0xF8 ) | u8Page ;
+	rtw_write8(Adapter, REG_MCUFWDL+2,value8);
 	_BlockWrite(Adapter,buffer,size);
 }
 
@@ -239,7 +320,7 @@ _WriteFW(
 		u32 	page,offset;
 		u8*	bufferPtr = (u8*)buffer;
 
-#if DEV_BUS_TYPE==DEV_BUS_PCI_INTERFACE
+#ifdef CONFIG_PCI_HCI
 		// 20100120 Joseph: Add for 88CE normal chip. 
 		// Fill in zero to make firmware image to dword alignment.
 		_FillDummy(bufferPtr, &size);
@@ -275,7 +356,7 @@ static int _FWFreeToGo(
 	
 	// polling CheckSum report
 	do{
-		value32 = read32(Adapter, REG_MCUFWDL);
+		value32 = rtw_read32(Adapter, REG_MCUFWDL);
 	}while((counter ++ < POLLING_READY_TIMEOUT_COUNT) && (!(value32 & FWDL_ChkSum_rpt)));	
 
 	if(counter >= POLLING_READY_TIMEOUT_COUNT){	
@@ -285,23 +366,23 @@ static int _FWFreeToGo(
 	//RT_TRACE(COMP_INIT, DBG_LOUD, ("Checksum report OK ! REG_MCUFWDL:0x%08x .\n",value32));
 
 
-	value32 = read32(Adapter, REG_MCUFWDL);
+	value32 = rtw_read32(Adapter, REG_MCUFWDL);
 	value32 |= MCUFWDL_RDY;
 	value32 &= ~WINTINI_RDY;
-	write32(Adapter, REG_MCUFWDL, value32);
+	rtw_write32(Adapter, REG_MCUFWDL, value32);
 	
 	// polling for FW ready
 	counter = 0;
 	do
 	{
-		if(read32(Adapter, REG_MCUFWDL) & WINTINI_RDY){
+		if(rtw_read32(Adapter, REG_MCUFWDL) & WINTINI_RDY){
 			//RT_TRACE(COMP_INIT, DBG_SERIOUS, ("Polling FW ready success!! REG_MCUFWDL:0x%08x .\n",PlatformIORead4Byte(Adapter, REG_MCUFWDL)) );
 			return _SUCCESS;
 		}
-		udelay_os(5);
+		rtw_udelay_os(5);
 	}while(counter++ < POLLING_READY_TIMEOUT_COUNT);
 
-	DBG_8192C("Polling FW ready fail!! REG_MCUFWDL:0x%08x .\n", read32(Adapter, REG_MCUFWDL));
+	DBG_8192C("Polling FW ready fail!! REG_MCUFWDL:0x%08x .\n", rtw_read32(Adapter, REG_MCUFWDL));
 	return _FAIL;
 	
 }
@@ -321,23 +402,23 @@ rtl8192c_FirmwareSelfReset(
 		pHalData->FirmwareSubVersion >= 0x01))
 	{
 		//0x1cf=0x20. Inform 8051 to reset. 2009.12.25. tynli_test
-		write8(Adapter, REG_HMETFR+3, 0x20);
+		rtw_write8(Adapter, REG_HMETFR+3, 0x20);
 	
-		u1bTmp = read8(Adapter, REG_SYS_FUNC_EN+1);
+		u1bTmp = rtw_read8(Adapter, REG_SYS_FUNC_EN+1);
 		while(u1bTmp&BIT2)
 		{
 			Delay--;
 			if(Delay == 0)
 				break;
-			udelay_os(50);
-			u1bTmp = read8(Adapter, REG_SYS_FUNC_EN+1);
+			rtw_udelay_os(50);
+			u1bTmp = rtw_read8(Adapter, REG_SYS_FUNC_EN+1);
 		}
 
 		if((u1bTmp&BIT2) && (Delay == 0))
 		{
 			DBG_8192C("FirmwareDownload92C():fw reset by itself Fail!!!!!! 0x03 = %x\n", u1bTmp);
 			//RT_ASSERT(FALSE, ("PowerOffAdapter8192CE(): 0x03 = %x\n", u1bTmp));
-			write8(Adapter,REG_SYS_FUNC_EN+1,(read8(Adapter, REG_SYS_FUNC_EN+1)&~BIT2));
+			rtw_write8(Adapter,REG_SYS_FUNC_EN+1,(rtw_read8(Adapter, REG_SYS_FUNC_EN+1)&~BIT2));
 		}
 
 		DBG_8192C("=====> 8051 reset success (%d) .\n", Delay);
@@ -431,6 +512,7 @@ int FirmwareDownload92C(
 	{
 		case FW_SOURCE_IMG_FILE:
 			//TODO:
+			//_rtw_memcpy(pFirmware->szFwBuffer, FwImage, FwImageLen);
 			break;
 		case FW_SOURCE_HEADER_FILE:
 			if(FwImageLen > FW_8192C_SIZE){
@@ -440,12 +522,7 @@ int FirmwareDownload92C(
 				goto Exit;
 			}
 
-			#ifdef CONFIG_EMBEDDED_FWIMG
-			pFirmware->szFwBuffer=FwImage;
-			#else
-			_memcpy(pFirmware->szFwBuffer, FwImage, FwImageLen);
-			#endif
-
+			pFirmware->szFwBuffer = FwImage;
 			pFirmware->ulFwLength = FwImageLen;
 			break;
 	}
@@ -474,10 +551,10 @@ int FirmwareDownload92C(
 		
 	// Suggested by Filen. If 8051 is running in RAM code, driver should inform Fw to reset by itself,
 	// or it will cause download Fw fail. 2010.02.01. by tynli.
-	if(read8(Adapter, REG_MCUFWDL)&BIT7) //8051 RAM code
+	if(rtw_read8(Adapter, REG_MCUFWDL)&BIT7) //8051 RAM code
 	{	
 		rtl8192c_FirmwareSelfReset(Adapter);
-		write8(Adapter, REG_MCUFWDL, 0x00);		
+		rtw_write8(Adapter, REG_MCUFWDL, 0x00);		
 	}
 
 		
@@ -545,61 +622,61 @@ static void _update_bt_param(_adapter *padapter)
 	pbtpriv->BT_Ampdu = registry_par->bt_ampdu;
 	pbtpriv->bCOBT = _TRUE;
 #if 1
-	printk("BT Coexistance = %s\n", (pbtpriv->BT_Coexist==_TRUE)?"enable":"disable");
+	DBG_8192C("BT Coexistance = %s\n", (pbtpriv->BT_Coexist==_TRUE)?"enable":"disable");
 	if(pbtpriv->BT_Coexist)
 	{
 		if(pbtpriv->BT_Ant_Num == Ant_x2)
 		{
-			printk("BlueTooth BT_Ant_Num = Antx2\n");
+			DBG_8192C("BlueTooth BT_Ant_Num = Antx2\n");
 		}
 		else if(pbtpriv->BT_Ant_Num == Ant_x1)
 		{
-			printk("BlueTooth BT_Ant_Num = Antx1\n");
+			DBG_8192C("BlueTooth BT_Ant_Num = Antx1\n");
 		}
 		switch(pbtpriv->BT_CoexistType)
 		{
 			case BT_2Wire:
-				printk("BlueTooth BT_CoexistType = BT_2Wire\n");
+				DBG_8192C("BlueTooth BT_CoexistType = BT_2Wire\n");
 				break;
 			case BT_ISSC_3Wire:
-				printk("BlueTooth BT_CoexistType = BT_ISSC_3Wire\n");
+				DBG_8192C("BlueTooth BT_CoexistType = BT_ISSC_3Wire\n");
 				break;
 			case BT_Accel:
-				printk("BlueTooth BT_CoexistType = BT_Accel\n");
+				DBG_8192C("BlueTooth BT_CoexistType = BT_Accel\n");
 				break;
 			case BT_CSR_BC4:
-				printk("BlueTooth BT_CoexistType = BT_CSR_BC4\n");
+				DBG_8192C("BlueTooth BT_CoexistType = BT_CSR_BC4\n");
 				break;
 			case BT_RTL8756:
-				printk("BlueTooth BT_CoexistType = BT_RTL8756\n");
+				DBG_8192C("BlueTooth BT_CoexistType = BT_RTL8756\n");
 				break;
 			default:
-				printk("BlueTooth BT_CoexistType = Unknown\n");
+				DBG_8192C("BlueTooth BT_CoexistType = Unknown\n");
 				break;
 		}
-		printk("BlueTooth BT_Ant_isolation = %d\n", pbtpriv->BT_Ant_isolation);
+		DBG_8192C("BlueTooth BT_Ant_isolation = %d\n", pbtpriv->BT_Ant_isolation);
 
 
 		switch(pbtpriv->BT_Service)
 		{
 			case BT_OtherAction:
-				printk("BlueTooth BT_Service = BT_OtherAction\n");
+				DBG_8192C("BlueTooth BT_Service = BT_OtherAction\n");
 				break;
 			case BT_SCO:
-				printk("BlueTooth BT_Service = BT_SCO\n");
+				DBG_8192C("BlueTooth BT_Service = BT_SCO\n");
 				break;
 			case BT_Busy:
-				printk("BlueTooth BT_Service = BT_Busy\n");
+				DBG_8192C("BlueTooth BT_Service = BT_Busy\n");
 				break;
 			case BT_OtherBusy:
-				printk("BlueTooth BT_Service = BT_OtherBusy\n");
+				DBG_8192C("BlueTooth BT_Service = BT_OtherBusy\n");
 				break;			
 			default:
-				printk("BlueTooth BT_Service = BT_Idle\n");
+				DBG_8192C("BlueTooth BT_Service = BT_Idle\n");
 				break;
 		}
 
-		printk("BT_RadioSharedType = 0x%x\n", pbtpriv->BT_RadioSharedType);
+		DBG_8192C("BT_RadioSharedType = 0x%x\n", pbtpriv->BT_RadioSharedType);
 	}
 #endif
 
@@ -656,7 +733,7 @@ rtl8192c_ReadChipVersion(
 	u32			ChipVersion=0;
 	HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(Adapter);
 
-	value32 = read32(Adapter, REG_SYS_CFG);
+	value32 = rtw_read32(Adapter, REG_SYS_CFG);
 
 	if (value32 & TRP_VAUX_EN)
 	{
@@ -739,13 +816,13 @@ rtl8192c_ReadChipVersion(
 
 		if(IS_92C_SERIAL(ChipVersion))
 		{
-			value32 = read32(Adapter, REG_HPON_FSM);
+			value32 = rtw_read32(Adapter, REG_HPON_FSM);
 			ChipVersion |= ((CHIP_BONDING_IDENTIFIER(value32) == CHIP_BONDING_92C_1T2R) ? RF_TYPE_1T2R : 0);			
 		}
 		else if(IS_8723_SERIES(ChipVersion))
 		{
 			//RT_ASSERT(IS_HARDWARE_TYPE_8723(Adapter), ("Incorrect chip version!!\n"));
-			value32 = read32(Adapter, REG_GPIO_OUTSTS);
+			value32 = rtw_read32(Adapter, REG_GPIO_OUTSTS);
 			ChipVersion |= ((value32 & RF_RL_ID)>>20);	 //ROM code version.	
 		}
 #endif
@@ -758,7 +835,7 @@ rtl8192c_ReadChipVersion(
 	if(IS_8723_SERIES(ChipVersion))
 	{
 		pHalData->MultiFunc = RT_MULTI_FUNC_NONE;
-		value32 = read32(Adapter, REG_MULTI_FUNC_CTRL);
+		value32 = rtw_read32(Adapter, REG_MULTI_FUNC_CTRL);
 		pHalData->MultiFunc =(RT_MULTI_FUNC) (pHalData->MultiFunc| ((value32 & WL_FUNC_EN) ?  RT_MULTI_FUNC_WIFI : 0) );
 		pHalData->MultiFunc =(RT_MULTI_FUNC) (pHalData->MultiFunc| ((value32 & BT_FUNC_EN) ?  RT_MULTI_FUNC_BT : 0) );
 		pHalData->MultiFunc =(RT_MULTI_FUNC) (pHalData->MultiFunc| ((value32 & GPS_FUNC_EN) ?  RT_MULTI_FUNC_GPS : 0) );
@@ -858,7 +935,10 @@ _HalMapChannelPlan8192C(
 			break;			
 #endif /* Not using EEPROM_CHANNEL_PLAN directly */
 		default:
-			rtChannelDomain = (RT_CHANNEL_DOMAIN)HalChannelPlan;
+			if(HalChannelPlan == 0xFF)
+				rtChannelDomain = RT_CHANNEL_DOMAIN_WORLD_WIDE_13;
+			else
+				rtChannelDomain = (RT_CHANNEL_DOMAIN)HalChannelPlan;
 			break;
 	}
 	
@@ -871,7 +951,7 @@ u8 GetEEPROMSize8192C(PADAPTER Adapter)
 	u8	size = 0;
 	u32	curRCR;
 
-	curRCR = read16(Adapter, REG_9346CR);
+	curRCR = rtw_read16(Adapter, REG_9346CR);
 	size = (curRCR & BOOT_FROM_EEPROM) ? 6 : 4; // 6: EEPROM used is 93C46, 4: boot from E-Fuse.
 	
 	MSG_8192C("EEPROM type is %s\n", size==4 ? "E-FUSE" : "93C46");
@@ -947,40 +1027,40 @@ hal_EfusePowerSwitch_RTL8192C(
 	if (PwrState == _TRUE)
 	{
 		// 1.2V Power: From VDDON with Power Cut(0x0000h[15]), defualt valid
-		tmpV16 = read16(pAdapter,REG_SYS_ISO_CTRL);
+		tmpV16 = rtw_read16(pAdapter,REG_SYS_ISO_CTRL);
 		if( ! (tmpV16 & PWC_EV12V ) ){
 			tmpV16 |= PWC_EV12V ;
-			write16(pAdapter,REG_SYS_ISO_CTRL,tmpV16);
+			rtw_write16(pAdapter,REG_SYS_ISO_CTRL,tmpV16);
 		}
 		// Reset: 0x0000h[28], default valid
-		tmpV16 =  read16(pAdapter,REG_SYS_FUNC_EN);
+		tmpV16 =  rtw_read16(pAdapter,REG_SYS_FUNC_EN);
 		if( !(tmpV16 & FEN_ELDR) ){
 			tmpV16 |= FEN_ELDR ;
-			write16(pAdapter,REG_SYS_FUNC_EN,tmpV16);
+			rtw_write16(pAdapter,REG_SYS_FUNC_EN,tmpV16);
 		}
 
 		// Clock: Gated(0x0008h[5]) 8M(0x0008h[1]) clock from ANA, default valid
-		tmpV16 = read16(pAdapter,REG_SYS_CLKR);
+		tmpV16 = rtw_read16(pAdapter,REG_SYS_CLKR);
 		if( (!(tmpV16 & LOADER_CLK_EN) )  ||(!(tmpV16 & ANA8M) ) ){
 			tmpV16 |= (LOADER_CLK_EN |ANA8M ) ;
-			write16(pAdapter,REG_SYS_CLKR,tmpV16);
+			rtw_write16(pAdapter,REG_SYS_CLKR,tmpV16);
 		}
 
 		if(bWrite == _TRUE)
 		{
 			// Enable LDO 2.5V before read/write action
-			tempval = read8(pAdapter, EFUSE_TEST+3);
+			tempval = rtw_read8(pAdapter, EFUSE_TEST+3);
 			tempval &= 0x0F;
 			tempval |= (VOLTAGE_V25 << 4);
-			write8(pAdapter, EFUSE_TEST+3, (tempval | 0x80));
+			rtw_write8(pAdapter, EFUSE_TEST+3, (tempval | 0x80));
 		}
 	}
 	else
 	{
 		if(bWrite == _TRUE){
 			// Disable LDO 2.5V after read/write action
-			tempval = read8(pAdapter, EFUSE_TEST+3);
-			write8(pAdapter, EFUSE_TEST+3, (tempval & 0x7F));
+			tempval = rtw_read8(pAdapter, EFUSE_TEST+3);
+			rtw_write8(pAdapter, EFUSE_TEST+3, (tempval & 0x7F));
 		}
 	}
 }
@@ -996,45 +1076,45 @@ hal_EfusePowerSwitch_RTL8723(
 
 	if (PwrState == _TRUE)
 	{
-		write8(pAdapter, REG_EFUSE_ACCESS, EFUSE_ACCESS_ON);	
+		rtw_write8(pAdapter, REG_EFUSE_ACCESS, EFUSE_ACCESS_ON);	
 
 		// 1.2V Power: From VDDON with Power Cut(0x0000h[15]), defualt valid
-		tmpV16 = read16(pAdapter,REG_SYS_ISO_CTRL);
+		tmpV16 = rtw_read16(pAdapter,REG_SYS_ISO_CTRL);
 		if( ! (tmpV16 & PWC_EV12V ) ){
 			tmpV16 |= PWC_EV12V ;
-			 write16(pAdapter,REG_SYS_ISO_CTRL,tmpV16);
+			 rtw_write16(pAdapter,REG_SYS_ISO_CTRL,tmpV16);
 		}
 		// Reset: 0x0000h[28], default valid
-		tmpV16 =  read16(pAdapter,REG_SYS_FUNC_EN);
+		tmpV16 =  rtw_read16(pAdapter,REG_SYS_FUNC_EN);
 		if( !(tmpV16 & FEN_ELDR) ){
 			tmpV16 |= FEN_ELDR ;
-			write16(pAdapter,REG_SYS_FUNC_EN,tmpV16);
+			rtw_write16(pAdapter,REG_SYS_FUNC_EN,tmpV16);
 		}
 
 		// Clock: Gated(0x0008h[5]) 8M(0x0008h[1]) clock from ANA, default valid
-		tmpV16 = read16(pAdapter,REG_SYS_CLKR);
+		tmpV16 = rtw_read16(pAdapter,REG_SYS_CLKR);
 		if( (!(tmpV16 & LOADER_CLK_EN) )  ||(!(tmpV16 & ANA8M) ) ){
 			tmpV16 |= (LOADER_CLK_EN |ANA8M ) ;
-			write16(pAdapter,REG_SYS_CLKR,tmpV16);
+			rtw_write16(pAdapter,REG_SYS_CLKR,tmpV16);
 		}
 
 		if(bWrite == _TRUE)
 		{
 			// Enable LDO 2.5V before read/write action
-			tempval = read8(pAdapter, EFUSE_TEST+3);
+			tempval = rtw_read8(pAdapter, EFUSE_TEST+3);
 			tempval &= 0x0F;
 			tempval |= (VOLTAGE_V25 << 4);
-			write8(pAdapter, EFUSE_TEST+3, (tempval | 0x80));
+			rtw_write8(pAdapter, EFUSE_TEST+3, (tempval | 0x80));
 		}
 	}
 	else
 	{
-		write8(pAdapter, REG_EFUSE_ACCESS, EFUSE_ACCESS_OFF);
+		rtw_write8(pAdapter, REG_EFUSE_ACCESS, EFUSE_ACCESS_OFF);
 
 		if(bWrite == _TRUE){
 			// Disable LDO 2.5V after read/write action
-			tempval = read8(pAdapter, EFUSE_TEST+3);
-			write8(pAdapter, EFUSE_TEST+3, (tempval & 0x7F));
+			tempval = rtw_read8(pAdapter, EFUSE_TEST+3);
+			rtw_write8(pAdapter, EFUSE_TEST+3, (tempval & 0x7F));
 		}
 	}	
 }
@@ -1363,7 +1443,7 @@ Hal_EfuseSwitchToBank(
 		if(IS_HARDWARE_TYPE_8723(pAdapter) && 
 			INCLUDE_MULTI_FUNC_BT(pAdapter))
 		{		
-			value32 = read32(pAdapter, EFUSE_TEST);
+			value32 = rtw_read32(pAdapter, EFUSE_TEST);
 			bRet = _TRUE;
 			switch(bank)
 			{
@@ -1384,7 +1464,7 @@ Hal_EfuseSwitchToBank(
 				bRet = _FALSE;
 				break;
 			}
-			write32(pAdapter, EFUSE_TEST, value32);
+			rtw_write32(pAdapter, EFUSE_TEST, value32);
 		}
 		else
 			bRet = _TRUE;
@@ -1883,7 +1963,7 @@ Hal_EfuseWordEnableDataWrite(	IN	PADAPTER	pAdapter,
 	u8	badworden = 0x0F;
 	u8	tmpdata[8]; 
 	
-	_memset((PVOID)tmpdata, 0xff, PGPKT_DATA_SIZE);
+	_rtw_memset((PVOID)tmpdata, 0xff, PGPKT_DATA_SIZE);
 	//RT_TRACE(COMP_EFUSE, DBG_LOUD, ("word_en = %x efuse_addr=%x\n", word_en, efuse_addr));
 
 	if(!(word_en&BIT0))
@@ -2240,8 +2320,8 @@ hal_EfusePgPacketRead_8192C(	IN	PADAPTER	pAdapter,
 	if(offset>15)		return _FALSE;	
 	
 
-	_memset((PVOID)data, 0xff, sizeof(u8)*PGPKT_DATA_SIZE);
-	_memset((PVOID)tmpdata, 0xff, sizeof(u8)*PGPKT_DATA_SIZE);
+	_rtw_memset((PVOID)data, 0xff, sizeof(u8)*PGPKT_DATA_SIZE);
+	_rtw_memset((PVOID)tmpdata, 0xff, sizeof(u8)*PGPKT_DATA_SIZE);
 	
 	//
 	// <Roger_TODO> Efuse has been pre-programmed dummy 5Bytes at the end of Efuse by CP.
@@ -2329,8 +2409,8 @@ hal_EfusePgPacketRead_8723(	IN	PADAPTER	pAdapter,
 	if(offset>max_section)
 		return _FALSE;
 
-	_memset((PVOID)data, 0xff, sizeof(u8)*PGPKT_DATA_SIZE);
-	_memset((PVOID)tmpdata, 0xff, sizeof(u8)*PGPKT_DATA_SIZE);
+	_rtw_memset((PVOID)data, 0xff, sizeof(u8)*PGPKT_DATA_SIZE);
+	_rtw_memset((PVOID)tmpdata, 0xff, sizeof(u8)*PGPKT_DATA_SIZE);
 	
 	
 	//
@@ -2484,7 +2564,7 @@ hal_EfuseFixHeaderProcess(
 	u16	efuse_addr=*pAddr;
 	u32	PgWriteSuccess=0;
 	
-	_memset((PVOID)originaldata, 0xff, 8);
+	_rtw_memset((PVOID)originaldata, 0xff, 8);
 					
 	if(Efuse_PgPacketRead(pAdapter, pFixPkt->offset, originaldata, bPseudoTest))
 	{	//check if data exist
@@ -2748,7 +2828,7 @@ hal_EfuseConstructPGPkt(
 
 )
 {
-	_memset((PVOID)pTargetPkt->data, 0xFF, sizeof(u8)*8);
+	_rtw_memset((PVOID)pTargetPkt->data, 0xFF, sizeof(u8)*8);
 	pTargetPkt->offset = offset;
 	pTargetPkt->word_en= word_en;
 	efuse_WordEnableDataRead(word_en, pData, pTargetPkt->data);
@@ -3048,7 +3128,7 @@ hal_EfusePgPacketWrite_8192C(IN	PADAPTER	pAdapter,
 	target_pkt.offset = offset;
 	target_pkt.word_en= word_en;
 
-	_memset((PVOID)target_pkt.data, 0xFF, sizeof(u8)*8);
+	_rtw_memset((PVOID)target_pkt.data, 0xFF, sizeof(u8)*8);
 	
 	efuse_WordEnableDataRead(word_en,data,target_pkt.data);
 	target_word_cnts = Efuse_CalculateWordCnts(target_pkt.word_en);
@@ -3224,7 +3304,7 @@ hal_EfusePgPacketWrite_8192C(IN	PADAPTER	pAdapter,
 																											
 					//************  s1-2-A :cover the exist data *******************
 					//memset(originaldata,0xff,sizeof(UINT8)*8);
-					_memset((PVOID)originaldata, 0xff, sizeof(u8)*8);
+					_rtw_memset((PVOID)originaldata, 0xff, sizeof(u8)*8);
 					
 					if(Efuse_PgPacketRead( pAdapter, tmp_pkt.offset,originaldata, bPseudoTest))
 					{	//check if data exist 					

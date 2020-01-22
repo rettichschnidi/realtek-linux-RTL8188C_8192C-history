@@ -34,12 +34,12 @@
 #include <circ_buf.h>
 
 
-uint remainder_len(struct pkt_file *pfile)
+uint rtw_remainder_len(struct pkt_file *pfile)
 {
 	return (pfile->buf_len - ((SIZE_PTR)(pfile->cur_addr) - (SIZE_PTR)(pfile->buf_start)));
 }
 
-void _open_pktfile (_pkt *pktptr, struct pkt_file *pfile)
+void _rtw_open_pktfile (_pkt *pktptr, struct pkt_file *pfile)
 {
 _func_enter_;
 
@@ -52,13 +52,13 @@ _func_enter_;
 _func_exit_;
 }
 
-uint _pktfile_read (struct pkt_file *pfile, u8 *rmem, uint rlen)
+uint _rtw_pktfile_read (struct pkt_file *pfile, u8 *rmem, uint rlen)
 {	
 	uint	len = 0;
 	
 _func_enter_;
 
-       len =  remainder_len(pfile);
+       len =  rtw_remainder_len(pfile);
       	len = (rlen > len)? len: rlen;
 
        if(rmem)
@@ -72,7 +72,7 @@ _func_exit_;
 	return len;	
 }
 
-sint endofpktfile(struct pkt_file *pfile)
+sint rtw_endofpktfile(struct pkt_file *pfile)
 {
 _func_enter_;
 
@@ -86,10 +86,10 @@ _func_exit_;
 	return _FALSE;
 }
 
-void set_tx_chksum_offload(_pkt *pkt, struct pkt_attrib *pattrib)
+void rtw_set_tx_chksum_offload(_pkt *pkt, struct pkt_attrib *pattrib)
 {
 
-#ifdef CONFIG_RTL8712_TCP_CSUM_OFFLOAD_TX
+#ifdef CONFIG_TCP_CSUM_OFFLOAD_TX
 	struct sk_buff *skb = (struct sk_buff *)pkt;
 	pattrib->hw_tcp_csum = 0;
 	
@@ -99,11 +99,11 @@ void set_tx_chksum_offload(_pkt *pkt, struct pkt_attrib *pattrib)
                         const struct iphdr *ip = ip_hdr(skb);
                         if (ip->protocol == IPPROTO_TCP) {
                                 // TCP checksum offload by HW
-                                printk("CHECKSUM_PARTIAL TCP\n");
+                                DBG_8192C("CHECKSUM_PARTIAL TCP\n");
                                 pattrib->hw_tcp_csum = 1;
                                 //skb_checksum_help(skb);
                         } else if (ip->protocol == IPPROTO_UDP) {
-                                //printk("CHECKSUM_PARTIAL UDP\n");
+                                //DBG_8192C("CHECKSUM_PARTIAL UDP\n");
 #if 1                       
                                 skb_checksum_help(skb);
 #else
@@ -112,12 +112,12 @@ void set_tx_chksum_offload(_pkt *pkt, struct pkt_attrib *pattrib)
                                 udp->check = 0;
 #endif
                         } else {
-				printk("%s-%d TCP CSUM offload Error!!\n", __FUNCTION__, __LINE__);
+				DBG_8192C("%s-%d TCP CSUM offload Error!!\n", __FUNCTION__, __LINE__);
                                 WARN_ON(1);     /* we need a WARN() */
 			    }
 		}
 		else { // IP fragmentation case
-			printk("%s-%d nr_frags != 0, using skb_checksum_help(skb);!!\n", __FUNCTION__, __LINE__);
+			DBG_8192C("%s-%d nr_frags != 0, using skb_checksum_help(skb);!!\n", __FUNCTION__, __LINE__);
                 	skb_checksum_help(skb);
 		}		
 	}
@@ -125,7 +125,7 @@ void set_tx_chksum_offload(_pkt *pkt, struct pkt_attrib *pattrib)
 	
 }
 
-int os_xmit_resource_alloc(_adapter *padapter, struct xmit_buf *pxmitbuf,u32 alloc_sz)
+int rtw_os_xmit_resource_alloc(_adapter *padapter, struct xmit_buf *pxmitbuf,u32 alloc_sz)
 {
 #ifdef CONFIG_USB_HCI
 	int i;
@@ -160,7 +160,7 @@ int os_xmit_resource_alloc(_adapter *padapter, struct xmit_buf *pxmitbuf,u32 all
       		pxmitbuf->pxmit_urb[i] = usb_alloc_urb(0, GFP_KERNEL);
              	if(pxmitbuf->pxmit_urb[i] == NULL) 
              	{
-             		printk("pxmitbuf->pxmit_urb[i]==NULL");
+             		DBG_8192C("pxmitbuf->pxmit_urb[i]==NULL");
 	        	return _FAIL;	 
              	}      		  	
 	
@@ -179,7 +179,7 @@ int os_xmit_resource_alloc(_adapter *padapter, struct xmit_buf *pxmitbuf,u32 all
 	return _SUCCESS;	
 }
 
-void os_xmit_resource_free(_adapter *padapter, struct xmit_buf *pxmitbuf,u32 free_sz)
+void rtw_os_xmit_resource_free(_adapter *padapter, struct xmit_buf *pxmitbuf,u32 free_sz)
 {
 #ifdef CONFIG_USB_HCI
 	int i;
@@ -220,7 +220,7 @@ void os_xmit_resource_free(_adapter *padapter, struct xmit_buf *pxmitbuf,u32 fre
 #endif
 }
 
-void os_pkt_complete(_adapter *padapter, _pkt *pkt)
+void rtw_os_pkt_complete(_adapter *padapter, _pkt *pkt)
 {
 	if (netif_queue_stopped(padapter->pnetdev))
 		netif_wake_queue(padapter->pnetdev);
@@ -228,28 +228,28 @@ void os_pkt_complete(_adapter *padapter, _pkt *pkt)
 	dev_kfree_skb_any(pkt);
 }
 
-void os_xmit_complete(_adapter *padapter, struct xmit_frame *pxframe)
+void rtw_os_xmit_complete(_adapter *padapter, struct xmit_frame *pxframe)
 {
 	if(pxframe->pkt)
 	{
-		//RT_TRACE(_module_xmit_osdep_c_,_drv_err_,("linux : os_xmit_complete, dev_kfree_skb()\n"));	
+		//RT_TRACE(_module_xmit_osdep_c_,_drv_err_,("linux : rtw_os_xmit_complete, dev_kfree_skb()\n"));	
 
 		//dev_kfree_skb_any(pxframe->pkt);	
-		os_pkt_complete(padapter, pxframe->pkt);
+		rtw_os_pkt_complete(padapter, pxframe->pkt);
 		
 	}	
 
 	pxframe->pkt = NULL;
 }
 
-void os_xmit_schedule(_adapter *padapter)
+void rtw_os_xmit_schedule(_adapter *padapter)
 {
 	_irqL  irqL;
 	struct xmit_priv *pxmitpriv = &padapter->xmitpriv;
 
 	_enter_critical_bh(&pxmitpriv->lock, &irqL);
 	
-	if(txframes_pending(padapter))	
+	if(rtw_txframes_pending(padapter))	
 	{
 		tasklet_hi_schedule(&pxmitpriv->xmit_tasklet);
 	}
@@ -258,9 +258,9 @@ void os_xmit_schedule(_adapter *padapter)
 }
 
 
-int xmit_entry(_pkt *pkt, _nic_hdl pnetdev)
+int rtw_xmit_entry(_pkt *pkt, _nic_hdl pnetdev)
 {
-	_adapter *padapter = (_adapter *)netdev_priv(pnetdev);
+	_adapter *padapter = (_adapter *)rtw_netdev_priv(pnetdev);
 	struct xmit_priv *pxmitpriv = &padapter->xmitpriv;
 
 	s32 res = 0;
@@ -270,8 +270,8 @@ _func_enter_;
 
 	RT_TRACE(_module_rtl871x_mlme_c_, _drv_info_, ("+xmit_enry\n"));
 
-	if (if_up(padapter) == _FALSE) {
-		RT_TRACE(_module_xmit_osdep_c_, _drv_err_, ("xmit_entry: if_up fail\n"));
+	if (rtw_if_up(padapter) == _FALSE) {
+		RT_TRACE(_module_xmit_osdep_c_, _drv_err_, ("rtw_xmit_entry: rtw_if_up fail\n"));
 		goto drop_packet;
 	}
 
@@ -279,13 +279,13 @@ _func_enter_;
 	if (res < 0) goto drop_packet;
 
 	pxmitpriv->tx_pkts++;
-	RT_TRACE(_module_xmit_osdep_c_, _drv_info_, ("xmit_entry: tx_pkts=%d\n", (u32)pxmitpriv->tx_pkts));
+	RT_TRACE(_module_xmit_osdep_c_, _drv_info_, ("rtw_xmit_entry: tx_pkts=%d\n", (u32)pxmitpriv->tx_pkts));
 	goto exit;
 
 drop_packet:
 	pxmitpriv->tx_drop++;
 	dev_kfree_skb_any(pkt);
-	RT_TRACE(_module_xmit_osdep_c_, _drv_notice_, ("xmit_entry: drop, tx_drop=%d\n", (u32)pxmitpriv->tx_drop));
+	RT_TRACE(_module_xmit_osdep_c_, _drv_notice_, ("rtw_xmit_entry: drop, tx_drop=%d\n", (u32)pxmitpriv->tx_drop));
 
 exit:
 

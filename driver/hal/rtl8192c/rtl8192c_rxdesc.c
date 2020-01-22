@@ -55,7 +55,7 @@ static s32 signal_scale_mapping(_adapter *padapter, s32 cur_sig )
 {
 	s32 ret_sig;
 
-#if DEV_BUS_TYPE==DEV_BUS_USB_INTERFACE
+#ifdef CONFIG_USB_HCI
 	if(cur_sig >= 51 && cur_sig <= 100)
 	{
 		ret_sig = 100;
@@ -475,7 +475,7 @@ void rtl8192c_query_rx_phy_status(union recv_frame *prframe, struct phy_stat *pp
 			pattrib->signal_strength= (u8)(signal_scale_mapping(padapter, total_rssi/=rf_rx_num));
 		}
 	}
-	//printk("%s,rx_pwr_all(%d),RxPWDBAll(%d)\n",__FUNCTION__,rx_pwr_all,pattrib->RxPWDBAll);
+	//DBG_8192C("%s,rx_pwr_all(%d),RxPWDBAll(%d)\n",__FUNCTION__,rx_pwr_all,pattrib->RxPWDBAll);
 
 }
 
@@ -485,7 +485,7 @@ static void process_rssi(_adapter *padapter,union recv_frame *prframe)
 	u32	last_rssi, tmp_val;
 	struct rx_pkt_attrib *pattrib = &prframe->u.hdr.attrib;
 
-	//printk("process_rssi=> pattrib->rssil(%d) signal_strength(%d)\n ",pattrib->RecvSignalPower,pattrib->signal_strength);
+	//DBG_8192C("process_rssi=> pattrib->rssil(%d) signal_strength(%d)\n ",pattrib->RecvSignalPower,pattrib->signal_strength);
 	//if(pRfd->Status.bPacketToSelf || pRfd->Status.bPacketBeacon)
 	{
 		//Adapter->RxStats.RssiCalculateCnt++;	//For antenna Test
@@ -625,7 +625,7 @@ static void process_link_qual(_adapter *padapter,union recv_frame *prframe)
 
 	pattrib = &prframe->u.hdr.attrib;
 
-	//printk("process_link_qual=> pattrib->signal_qual(%d)\n ",pattrib->signal_qual);
+	//DBG_8192C("process_link_qual=> pattrib->signal_qual(%d)\n ",pattrib->signal_qual);
 	if(pattrib->signal_qual != 0)
 	{
 			//

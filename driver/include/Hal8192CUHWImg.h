@@ -22,10 +22,10 @@
 
 /*Created on  2010/ 5/25,  2:21*/
 
-#if ( P2P_INCLUDED == 0 )
+#ifndef CONFIG_P2P
 #define TSMCImgArrayLength 16352 //v68.1 2011-02-24
 #else
-#define TSMCImgArrayLength 14230 //P2P_PS 2011-03-07
+#define TSMCImgArrayLength 15168 //P2P_PS 2011-05-11
 #endif
 extern u8 Rtl8192CUFwTSMCImgArray[TSMCImgArrayLength];
 

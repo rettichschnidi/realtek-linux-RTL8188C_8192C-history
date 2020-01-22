@@ -73,13 +73,13 @@ int proc_set_write_reg(struct file *file, const char *buffer,
 		unsigned long count, void *data)
 {
 	struct net_device *dev = (struct net_device *)data;
-	_adapter *padapter = (_adapter *)netdev_priv(dev);
+	_adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
 	char tmp[32];
 	u32 addr, val, len;
 
 	if (count < 3)
 	{
-		printk("argument size is less than 3\n");
+		DBG_8192C("argument size is less than 3\n");
 		return -EFAULT;
 	}	
 
@@ -88,23 +88,23 @@ int proc_set_write_reg(struct file *file, const char *buffer,
 		int num = sscanf(tmp, "%x %x %x", &addr, &val, &len);
 
 		if (num !=  3) {
-			printk("invalid write_reg parameter!\n");
+			DBG_8192C("invalid write_reg parameter!\n");
 			return count;
 		}
 
 		switch(len)
 		{
 			case 1:
-				write8(padapter, addr, (u8)val);				
+				rtw_write8(padapter, addr, (u8)val);				
 				break;
 			case 2:
-				write16(padapter, addr, (u16)val);				
+				rtw_write16(padapter, addr, (u16)val);				
 				break;
 			case 4:
-				write32(padapter, addr, val);				
+				rtw_write32(padapter, addr, val);				
 				break;
 			default:
-				printk("error write length=%d", len);
+				DBG_8192C("error write length=%d", len);
 				break;
 		}			
 		
@@ -122,7 +122,7 @@ int proc_get_read_reg(char *page, char **start,
 			  int *eof, void *data)
 {	
 	struct net_device *dev = data;
-	_adapter *padapter = (_adapter *)netdev_priv(dev);	
+	_adapter *padapter = (_adapter *)rtw_netdev_priv(dev);	
 	
 	int len = 0;
 
@@ -135,13 +135,13 @@ int proc_get_read_reg(char *page, char **start,
 	switch(proc_get_read_len)
 	{
 		case 1:			
-			len += snprintf(page + len, count - len, "read8(0x%x)=0x%x\n", proc_get_read_addr, read8(padapter, proc_get_read_addr));
+			len += snprintf(page + len, count - len, "rtw_read8(0x%x)=0x%x\n", proc_get_read_addr, rtw_read8(padapter, proc_get_read_addr));
 			break;
 		case 2:
-			len += snprintf(page + len, count - len, "read16(0x%x)=0x%x\n", proc_get_read_addr, read16(padapter, proc_get_read_addr));
+			len += snprintf(page + len, count - len, "rtw_read16(0x%x)=0x%x\n", proc_get_read_addr, rtw_read16(padapter, proc_get_read_addr));
 			break;
 		case 4:
-			len += snprintf(page + len, count - len, "read32(0x%x)=0x%x\n", proc_get_read_addr, read32(padapter, proc_get_read_addr));
+			len += snprintf(page + len, count - len, "rtw_read32(0x%x)=0x%x\n", proc_get_read_addr, rtw_read32(padapter, proc_get_read_addr));
 			break;
 		default:
 			len += snprintf(page + len, count - len, "error read length=%d\n", proc_get_read_len);
@@ -157,13 +157,13 @@ int proc_set_read_reg(struct file *file, const char *buffer,
 		unsigned long count, void *data)
 {
 	struct net_device *dev = (struct net_device *)data;
-	_adapter *padapter = (_adapter *)netdev_priv(dev);
+	_adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
 	char tmp[16];
 	u32 addr, len;
 
 	if (count < 2)
 	{
-		printk("argument size is less than 2\n");
+		DBG_8192C("argument size is less than 2\n");
 		return -EFAULT;
 	}	
 
@@ -172,7 +172,7 @@ int proc_set_read_reg(struct file *file, const char *buffer,
 		int num = sscanf(tmp, "%x %x", &addr, &len);
 
 		if (num !=  2) {
-			printk("invalid read_reg parameter!\n");
+			DBG_8192C("invalid read_reg parameter!\n");
 			return count;
 		}
 
@@ -190,7 +190,7 @@ int proc_get_fwstate(char *page, char **start,
 			  int *eof, void *data)
 {
 	struct net_device *dev = data;
-	_adapter *padapter = (_adapter *)netdev_priv(dev);
+	_adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
 	struct mlme_priv *pmlmepriv = &(padapter->mlmepriv);
 	
 	int len = 0;
@@ -206,7 +206,7 @@ int proc_get_sec_info(char *page, char **start,
 			  int *eof, void *data)
 {
 	struct net_device *dev = data;
-	_adapter *padapter = (_adapter *)netdev_priv(dev);	
+	_adapter *padapter = (_adapter *)rtw_netdev_priv(dev);	
 	struct security_priv *psecuritypriv = &padapter->securitypriv;
 	
 	int len = 0;
@@ -224,7 +224,7 @@ int proc_get_mlmext_state(char *page, char **start,
 			  int *eof, void *data)
 {
 	struct net_device *dev = data;
-	_adapter *padapter = (_adapter *)netdev_priv(dev);	
+	_adapter *padapter = (_adapter *)rtw_netdev_priv(dev);	
 	struct mlme_ext_priv	*pmlmeext = &padapter->mlmeextpriv;
 	struct mlme_ext_info	*pmlmeinfo = &(pmlmeext->mlmext_info);
 	
@@ -241,7 +241,7 @@ int proc_get_qos_option(char *page, char **start,
 			  int *eof, void *data)
 {
 	struct net_device *dev = data;
-	_adapter *padapter = (_adapter *)netdev_priv(dev);
+	_adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
 	struct mlme_priv *pmlmepriv = &(padapter->mlmepriv);
 	
 	int len = 0;
@@ -258,7 +258,7 @@ int proc_get_ht_option(char *page, char **start,
 			  int *eof, void *data)
 {
 	struct net_device *dev = data;
-	_adapter *padapter = (_adapter *)netdev_priv(dev);
+	_adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
 	struct mlme_priv *pmlmepriv = &(padapter->mlmepriv);
 	
 	int len = 0;
@@ -274,7 +274,7 @@ int proc_get_rf_info(char *page, char **start,
 			  int *eof, void *data)
 {
 	struct net_device *dev = data;
-	_adapter *padapter = (_adapter *)netdev_priv(dev);	
+	_adapter *padapter = (_adapter *)rtw_netdev_priv(dev);	
 	struct mlme_ext_priv	*pmlmeext = &padapter->mlmeextpriv;	
 	int len = 0;
 
@@ -293,13 +293,13 @@ int proc_get_ap_info(char *page, char **start,
 {
 	struct sta_info *psta;
 	struct net_device *dev = data;
-	_adapter *padapter = (_adapter *)netdev_priv(dev);
+	_adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
 	struct mlme_priv *pmlmepriv = &(padapter->mlmepriv);
 	struct wlan_network *cur_network = &(pmlmepriv->cur_network);
 	struct sta_priv *pstapriv = &padapter->stapriv;
 	int len = 0;
 
-	psta = get_stainfo(pstapriv, cur_network->network.MacAddress);
+	psta = rtw_get_stainfo(pstapriv, cur_network->network.MacAddress);
 	if(psta)
 	{
 		int i;
@@ -338,7 +338,7 @@ int proc_get_adapter_state(char *page, char **start,
 			  int *eof, void *data)
 {
 	struct net_device *dev = data;
-	_adapter *padapter = (_adapter *)netdev_priv(dev);
+	_adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
 	int len = 0;
 	
 	len += snprintf(page + len, count - len, "bSurpriseRemoved=%d, bDriverStopped=%d\n", 
@@ -354,7 +354,7 @@ int proc_get_trx_info(char *page, char **start,
 			  int *eof, void *data)
 {
 	struct net_device *dev = data;
-	_adapter *padapter = (_adapter *)netdev_priv(dev);
+	_adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
 	struct xmit_priv *pxmitpriv = &padapter->xmitpriv;
 	struct recv_priv  *precvpriv = &padapter->recvpriv;
 	int len = 0;
@@ -380,7 +380,7 @@ int proc_get_all_sta_info(char *page, char **start,
 	_irqL irqL;
 	struct sta_info *psta;
 	struct net_device *dev = data;
-	_adapter *padapter = (_adapter *)netdev_priv(dev);
+	_adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
 	struct sta_priv *pstapriv = &padapter->stapriv;
 	int i, j;
 	_list	*plist, *phead;
@@ -397,7 +397,7 @@ int proc_get_all_sta_info(char *page, char **start,
 		phead = &(pstapriv->sta_hash[i]);
 		plist = get_next(phead);
 		
-		while ((end_of_queue_search(phead, plist)) == _FALSE)
+		while ((rtw_end_of_queue_search(phead, plist)) == _FALSE)
 		{
 			psta = LIST_CONTAINOR(plist, struct sta_info, hash_list);
 
@@ -464,7 +464,7 @@ int proc_get_best_channel(char *page, char **start,
 			  int *eof, void *data)
 {
 	struct net_device *dev = data;
-	_adapter *padapter = (_adapter *)netdev_priv(dev);
+	_adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
 	struct mlme_ext_priv *pmlmeext = &padapter->mlmeextpriv;
 	int len = 0;
 	u32 i, best_channel_24G = 1, best_channel_5G = 36, index_24G = 0, index_5G = 0;

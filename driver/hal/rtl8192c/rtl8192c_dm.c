@@ -365,13 +365,13 @@ dm_CtrlInitGainByRssi(
 	DM_DigTable.CurIGValue = value_IGI;
 #endif
 
-#if (DEV_BUS_TYPE==DEV_BUS_USB_INTERFACE)
+#ifdef CONFIG_USB_HCI
 	if(FalseAlmCnt->Cnt_all < 250)
 	{
 #endif
 		//DBG_8192C("===> dm_CtrlInitGainByRssi, Enter DIG by SS mode\n");
 		
-		isBT = read8(pAdapter, 0x4fd) & 0x01;
+		isBT = rtw_read8(pAdapter, 0x4fd) & 0x01;
 
 		if(!isBT){
 
@@ -401,7 +401,7 @@ dm_CtrlInitGainByRssi(
 			pDigTable->CurIGValue = pDigTable->Rssi_val_min+10-pDigTable->BackoffVal;
 
 		//DBG_8192C("Rssi_val_min = %x BackoffVal %x\n",pDigTable->Rssi_val_min, pDigTable->BackoffVal);
-#if (DEV_BUS_TYPE==DEV_BUS_USB_INTERFACE)
+#ifdef CONFIG_USB_HCI
 	}
 	else
 	{		
@@ -672,7 +672,7 @@ static void dm_SavePowerIndex(IN	PADAPTER	Adapter)
 	u32			Power_Index_REG[6] = {0xc90, 0xc91, 0xc92, 0xc98, 0xc99, 0xc9a};
 	
 	for(index = 0; index< 6; index++)
-		pdmpriv->PowerIndex_backup[index] = read8(Adapter, Power_Index_REG[index]);
+		pdmpriv->PowerIndex_backup[index] = rtw_read8(Adapter, Power_Index_REG[index]);
 }
 
 static void dm_RestorePowerIndex(IN	PADAPTER	Adapter)
@@ -683,7 +683,7 @@ static void dm_RestorePowerIndex(IN	PADAPTER	Adapter)
 	u32			Power_Index_REG[6] = {0xc90, 0xc91, 0xc92, 0xc98, 0xc99, 0xc9a};
 	
 	for(index = 0; index< 6; index++)
-		write8(Adapter, Power_Index_REG[index], pdmpriv->PowerIndex_backup[index]);
+		rtw_write8(Adapter, Power_Index_REG[index], pdmpriv->PowerIndex_backup[index]);
 }
 
 static void dm_WritePowerIndex(
@@ -695,7 +695,7 @@ static void dm_WritePowerIndex(
 	u32			Power_Index_REG[6] = {0xc90, 0xc91, 0xc92, 0xc98, 0xc99, 0xc9a};
 	
 	for(index = 0; index< 6; index++)
-		write8(Adapter, Power_Index_REG[index], Value);
+		rtw_write8(Adapter, Power_Index_REG[index], Value);
 }
 
 static void dm_InitDynamicTxPower(IN	PADAPTER	Adapter)
@@ -703,7 +703,7 @@ static void dm_InitDynamicTxPower(IN	PADAPTER	Adapter)
 	HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(Adapter);
 	struct dm_priv	*pdmpriv = &pHalData->dmpriv;
 
-#if DEV_BUS_TYPE==DEV_BUS_USB_INTERFACE					
+#ifdef CONFIG_USB_HCI
 	if(pHalData->BoardType == BOARD_USB_High_PA)
 	{
 		dm_SavePowerIndex(Adapter);
@@ -881,14 +881,14 @@ static VOID PWDB_Monitor(
 			phead = &(pstapriv->sta_hash[i]);
 			plist = get_next(phead);
 		
-			while ((end_of_queue_search(phead, plist)) == _FALSE)
+			while ((rtw_end_of_queue_search(phead, plist)) == _FALSE)
 			{
 				psta = LIST_CONTAINOR(plist, struct sta_info, hash_list);
 
 				plist = get_next(plist);
 
-				if(_memcmp(psta	->hwaddr, bcast_addr, NUM_STA) || 
-					_memcmp(psta->hwaddr, myid(&Adapter->eeprompriv), NUM_STA))
+				if(_rtw_memcmp(psta	->hwaddr, bcast_addr, ETH_ALEN) || 
+					_rtw_memcmp(psta->hwaddr, myid(&Adapter->eeprompriv), ETH_ALEN))
 					continue;
 
 				if(psta->state & WIFI_ASOC_STATE)
@@ -1070,7 +1070,7 @@ dm_CheckEdcaTurbo(
 #endif
 			}
 
-#if DEV_BUS_TYPE==DEV_BUS_PCI_INTERFACE
+#ifdef CONFIG_PCI_HCI
 			if(IS_92C_SERIAL(pHalData->VersionID))
 			{
 				edca_param = 0x60a42b;
@@ -1080,7 +1080,7 @@ dm_CheckEdcaTurbo(
 				edca_param = 0x6ea42b;
 			}
 #endif
-			write32(Adapter, REG_EDCA_BE_PARAM, edca_param);
+			rtw_write32(Adapter, REG_EDCA_BE_PARAM, edca_param);
 
 			pdmpriv->prv_traffic_idx = trafficIndex;
 		}
@@ -1095,7 +1095,7 @@ dm_CheckEdcaTurbo(
 		//
 		 if(pHalData->bCurrentTurboEDCA)
 		{
-			write32(Adapter, REG_EDCA_BE_PARAM, pHalData->AcParam_BE);
+			rtw_write32(Adapter, REG_EDCA_BE_PARAM, pHalData->AcParam_BE);
 			pHalData->bCurrentTurboEDCA = _FALSE;
 		}
 	}
@@ -1177,7 +1177,7 @@ dm_TXPowerTrackingCallback_ThermalMeter_92C(
 				if(ele_D == (OFDMSwingTable[i]&bMaskOFDM_D))
 				{
 					OFDM_index_old[0] = (u8)i;
-					//printk("Initial pathA ele_D reg0x%x = 0x%x, OFDM_index=0x%x\n", rOFDM0_XATxIQImbalance, ele_D, OFDM_index_old[0]);
+					//DBG_8192C("Initial pathA ele_D reg0x%x = 0x%x, OFDM_index=0x%x\n", rOFDM0_XATxIQImbalance, ele_D, OFDM_index_old[0]);
 					break;
 				}
 			}
@@ -1191,7 +1191,7 @@ dm_TXPowerTrackingCallback_ThermalMeter_92C(
 					if(ele_D == (OFDMSwingTable[i]&bMaskOFDM_D))
 					{
 						OFDM_index_old[1] = (u8)i;
-						//printk("Initial pathB ele_D reg0x%x = 0x%x, OFDM_index=0x%x\n",rOFDM0_XBTxIQImbalance, ele_D, OFDM_index_old[1]);
+						//DBG_8192C("Initial pathB ele_D reg0x%x = 0x%x, OFDM_index=0x%x\n",rOFDM0_XBTxIQImbalance, ele_D, OFDM_index_old[1]);
 						break;
 					}
 				}
@@ -1203,19 +1203,19 @@ dm_TXPowerTrackingCallback_ThermalMeter_92C(
 			{
 				if(pdmpriv->bCCKinCH14)
 				{
-					if(_memcmp((void*)&TempCCk, (void*)&CCKSwingTable_Ch14[i][2], 4)==_TRUE)
+					if(_rtw_memcmp((void*)&TempCCk, (void*)&CCKSwingTable_Ch14[i][2], 4)==_TRUE)
 					{
 						CCK_index_old =(u8)i;
-						//printk("Initial reg0x%x = 0x%x, CCK_index=0x%x, ch 14 %d\n", rCCK0_TxFilter2, TempCCk, CCK_index_old, pdmpriv->bCCKinCH14);
+						//DBG_8192C("Initial reg0x%x = 0x%x, CCK_index=0x%x, ch 14 %d\n", rCCK0_TxFilter2, TempCCk, CCK_index_old, pdmpriv->bCCKinCH14);
 						break;
 					}
 				}
 				else
 				{
-					if(_memcmp((void*)&TempCCk, (void*)&CCKSwingTable_Ch1_Ch13[i][2], 4)==_TRUE)
+					if(_rtw_memcmp((void*)&TempCCk, (void*)&CCKSwingTable_Ch1_Ch13[i][2], 4)==_TRUE)
 					{
 						CCK_index_old =(u8)i;
-						//printk("Initial reg0x%x = 0x%x, CCK_index=0x%x, ch14 %d\n", rCCK0_TxFilter2, TempCCk, CCK_index_old, pdmpriv->bCCKinCH14);
+						//DBG_8192C("Initial reg0x%x = 0x%x, CCK_index=0x%x, ch14 %d\n", rCCK0_TxFilter2, TempCCk, CCK_index_old, pdmpriv->bCCKinCH14);
 						break;
 					}			
 				}
@@ -1228,7 +1228,7 @@ dm_TXPowerTrackingCallback_ThermalMeter_92C(
 				pdmpriv->ThermalValue_IQK = ThermalValue;
 				pdmpriv->ThermalValue_DPK = pHalData->EEPROMThermalMeter;
 
-#if DEV_BUS_TYPE==DEV_BUS_USB_INTERFACE				
+#ifdef CONFIG_USB_HCI
 				for(i = 0; i < rf; i++)
 					pdmpriv->OFDM_index_HP[i] = pdmpriv->OFDM_index[i] = OFDM_index_old[i];
 				pdmpriv->CCK_index_HP = pdmpriv->CCK_index = CCK_index_old;
@@ -1239,7 +1239,7 @@ dm_TXPowerTrackingCallback_ThermalMeter_92C(
 #endif
 			}
 
-#if DEV_BUS_TYPE==DEV_BUS_USB_INTERFACE				
+#ifdef CONFIG_USB_HCI
 			if(pHalData->BoardType == BOARD_USB_High_PA)
 			{
 				pdmpriv->ThermalValue_HP[pdmpriv->ThermalValue_HP_index] = ThermalValue;
@@ -1263,7 +1263,7 @@ dm_TXPowerTrackingCallback_ThermalMeter_92C(
 		}
 
 		delta = (ThermalValue > pdmpriv->ThermalValue)?(ThermalValue - pdmpriv->ThermalValue):(pdmpriv->ThermalValue - ThermalValue);
-#if DEV_BUS_TYPE==DEV_BUS_USB_INTERFACE				
+#ifdef CONFIG_USB_HCI
 		if(pHalData->BoardType == BOARD_USB_High_PA)
 		{
 			if(pdmpriv->bDoneTxpower)
@@ -1290,7 +1290,7 @@ dm_TXPowerTrackingCallback_ThermalMeter_92C(
 		
 		if((delta > 0 || delta_HP > 0) && pdmpriv->TxPowerTrackControl)
 		{
-#if DEV_BUS_TYPE==DEV_BUS_USB_INTERFACE		
+#ifdef CONFIG_USB_HCI
 			if(pHalData->BoardType == BOARD_USB_High_PA)
 			{
 				pdmpriv->bDoneTxpower = _TRUE;
@@ -1339,17 +1339,17 @@ dm_TXPowerTrackingCallback_ThermalMeter_92C(
 	/*		
 			if(is2T)
 			{
-				printk("temp OFDM_A_index=0x%x, OFDM_B_index=0x%x, CCK_index=0x%x\n", 
+				DBG_8192C("temp OFDM_A_index=0x%x, OFDM_B_index=0x%x, CCK_index=0x%x\n", 
 					pdmpriv->OFDM_index[0], pdmpriv->OFDM_index[1], pdmpriv->CCK_index);			
 			}
 			else
 			{
-				//printk("temp OFDM_A_index=0x%x, CCK_index=0x%x\n",pdmpriv->OFDM_index[0], pdmpriv->CCK_index);			
+				//DBG_8192C("temp OFDM_A_index=0x%x, CCK_index=0x%x\n",pdmpriv->OFDM_index[0], pdmpriv->CCK_index);			
 			}
 	*/
 
 			//no adjust
-#if DEV_BUS_TYPE==DEV_BUS_USB_INTERFACE					
+#ifdef CONFIG_USB_HCI
 			if(pHalData->BoardType != BOARD_USB_High_PA)
 #endif
 			{
@@ -1441,11 +1441,11 @@ dm_TXPowerTrackingCallback_ThermalMeter_92C(
 	/*		
 			if(is2T)
 			{
-				printk("new OFDM_A_index=0x%x, OFDM_B_index=0x%x, CCK_index=0x%x\n", OFDM_index[0], OFDM_index[1], CCK_index);
+				DBG_8192C("new OFDM_A_index=0x%x, OFDM_B_index=0x%x, CCK_index=0x%x\n", OFDM_index[0], OFDM_index[1], CCK_index);
 			}
 			else
 			{
-				//printk("new OFDM_A_index=0x%x, CCK_index=0x%x\n",	OFDM_index[0], CCK_index);			
+				//DBG_8192C("new OFDM_A_index=0x%x, CCK_index=0x%x\n",	OFDM_index[0], CCK_index);			
 			}
 	*/
 			
@@ -1494,24 +1494,24 @@ dm_TXPowerTrackingCallback_ThermalMeter_92C(
 
 			//Adjust CCK according to IQK result
 			if(!pdmpriv->bCCKinCH14){
-				write8(Adapter, 0xa22, CCKSwingTable_Ch1_Ch13[(u8)CCK_index][0]);
-				write8(Adapter, 0xa23, CCKSwingTable_Ch1_Ch13[(u8)CCK_index][1]);
-				write8(Adapter, 0xa24, CCKSwingTable_Ch1_Ch13[(u8)CCK_index][2]);
-				write8(Adapter, 0xa25, CCKSwingTable_Ch1_Ch13[(u8)CCK_index][3]);
-				write8(Adapter, 0xa26, CCKSwingTable_Ch1_Ch13[(u8)CCK_index][4]);
-				write8(Adapter, 0xa27, CCKSwingTable_Ch1_Ch13[(u8)CCK_index][5]);
-				write8(Adapter, 0xa28, CCKSwingTable_Ch1_Ch13[(u8)CCK_index][6]);
-				write8(Adapter, 0xa29, CCKSwingTable_Ch1_Ch13[(u8)CCK_index][7]);
+				rtw_write8(Adapter, 0xa22, CCKSwingTable_Ch1_Ch13[(u8)CCK_index][0]);
+				rtw_write8(Adapter, 0xa23, CCKSwingTable_Ch1_Ch13[(u8)CCK_index][1]);
+				rtw_write8(Adapter, 0xa24, CCKSwingTable_Ch1_Ch13[(u8)CCK_index][2]);
+				rtw_write8(Adapter, 0xa25, CCKSwingTable_Ch1_Ch13[(u8)CCK_index][3]);
+				rtw_write8(Adapter, 0xa26, CCKSwingTable_Ch1_Ch13[(u8)CCK_index][4]);
+				rtw_write8(Adapter, 0xa27, CCKSwingTable_Ch1_Ch13[(u8)CCK_index][5]);
+				rtw_write8(Adapter, 0xa28, CCKSwingTable_Ch1_Ch13[(u8)CCK_index][6]);
+				rtw_write8(Adapter, 0xa29, CCKSwingTable_Ch1_Ch13[(u8)CCK_index][7]);
 			}
 			else{
-				write8(Adapter, 0xa22, CCKSwingTable_Ch14[(u8)CCK_index][0]);
-				write8(Adapter, 0xa23, CCKSwingTable_Ch14[(u8)CCK_index][1]);
-				write8(Adapter, 0xa24, CCKSwingTable_Ch14[(u8)CCK_index][2]);
-				write8(Adapter, 0xa25, CCKSwingTable_Ch14[(u8)CCK_index][3]);
-				write8(Adapter, 0xa26, CCKSwingTable_Ch14[(u8)CCK_index][4]);
-				write8(Adapter, 0xa27, CCKSwingTable_Ch14[(u8)CCK_index][5]);
-				write8(Adapter, 0xa28, CCKSwingTable_Ch14[(u8)CCK_index][6]);
-				write8(Adapter, 0xa29, CCKSwingTable_Ch14[(u8)CCK_index][7]);	
+				rtw_write8(Adapter, 0xa22, CCKSwingTable_Ch14[(u8)CCK_index][0]);
+				rtw_write8(Adapter, 0xa23, CCKSwingTable_Ch14[(u8)CCK_index][1]);
+				rtw_write8(Adapter, 0xa24, CCKSwingTable_Ch14[(u8)CCK_index][2]);
+				rtw_write8(Adapter, 0xa25, CCKSwingTable_Ch14[(u8)CCK_index][3]);
+				rtw_write8(Adapter, 0xa26, CCKSwingTable_Ch14[(u8)CCK_index][4]);
+				rtw_write8(Adapter, 0xa27, CCKSwingTable_Ch14[(u8)CCK_index][5]);
+				rtw_write8(Adapter, 0xa28, CCKSwingTable_Ch14[(u8)CCK_index][6]);
+				rtw_write8(Adapter, 0xa29, CCKSwingTable_Ch14[(u8)CCK_index][7]);	
 			}		
 
 			if(is2T)
@@ -1705,7 +1705,7 @@ static BOOLEAN BT_BTStateChange(PADAPTER Adapter)
 	if(check_fwstate(pmlmepriv, _FW_LINKED) == _FALSE)	
 		return _FALSE;
 	
-	BT_State = read8(Adapter, 0x4fd);
+	BT_State = rtw_read8(Adapter, 0x4fd);
 /*
 	temp = PlatformEFIORead4Byte(Adapter, 0x488);
 	BT_Tx = (u2Byte)(((temp<<8)&0xff00)+((temp>>8)&0xff));
@@ -1716,20 +1716,20 @@ static BOOLEAN BT_BTStateChange(PADAPTER Adapter)
 			((temp<<8)&0x0000ff00) + ((temp>>8)&0x000000ff);
 	
 */
-	BT_Tx = read32(Adapter, 0x488);
+	BT_Tx = rtw_read32(Adapter, 0x488);
 	
-	printk("Ratio 0x488  =%x\n", BT_Tx);
+	DBG_8192C("Ratio 0x488  =%x\n", BT_Tx);
 	BT_Tx =BT_Tx & 0x00ffffff;
 	//RTPRINT(FBT, BT_TRACE, ("Ratio BT_Tx  =%x\n", BT_Tx));
 
-	BT_PRI = read32(Adapter, 0x48c);
+	BT_PRI = rtw_read32(Adapter, 0x48c);
 	
-	printk("Ratio 0x48c  =%x\n", BT_PRI);
+	DBG_8192C("Ratio 0x48c  =%x\n", BT_PRI);
 	BT_PRI =BT_PRI & 0x00ffffff;
 	//RTPRINT(FBT, BT_TRACE, ("Ratio BT_PRI  =%x\n", BT_PRI));
 
 
-	Polling = read32(Adapter, 0x490);
+	Polling = rtw_read32(Adapter, 0x490);
 	//RTPRINT(FBT, BT_TRACE, ("Ratio 0x490  =%x\n", Polling));
 
 
@@ -1748,18 +1748,18 @@ static BOOLEAN BT_BTStateChange(PADAPTER Adapter)
 		
 			pbtpriv->BT_Service = BT_Idle;
 
-			printk("BT_%s\n", BT_State?"ON":"OFF");
+			DBG_8192C("BT_%s\n", BT_State?"ON":"OFF");
 
 			BT_State = BT_State | 
 					((pbtpriv->BT_Ant_isolation==1)?0:BIT1) |BIT2;
 
-			write8(Adapter, 0x4fd, BT_State);
-			printk("BT set 0x4fd to %x\n", BT_State);
+			rtw_write8(Adapter, 0x4fd, BT_State);
+			DBG_8192C("BT set 0x4fd to %x\n", BT_State);
 		}
 		
 		return _TRUE;
 	}
-	printk("bRegBT_Sco =  %d\n",registry_par->bt_sco);
+	DBG_8192C("bRegBT_Sco =  %d\n",registry_par->bt_sco);
 
 	Ratio_Tx = BT_Tx*1000/Polling;
 	Ratio_PRI = BT_PRI*1000/Polling;
@@ -1767,13 +1767,13 @@ static BOOLEAN BT_BTStateChange(PADAPTER Adapter)
 	pbtpriv->Ratio_Tx=Ratio_Tx;
 	pbtpriv->Ratio_PRI=Ratio_PRI;
 	
-	printk("Ratio_Tx=%d\n", Ratio_Tx);
-	printk("Ratio_PRI=%d\n", Ratio_PRI);
+	DBG_8192C("Ratio_Tx=%d\n", Ratio_Tx);
+	DBG_8192C("Ratio_PRI=%d\n", Ratio_PRI);
 
 	
 	if(BT_State && registry_par->bt_sco==3)
 	{
-		printk("bt_sco  ==3 Follow Counter\n");
+		DBG_8192C("bt_sco  ==3 Follow Counter\n");
 //		if(BT_Tx==0xffff && BT_PRI==0xffff && Polling==0xffffffff)
 //		{
 //			ServiceTypeCnt = 0;
@@ -1843,27 +1843,27 @@ static BOOLEAN BT_BTStateChange(PADAPTER Adapter)
 
 			if(pbtpriv->BT_Service==BT_SCO)
 			{
-				printk("BT TYPE Set to  ==> BT_SCO\n");
+				DBG_8192C("BT TYPE Set to  ==> BT_SCO\n");
 			}
 			else if(pbtpriv->BT_Service==BT_Idle)
 			{
-				printk("BT TYPE Set to  ==> BT_Idle\n");
+				DBG_8192C("BT TYPE Set to  ==> BT_Idle\n");
 			}
 			else if(pbtpriv->BT_Service==BT_OtherAction)
 			{
-				printk("BT TYPE Set to  ==> BT_OtherAction\n");
+				DBG_8192C("BT TYPE Set to  ==> BT_OtherAction\n");
 			}
 			else if(pbtpriv->BT_Service==BT_Busy)
 			{
-				printk("BT TYPE Set to  ==> BT_Busy\n");
+				DBG_8192C("BT TYPE Set to  ==> BT_Busy\n");
 			}
 			else if(pbtpriv->BT_Service==BT_PAN)
 			{
-				printk("BT TYPE Set to  ==> BT_PAN\n");
+				DBG_8192C("BT TYPE Set to  ==> BT_PAN\n");
 			}
 			else
 			{
-				printk("BT TYPE Set to ==> BT_OtherBusy\n");
+				DBG_8192C("BT TYPE Set to ==> BT_OtherBusy\n");
 			}
 				
 			//Add interrupt migration when bt is not in idel state (no traffic).
@@ -1871,19 +1871,19 @@ static BOOLEAN BT_BTStateChange(PADAPTER Adapter)
 			if(pbtpriv->BT_Service!=BT_Idle)//EDCA_VI_PARAM modify
 			{
 			
-				write16(Adapter, 0x504, 0x0ccc);
-				write8(Adapter, 0x506, 0x54);
-				write8(Adapter, 0x507, 0x54);
+				rtw_write16(Adapter, 0x504, 0x0ccc);
+				rtw_write8(Adapter, 0x506, 0x54);
+				rtw_write8(Adapter, 0x507, 0x54);
 			
 			}
 			else
 			{
-				write8(Adapter, 0x506, 0x00);
-				write8(Adapter, 0x507, 0x00);			
+				rtw_write8(Adapter, 0x506, 0x00);
+				rtw_write8(Adapter, 0x507, 0x00);			
 			}
 				
-			write8(Adapter, 0x4fd, BT_State);
-			printk("BT_SCO set 0x4fd to %x\n", BT_State);
+			rtw_write8(Adapter, 0x4fd, BT_State);
+			DBG_8192C("BT_SCO set 0x4fd to %x\n", BT_State);
 			return _TRUE;
 		}
 	}
@@ -2032,12 +2032,12 @@ static void dm_BTCoexist(PADAPTER Adapter )
 		bBtStateChange	= BT_BTStateChange(Adapter);
 		bRssiStateChange 	= BT_RssiStateChange(Adapter);
 		
-		printk("bWifiConnectChange %d, bBtStateChange  %d,bRssiStateChange  %d\n",
+		DBG_8192C("bWifiConnectChange %d, bBtStateChange  %d,bRssiStateChange  %d\n",
 			bWifiConnectChange,bBtStateChange,bRssiStateChange);
 
 		// add by hpfan for debug message
-		BT_gpio_mux = read8(Adapter, REG_GPIO_MUXCFG);
-		printk("BTCoexit Reg_0x40 (%2x)\n", BT_gpio_mux);
+		BT_gpio_mux = rtw_read8(Adapter, REG_GPIO_MUXCFG);
+		DBG_8192C("BTCoexit Reg_0x40 (%2x)\n", BT_gpio_mux);
 
 		if( bWifiConnectChange ||bBtStateChange  ||bRssiStateChange )
 		{
@@ -2054,7 +2054,7 @@ static void dm_BTCoexist(PADAPTER Adapter )
 						{
 							if(pmlmeinfo->bAcceptAddbaReq)
 							{
-								printk("BT_Disallow AMPDU \n");	
+								DBG_8192C("BT_Disallow AMPDU \n");	
 								pmlmeinfo->bAcceptAddbaReq = _FALSE;
 								send_delba(Adapter,0, get_my_bssid(&(pmlmeinfo->network)));
 							}
@@ -2063,7 +2063,7 @@ static void dm_BTCoexist(PADAPTER Adapter )
 						{
 							if(!pmlmeinfo->bAcceptAddbaReq)
 							{
-								printk("BT_Allow AMPDU  RSSI >=40\n");	
+								DBG_8192C("BT_Allow AMPDU  RSSI >=40\n");	
 								pmlmeinfo->bAcceptAddbaReq = _TRUE;
 							}
 						}
@@ -2072,7 +2072,7 @@ static void dm_BTCoexist(PADAPTER Adapter )
 					{
 						if(!pmlmeinfo->bAcceptAddbaReq)
 						{
-							printk("BT_Allow AMPDU BT Idle\n");	
+							DBG_8192C("BT_Allow AMPDU BT Idle\n");	
 							pmlmeinfo->bAcceptAddbaReq = _TRUE;
 						}
 					}
@@ -2112,7 +2112,7 @@ static void dm_BTCoexist(PADAPTER Adapter )
 
 				if(pbtpriv->BT_Ant_isolation)
 				{			
-					printk("BT_IsolationLow\n");
+					DBG_8192C("BT_IsolationLow\n");
 
 // 20100427 Joseph: Do not adjust Rate adaptive for BT coexist suggested by SD3.
 #if 0
@@ -2147,58 +2147,58 @@ static void dm_BTCoexist(PADAPTER Adapter )
 						if((pmlmeinfo->assoc_AP_vendor == ciscoAP)	&&
 							pbtpriv->BT_Service==BT_OtherAction)
 						{
-							printk("BT_Turn ON Coexist\n");
-							write8(Adapter, REG_GPIO_MUXCFG, 0xa0);	
+							DBG_8192C("BT_Turn ON Coexist\n");
+							rtw_write8(Adapter, REG_GPIO_MUXCFG, 0xa0);	
 						}
 						else
 						{
 							if((pbtpriv->BT_Service==BT_Busy) &&
 								(pbtpriv->BtRssiState & BT_RSSI_STATE_NORMAL_POWER))
 							{
-								printk("BT_Turn ON Coexist\n");
-								write8(Adapter, REG_GPIO_MUXCFG, 0xa0);
+								DBG_8192C("BT_Turn ON Coexist\n");
+								rtw_write8(Adapter, REG_GPIO_MUXCFG, 0xa0);
 							}
 							else if((pbtpriv->BT_Service==BT_OtherAction) &&
 									(pbtpriv->BtRssiState & BT_RSSI_STATE_SPECIAL_LOW))
 							{
-								printk("BT_Turn ON Coexist\n");
-								write8(Adapter, REG_GPIO_MUXCFG, 0xa0);	
+								DBG_8192C("BT_Turn ON Coexist\n");
+								rtw_write8(Adapter, REG_GPIO_MUXCFG, 0xa0);	
 							}
 							else if(pbtpriv->BT_Service==BT_PAN)
 							{
-								printk("BT_Turn ON Coexist\n");
-								write8(Adapter, REG_GPIO_MUXCFG, 0x00);	
+								DBG_8192C("BT_Turn ON Coexist\n");
+								rtw_write8(Adapter, REG_GPIO_MUXCFG, 0x00);	
 							}
 							else
 							{
-								printk("BT_Turn OFF Coexist\n");
-								write8(Adapter, REG_GPIO_MUXCFG, 0x00);
+								DBG_8192C("BT_Turn OFF Coexist\n");
+								rtw_write8(Adapter, REG_GPIO_MUXCFG, 0x00);
 							}
 						}
 					}
 					else
 					{
-						printk("BT: There is no Wifi traffic!! Turn off Coexist\n");
-						write8(Adapter, REG_GPIO_MUXCFG, 0x00);
+						DBG_8192C("BT: There is no Wifi traffic!! Turn off Coexist\n");
+						rtw_write8(Adapter, REG_GPIO_MUXCFG, 0x00);
 					}
 
 					if(1)//pMgntInfo->LinkDetectInfo.NumRecvDataInPeriod >= 20)
 					{
 						if(pbtpriv->BT_Service==BT_PAN)
 						{
-							printk("BT_Turn ON Coexist(Reg0x44 = 0x10100)\n");
-							write32(Adapter, REG_GPIO_PIN_CTRL, 0x10100);	
+							DBG_8192C("BT_Turn ON Coexist(Reg0x44 = 0x10100)\n");
+							rtw_write32(Adapter, REG_GPIO_PIN_CTRL, 0x10100);	
 						}
 						else
 						{
-							printk("BT_Turn OFF Coexist(Reg0x44 = 0x0)\n");
-							write32(Adapter, REG_GPIO_PIN_CTRL, 0x0);	
+							DBG_8192C("BT_Turn OFF Coexist(Reg0x44 = 0x0)\n");
+							rtw_write32(Adapter, REG_GPIO_PIN_CTRL, 0x0);	
 						}
 					}
 					else
 					{
-						printk("BT: There is no Wifi traffic!! Turn off Coexist(Reg0x44 = 0x0)\n");
-						write32(Adapter, REG_GPIO_PIN_CTRL, 0x0);	
+						DBG_8192C("BT: There is no Wifi traffic!! Turn off Coexist(Reg0x44 = 0x0)\n");
+						rtw_write32(Adapter, REG_GPIO_PIN_CTRL, 0x0);	
 					}
 
 					// 20100430 Joseph: Integrate the BT coexistence EDCA tuning here.
@@ -2211,7 +2211,7 @@ static void dm_BTCoexist(PADAPTER Adapter )
 							pbtpriv->BT_EDCA[UP_LINK] = 0x5ea72b;
 							pbtpriv->BT_EDCA[DOWN_LINK] = 0x5ea72b;							
 							
-							printk("BT in BT_OtherBusy state Tx (%d) >350 parameter(0x%x) = 0x%x\n", pbtpriv->Ratio_Tx ,REG_EDCA_BE_PARAM, 0x5ea72b);
+							DBG_8192C("BT in BT_OtherBusy state Tx (%d) >350 parameter(0x%x) = 0x%x\n", pbtpriv->Ratio_Tx ,REG_EDCA_BE_PARAM, 0x5ea72b);
 						}
 						else if(pbtpriv->BT_Service==BT_Busy)
 						{
@@ -2221,7 +2221,7 @@ static void dm_BTCoexist(PADAPTER Adapter )
 							pbtpriv->BT_EDCA[UP_LINK] = 0x5eb82f;
 							pbtpriv->BT_EDCA[DOWN_LINK] = 0x5eb82f;							
 							
-							printk("BT in BT_Busy state parameter(0x%x) = 0x%x\n", REG_EDCA_BE_PARAM, 0x5eb82f);		
+							DBG_8192C("BT in BT_Busy state parameter(0x%x) = 0x%x\n", REG_EDCA_BE_PARAM, 0x5eb82f);		
 						}
 						else if(pbtpriv->BT_Service==BT_SCO)
 						{
@@ -2231,7 +2231,7 @@ static void dm_BTCoexist(PADAPTER Adapter )
 								//pbtpriv->BtEdcaDL = 0x5ea72f;
 								pbtpriv->BT_EDCA[UP_LINK] = 0x5ea72f;
 								pbtpriv->BT_EDCA[DOWN_LINK] = 0x5ea72f;							
-								printk("BT in BT_SCO state Tx (%d) >160 parameter(0x%x) = 0x%x\n",pbtpriv->Ratio_Tx, REG_EDCA_BE_PARAM, 0x5ea72f);
+								DBG_8192C("BT in BT_SCO state Tx (%d) >160 parameter(0x%x) = 0x%x\n",pbtpriv->Ratio_Tx, REG_EDCA_BE_PARAM, 0x5ea72f);
 							}
 							else
 							{
@@ -2241,7 +2241,7 @@ static void dm_BTCoexist(PADAPTER Adapter )
 								pbtpriv->BT_EDCA[UP_LINK] = 0x5ea32b;
 								pbtpriv->BT_EDCA[DOWN_LINK] = 0x5ea42b;						
 								
-								printk("BT in BT_SCO state Tx (%d) <160 parameter(0x%x) = 0x%x\n", pbtpriv->Ratio_Tx,REG_EDCA_BE_PARAM, 0x5ea32f);
+								DBG_8192C("BT in BT_SCO state Tx (%d) <160 parameter(0x%x) = 0x%x\n", pbtpriv->Ratio_Tx,REG_EDCA_BE_PARAM, 0x5ea32f);
 							}									
 						}
 						else
@@ -2252,7 +2252,7 @@ static void dm_BTCoexist(PADAPTER Adapter )
 
 							pbtpriv->BT_EDCA[UP_LINK] = 0;
 							pbtpriv->BT_EDCA[DOWN_LINK] = 0;							
-							printk("BT in  State  %d  and parameter(0x%x) use original setting.\n",pbtpriv->BT_Service, REG_EDCA_BE_PARAM);
+							DBG_8192C("BT in  State  %d  and parameter(0x%x) use original setting.\n",pbtpriv->BT_Service, REG_EDCA_BE_PARAM);
 						}
 
 						if((pbtpriv->BT_Service!=BT_Idle) &&
@@ -2265,7 +2265,7 @@ static void dm_BTCoexist(PADAPTER Adapter )
 							pbtpriv->BT_EDCA[UP_LINK] = 0x5eb82b;
 							pbtpriv->BT_EDCA[DOWN_LINK] = 0x5eb82b;							
 							
-							printk("BT set parameter(0x%x) = 0x%x\n", REG_EDCA_BE_PARAM, 0x5eb82b);		
+							DBG_8192C("BT set parameter(0x%x) = 0x%x\n", REG_EDCA_BE_PARAM, 0x5eb82b);		
 						}
 					}
 					else
@@ -2281,14 +2281,14 @@ static void dm_BTCoexist(PADAPTER Adapter )
 					// 20100415 Joseph: Set RF register 0x1E and 0x1F for BT coexist suggested by Yaying.
 					if(pbtpriv->BT_Service!=BT_Idle)
 					{
-						printk("BT Set RfReg0x1E[7:4] = 0x%x \n", 0xf);
+						DBG_8192C("BT Set RfReg0x1E[7:4] = 0x%x \n", 0xf);
 						PHY_SetRFReg(Adapter, PathA, 0x1e, 0xf0, 0xf);
 						//RTPRINT(FBT, BT_TRACE, ("BT Set RfReg0x1E[7:4] = 0x%x \n", 0xf));
 						//PHY_SetRFReg(Adapter, PathA, 0x1f, 0xf0, 0xf);
 					}
 					else
 					{
-						printk("BT Set RfReg0x1E[7:4] = 0x%x \n",pbtpriv->BtRfRegOrigin1E);
+						DBG_8192C("BT Set RfReg0x1E[7:4] = 0x%x \n",pbtpriv->BtRfRegOrigin1E);
 						PHY_SetRFReg(Adapter, PathA, 0x1e, 0xf0, pbtpriv->BtRfRegOrigin1E);
 						//RTPRINT(FBT, BT_TRACE, ("BT Set RfReg0x1F[7:4] = 0x%x \n", pHalData->bt_coexist.BtRfRegOrigin1F));
 						//PHY_SetRFReg(Adapter, PathA, 0x1f, 0xf0, pHalData->bt_coexist.BtRfRegOrigin1F);
@@ -2296,7 +2296,7 @@ static void dm_BTCoexist(PADAPTER Adapter )
 				}
 				else
 				{
-					printk("BT_IsolationHigh\n");
+					DBG_8192C("BT_IsolationHigh\n");
 					// Do nothing.
 				}			
 			}
@@ -2305,14 +2305,14 @@ static void dm_BTCoexist(PADAPTER Adapter )
 			
 				if(pbtpriv->BT_Ampdu && !pmlmeinfo->bAcceptAddbaReq)
 				{
-					printk("BT_Allow AMPDU bt is off\n");	
+					DBG_8192C("BT_Allow AMPDU bt is off\n");	
 					pmlmeinfo->bAcceptAddbaReq = _TRUE;
 				}
 			
-				printk("BT_Turn OFF Coexist bt is off \n");
-				write8(Adapter, REG_GPIO_MUXCFG, 0x00);
+				DBG_8192C("BT_Turn OFF Coexist bt is off \n");
+				rtw_write8(Adapter, REG_GPIO_MUXCFG, 0x00);
 
-				printk("BT Set RfReg0x1E[7:4] = 0x%x \n", pbtpriv->BtRfRegOrigin1E);
+				DBG_8192C("BT Set RfReg0x1E[7:4] = 0x%x \n", pbtpriv->BtRfRegOrigin1E);
 				PHY_SetRFReg(Adapter, PathA, 0x1e, 0xf0, pbtpriv->BtRfRegOrigin1E);
 				//RTPRINT(FBT, BT_TRACE, ("BT Set RfReg0x1F[7:4] = 0x%x \n", pHalData->bt_coexist.BtRfRegOrigin1F));
 				//PHY_SetRFReg(Adapter, PathA, 0x1f, 0xf0, pHalData->bt_coexist.BtRfRegOrigin1F);
@@ -2387,7 +2387,7 @@ void rtl8192c_issue_delete_ba(_adapter *padapter, u8 dir)
 
 #endif
 
-#if 0//(DEV_BUS_TYPE==DEV_BUS_PCI_INTERFACE)
+#if 0//def CONFIG_PCI_HCI
 
 BOOLEAN
 BT_BTStateChange(
@@ -2777,12 +2777,21 @@ dm_CheckRfCtrlGPIO(
 {
 #if 0
 	HAL_DATA_TYPE		*pHalData = GET_HAL_DATA(Adapter);
-
-#if ( (HAL_CODE_BASE == RTL8190) || \
- 	 ((HAL_CODE_BASE == RTL8192) && (DEV_BUS_TYPE==DEV_BUS_USB_INTERFACE)))
-	//return;
+#if defined (CONFIG_USB_HCI) || defined (CONFIG_SDIO_HCI)
+	#ifdef CONFIG_USB_HCI
+		// 2010/08/12 MH Add for CU selective suspend.
+		PRT_USB_DEVICE		pDevice = GET_RT_USB_DEVICE(Adapter);
+	#else
+		PRT_SDIO_DEVICE	pDevice = GET_RT_SDIO_DEVICE(Adapter);
+	#endif
 #endif
-	
+
+	if(!Adapter->MgntInfo.PowerSaveControl.bGpioRfSw)
+		return;
+
+	RTPRINT(FPWR, PWRHW, ("dm_CheckRfCtrlGPIO \n"));
+
+#if defined (CONFIG_USB_HCI) || defined (CONFIG_SDIO_HCI)
 	// Walk around for DTM test, we will not enable HW - radio on/off because r/w
 	// page 1 register before Lextra bus is enabled cause system fails when resuming
 	// from S4. 20080218, Emily
@@ -2792,9 +2801,73 @@ dm_CheckRfCtrlGPIO(
 //#if ((HAL_CODE_BASE == RTL8192_S) )
 	//Adapter->HalFunc.GPIOChangeRFHandler(Adapter, GPIORF_POLLING);
 //#else
-	PlatformScheduleWorkItem( &(pHalData->GPIOChangeRFWorkItem) );
-//#endif
+	// 2010/07/27 MH Only Minicard and support selective suspend, we can not turn off all MAC power to 
+	// stop 8051. For dongle and minicard, we both support selective suspend mode.
+	//if(pDevice->RegUsbSS && Adapter->HalFunc.GetInterfaceSelectionHandler(Adapter) == INTF_SEL2_MINICARD)
 
+	//
+	// 2010/08/12 MH We support severl power consumption combination as below.
+	//
+	// Power consumption combination  
+	//	SS Enable: (LPS disable + IPS + SW/HW radio off)
+	//	1. Dongle + PDN  (support HW radio off)
+	//	2. Dongle + Normal  (No HW radio off)
+	//	3. MiniCard + PDN (support HW radio off)
+	//	4. MiniCard + Normal (support HW radio off)
+	//
+	//	SS Disable: (LPS + IPS + SW/HW radio off)
+	//	1. Dongle + PDN  (support HW radio off)
+	//	2. Dongle + Normal  (No HW radio off)
+	//	3. MiniCard + PDN (support HW radio off)
+	//	4. MiniCard + Normal (support HW radio off)
+	//
+	//	For Power down module detection. We need to read power register no matter
+	//	dongle or minicard, we will add the item is the detection method.
+	//
+	//
+	//vivi add du case
+	if ((IS_HARDWARE_TYPE_8192CU(Adapter)||IS_HARDWARE_TYPE_8192DU(Adapter))
+		&& pDevice->RegUsbSS)
+	{
+		RT_TRACE(COMP_RF, DBG_LOUD, ("USB SS Enabled\n"));
+		if (SUPPORT_HW_RADIO_DETECT(Adapter))
+		{	// Support HW radio detection
+			RT_TRACE(COMP_RF, DBG_LOUD, ("USB Card Type 2/3/4 support GPIO Detect\n"));
+			GpioDetectTimerStart(Adapter);
+		}
+		else
+		{	// Dongle does not support HW radio detection.?? In the fufure??
+			RT_TRACE(COMP_RF, DBG_LOUD, ("USB DONGLE Non-GPIO-Detect\n"));				
+		}			
+	}
+	else if (IS_HARDWARE_TYPE_8192CU(Adapter) ||
+		IS_HARDWARE_TYPE_8723U(Adapter)||
+		IS_HARDWARE_TYPE_8192DU(Adapter) ||
+		IS_HARDWARE_TYPE_8723S(Adapter))
+	{	// Not support Selective suspend 
+		RT_TRACE(COMP_RF, DBG_LOUD, ("USB SS Disable\n"));
+		if (SUPPORT_HW_RADIO_DETECT(Adapter))
+		{
+			RT_TRACE(COMP_RF, DBG_LOUD, ("USB Card Type 2/3/4 support GPIO Detect\n"));
+			PlatformScheduleWorkItem( &(pHalData->GPIOChangeRFWorkItem) );
+		}
+		else
+		{
+			RT_TRACE(COMP_RF, DBG_LOUD, ("USB DONGLE Non-GPIO-Detect\n"));
+		}
+	}
+	else
+	{	// CE only support noemal HW radio detection now. Support timers GPIO detection in SE/CU.		
+		PlatformScheduleWorkItem( &(pHalData->GPIOChangeRFWorkItem) );
+	}
+//#endif
+#else if defined CONFIG_PCI_HCI
+	if(Adapter->bInHctTest)
+		return;
+
+	// CE only support noemal HW radio detection now. We support timers GPIO detection in SE.		
+	PlatformScheduleWorkItem( &(pHalData->GPIOChangeRFWorkItem) );
+#endif
 #endif
 }	/* dm_CheckRfCtrlGPIO */
 
@@ -3045,18 +3118,18 @@ static void dm_CheckPbcGPIO(_adapter *padapter)
 {	
 	u8 tmp1byte;
 
-	tmp1byte = read8(padapter, GPIO_IO_SEL);
+	tmp1byte = rtw_read8(padapter, GPIO_IO_SEL);
 	tmp1byte |= (HAL_8192C_HW_GPIO_WPS_BIT);
-	write8(padapter, GPIO_IO_SEL, tmp1byte);	//enable GPIO[2] as output mode
+	rtw_write8(padapter, GPIO_IO_SEL, tmp1byte);	//enable GPIO[2] as output mode
 
 	tmp1byte &= ~(HAL_8192C_HW_GPIO_WPS_BIT);
-	write8(padapter,  GPIO_IN, tmp1byte);		//reset the floating voltage level
+	rtw_write8(padapter,  GPIO_IN, tmp1byte);		//reset the floating voltage level
 
-	tmp1byte = read8(padapter, GPIO_IO_SEL);
+	tmp1byte = rtw_read8(padapter, GPIO_IO_SEL);
 	tmp1byte &= ~(HAL_8192C_HW_GPIO_WPS_BIT);
-	write8(padapter, GPIO_IO_SEL, tmp1byte);	//enable GPIO[2] as input mode
+	rtw_write8(padapter, GPIO_IO_SEL, tmp1byte);	//enable GPIO[2] as input mode
 
-	tmp1byte =read8(padapter, GPIO_IN);
+	tmp1byte =rtw_read8(padapter, GPIO_IN);
 	
 	if (tmp1byte == 0xff)
 		return ;
@@ -3138,7 +3211,7 @@ dm_InterruptMigration(
 	
 	//Update current settings.
 	if( bCurrentIntMt != IntMtToSet ){
-		printk("%s(): Update interrrupt migration(%d)\n",__FUNCTION__,IntMtToSet);
+		DBG_8192C("%s(): Update interrrupt migration(%d)\n",__FUNCTION__,IntMtToSet);
 		if(IntMtToSet)
 		{
 			//
@@ -3146,19 +3219,19 @@ dm_InterruptMigration(
 			// timer 25ns*0xfa0=100us for 0xf packets.
 			// 2010.03.05.
 			//
-			write32(Adapter, REG_INT_MIG, 0xff000fa0);// 0x306:Rx, 0x307:Tx
+			rtw_write32(Adapter, REG_INT_MIG, 0xff000fa0);// 0x306:Rx, 0x307:Tx
 			pHalData->bInterruptMigration = IntMtToSet;
 		}
 		else
 		{
 			// Reset all interrupt migration settings.
-			write32(Adapter, REG_INT_MIG, 0);
+			rtw_write32(Adapter, REG_INT_MIG, 0);
 			pHalData->bInterruptMigration = IntMtToSet;
 		}
 	}
 
 	/*if( bCurrentACIntDisable != ACIntToSet ){
-		printk("%s(): Update AC interrrupt(%d)\n",__FUNCTION__,ACIntToSet);
+		DBG_8192C("%s(): Update AC interrrupt(%d)\n",__FUNCTION__,ACIntToSet);
 		if(ACIntToSet) // Disable four ACs interrupts.
 		{
 			//
@@ -3192,7 +3265,7 @@ dm_InitGPIOSetting(
 	
 	u8	tmp1byte;
 	
-	tmp1byte = read8(Adapter, REG_GPIO_MUXCFG);
+	tmp1byte = rtw_read8(Adapter, REG_GPIO_MUXCFG);
 	tmp1byte &= (GPIOSEL_GPIO | ~GPIOSEL_ENBT);
 	
 #ifdef CONFIG_BT_COEXIST
@@ -3203,7 +3276,7 @@ dm_InitGPIOSetting(
 		tmp1byte |= (BIT5);	
 	}
 #endif	
-	write8(Adapter, REG_GPIO_MUXCFG, tmp1byte);
+	rtw_write8(Adapter, REG_GPIO_MUXCFG, tmp1byte);
 
 }
 
@@ -3282,12 +3355,12 @@ static void update_EDCA_param(_adapter *padapter)
 #if 0
 #ifdef CONFIG_BT_COEXIST
 		if(_TRUE == bbtchange)		
-			write32(padapter, REG_EDCA_BE_PARAM, pbtpriv->BT_EDCA[trafficIndex]);		
+			rtw_write32(padapter, REG_EDCA_BE_PARAM, pbtpriv->BT_EDCA[trafficIndex]);		
 		else
 #endif
 		//adjust EDCA parameter for BE queue
 		//fire_write_MAC_cmd(padapter, EDCA_BE_PARAM, EDCAParam[pmlmeinfo->assoc_AP_vendor][trafficIndex]);
-		write32(padapter, REG_EDCA_BE_PARAM, EDCAParam[pmlmeinfo->assoc_AP_vendor][trafficIndex]);
+		rtw_write32(padapter, REG_EDCA_BE_PARAM, EDCAParam[pmlmeinfo->assoc_AP_vendor][trafficIndex]);
 
 #else
 		if((pmlmeinfo->assoc_AP_vendor == ciscoAP) && (pmlmeext->cur_wireless_mode & WIRELESS_11_24N))
@@ -3309,7 +3382,7 @@ static void update_EDCA_param(_adapter *padapter)
 			edca_param = pbtpriv->BT_EDCA[trafficIndex];
 #endif
 
-		write32(padapter, REG_EDCA_BE_PARAM, edca_param);
+		rtw_write32(padapter, REG_EDCA_BE_PARAM, edca_param);
 #endif
 		pdmpriv->prv_traffic_idx = trafficIndex;
 	}
@@ -3535,7 +3608,7 @@ void	SwAntDivCompare8192C(PADAPTER Adapter, WLAN_BSSID_EX *dst, WLAN_BSSID_EX *s
 
 	if((0 != pHalData->AntDivCfg) && (!IS_92C_SERIAL(pHalData->VersionID)) )
 	{
-		//printk("update_network=> orgRSSI(%d)(%d),newRSSI(%d)(%d)\n",dst->Rssi,query_rx_pwr_percentage(dst->Rssi),
+		//DBG_8192C("update_network=> orgRSSI(%d)(%d),newRSSI(%d)(%d)\n",dst->Rssi,query_rx_pwr_percentage(dst->Rssi),
 		//	src->Rssi,query_rx_pwr_percentage(src->Rssi));
 		//select optimum_antenna for before linked =>For antenna diversity
 		if(dst->Rssi >=  src->Rssi )//keep org parameter
@@ -3589,7 +3662,7 @@ u8 SwAntDivBeforeLink8192C(IN PADAPTER Adapter)
 		pDM_SWAT_Table->CurAntenna = (pDM_SWAT_Table->CurAntenna==Antenna_A)?Antenna_B:Antenna_A;
 
 		//PHY_SetBBReg(Adapter, rFPGA0_XA_RFInterfaceOE, 0x300, pDM_SWAT_Table->CurAntenna);
-		antenna_select_cmd(Adapter, pDM_SWAT_Table->CurAntenna, _FALSE);
+		rtw_antenna_select_cmd(Adapter, pDM_SWAT_Table->CurAntenna, _FALSE);
 		DBG_8192C("%s change antenna to ANT_( %s ).....\n",__FUNCTION__, (pDM_SWAT_Table->CurAntenna==Antenna_A)?"A":"B");
 		return _TRUE;
 	}
@@ -3694,7 +3767,7 @@ dm_SW_AntennaSwitch(
 		return;
 	}
 #endif
-	//printk("\n............................ %s.........................\n",__FUNCTION__);
+	//DBG_8192C("\n............................ %s.........................\n",__FUNCTION__);
 	// Handling step mismatch condition.
 	// Peak step is not finished at last time. Recover the variable and check again.
 	if( Step != pDM_SWAT_Table->try_flag	)
@@ -3779,26 +3852,26 @@ dm_SW_AntennaSwitch(
 		{
 				pdmpriv->TXByteCnt_A += curTxOkCnt;
 				pdmpriv->RXByteCnt_A += curRxOkCnt;
-				//printk("#####  TXByteCnt_A(%lld) , RXByteCnt_A(%lld) ####\n",pdmpriv->TXByteCnt_A,pdmpriv->RXByteCnt_A);
+				//DBG_8192C("#####  TXByteCnt_A(%lld) , RXByteCnt_A(%lld) ####\n",pdmpriv->TXByteCnt_A,pdmpriv->RXByteCnt_A);
 			}
 			else
 			{
 				pdmpriv->TXByteCnt_B += curTxOkCnt;
 				pdmpriv->RXByteCnt_B += curRxOkCnt;
-				//printk("#####  TXByteCnt_B(%lld) , RXByteCnt_B(%lld) ####\n",pdmpriv->TXByteCnt_B,pdmpriv->RXByteCnt_B);
+				//DBG_8192C("#####  TXByteCnt_B(%lld) , RXByteCnt_B(%lld) ####\n",pdmpriv->TXByteCnt_B,pdmpriv->RXByteCnt_B);
 			}
 		
 			nextAntenna = (pDM_SWAT_Table->CurAntenna == Antenna_A)? Antenna_B : Antenna_A;
 			pDM_SWAT_Table->RSSI_Trying--;
-			//printk("RSSI_Trying = %d\n",pDM_SWAT_Table->RSSI_Trying);
+			//DBG_8192C("RSSI_Trying = %d\n",pDM_SWAT_Table->RSSI_Trying);
 			
 			if(pDM_SWAT_Table->RSSI_Trying == 0)
 			{
 				CurByteCnt = (pDM_SWAT_Table->CurAntenna == Antenna_A)? (pdmpriv->TXByteCnt_A+pdmpriv->RXByteCnt_A) : (pdmpriv->TXByteCnt_B+pdmpriv->RXByteCnt_B);
 				PreByteCnt = (pDM_SWAT_Table->CurAntenna == Antenna_A)? (pdmpriv->TXByteCnt_B+pdmpriv->RXByteCnt_B) : (pdmpriv->TXByteCnt_A+pdmpriv->RXByteCnt_A);
 
-				//printk("CurByteCnt = %lld\n", CurByteCnt);
-				//printk("PreByteCnt = %lld\n",PreByteCnt);		
+				//DBG_8192C("CurByteCnt = %lld\n", CurByteCnt);
+				//DBG_8192C("PreByteCnt = %lld\n",PreByteCnt);		
 				
 				if(pdmpriv->TrafficLoad == TRAFFIC_HIGH)
 				{
@@ -3811,8 +3884,8 @@ dm_SW_AntennaSwitch(
 				}
 
 
-				//printk("After DIV=>CurByteCnt = %lld\n", CurByteCnt);
-				//printk("PreByteCnt = %lld\n",PreByteCnt);		
+				//DBG_8192C("After DIV=>CurByteCnt = %lld\n", CurByteCnt);
+				//DBG_8192C("PreByteCnt = %lld\n",PreByteCnt);		
 
 				if(pHalData->RSSI_cnt_A > 0)
 					RSSI_A = pHalData->RSSI_sum_A/pHalData->RSSI_cnt_A; 
@@ -3825,10 +3898,10 @@ dm_SW_AntennaSwitch(
 				
 				curRSSI = (pDM_SWAT_Table->CurAntenna == Antenna_A)? RSSI_A : RSSI_B;
 				pDM_SWAT_Table->PreRSSI =  (pDM_SWAT_Table->CurAntenna == Antenna_A)? RSSI_B : RSSI_A;
-				//printk("Luke:PreRSSI = %d, CurRSSI = %d\n",pDM_SWAT_Table->PreRSSI, curRSSI);
-				//printk("SWAS: preAntenna= %s, curAntenna= %s \n", 
+				//DBG_8192C("Luke:PreRSSI = %d, CurRSSI = %d\n",pDM_SWAT_Table->PreRSSI, curRSSI);
+				//DBG_8192C("SWAS: preAntenna= %s, curAntenna= %s \n", 
 				//(pDM_SWAT_Table->PreAntenna == Antenna_A?"A":"B"), (pDM_SWAT_Table->CurAntenna == Antenna_A?"A":"B"));
-				//printk("Luke:RSSI_A= %d, RSSI_cnt_A = %d, RSSI_B= %d, RSSI_cnt_B = %d\n",
+				//DBG_8192C("Luke:RSSI_A= %d, RSSI_cnt_A = %d, RSSI_B= %d, RSSI_cnt_B = %d\n",
 					//RSSI_A, pHalData->RSSI_cnt_A, RSSI_B, pHalData->RSSI_cnt_B);
 			}
 
@@ -3846,11 +3919,11 @@ dm_SW_AntennaSwitch(
 				RSSI_B = 0;
 			curRSSI = (pDM_SWAT_Table->CurAntenna == Antenna_A)? RSSI_A : RSSI_B;
 			pDM_SWAT_Table->PreRSSI =  (pDM_SWAT_Table->PreAntenna == Antenna_A)? RSSI_A : RSSI_B;
-			//printk("Ekul:PreRSSI = %d, CurRSSI = %d\n", pDM_SWAT_Table->PreRSSI, curRSSI);
-			//printk("SWAS: preAntenna= %s, curAntenna= %s \n", 
+			//DBG_8192C("Ekul:PreRSSI = %d, CurRSSI = %d\n", pDM_SWAT_Table->PreRSSI, curRSSI);
+			//DBG_8192C("SWAS: preAntenna= %s, curAntenna= %s \n", 
 			//(pDM_SWAT_Table->PreAntenna == Antenna_A?"A":"B"), (pDM_SWAT_Table->CurAntenna == Antenna_A?"A":"B"));
 
-			//printk("Ekul:RSSI_A= %d, RSSI_cnt_A = %d, RSSI_B= %d, RSSI_cnt_B = %d\n",
+			//DBG_8192C("Ekul:RSSI_A= %d, RSSI_cnt_A = %d, RSSI_B= %d, RSSI_cnt_B = %d\n",
 			//	RSSI_A, pHalData->RSSI_cnt_A, RSSI_B, pHalData->RSSI_cnt_B);
 			//RT_TRACE(COMP_SWAS, DBG_LOUD, ("Ekul:curTxOkCnt = %d\n", curTxOkCnt));
 			//RT_TRACE(COMP_SWAS, DBG_LOUD, ("Ekul:curRxOkCnt = %d\n", curRxOkCnt));
@@ -3862,68 +3935,68 @@ dm_SW_AntennaSwitch(
 
 			if(pDM_SWAT_Table->TestMode == TP_MODE)
 			{
-				printk("SWAS: TestMode = TP_MODE\n");
-				//printk("TRY:CurByteCnt = %lld\n", CurByteCnt);
-				//printk("TRY:PreByteCnt = %lld\n",PreByteCnt);		
+				DBG_8192C("SWAS: TestMode = TP_MODE\n");
+				//DBG_8192C("TRY:CurByteCnt = %lld\n", CurByteCnt);
+				//DBG_8192C("TRY:PreByteCnt = %lld\n",PreByteCnt);		
 				if(CurByteCnt < PreByteCnt)
 				{
 					if(pDM_SWAT_Table->CurAntenna == Antenna_A)
 						pDM_SWAT_Table->SelectAntennaMap=pDM_SWAT_Table->SelectAntennaMap<<1;
 					else
 						pDM_SWAT_Table->SelectAntennaMap=(pDM_SWAT_Table->SelectAntennaMap<<1)+1;
-		}
-		else
-		{
+				}
+				else
+				{
 					if(pDM_SWAT_Table->CurAntenna == Antenna_A)
 						pDM_SWAT_Table->SelectAntennaMap=(pDM_SWAT_Table->SelectAntennaMap<<1)+1;
 					else
 						pDM_SWAT_Table->SelectAntennaMap=pDM_SWAT_Table->SelectAntennaMap<<1;
 				}
 				for (i= 0; i<8; i++)
-			{	
+				{
 					if(((pDM_SWAT_Table->SelectAntennaMap>>i)&BIT0) == 1)
 						Score_A++;
 					else
 						Score_B++;
 				}
-				//printk("SelectAntennaMap=%x\n ",pDM_SWAT_Table->SelectAntennaMap);
-				//printk("Score_A=%d, Score_B=%d\n", Score_A, Score_B);
+				//DBG_8192C("SelectAntennaMap=%x\n ",pDM_SWAT_Table->SelectAntennaMap);
+				//DBG_8192C("Score_A=%d, Score_B=%d\n", Score_A, Score_B);
 				
 				if(pDM_SWAT_Table->CurAntenna == Antenna_A)
 				{
 					nextAntenna = (Score_A > Score_B)?Antenna_A:Antenna_B;
 				}
 				else
-					{
+				{
 					nextAntenna = (Score_B > Score_A)?Antenna_B:Antenna_A;
-					}
+				}
 				//RT_TRACE(COMP_SWAS, DBG_LOUD, ("nextAntenna=%s\n",(nextAntenna==Antenna_A)?"A":"B"));
 				//RT_TRACE(COMP_SWAS, DBG_LOUD, ("preAntenna= %s, curAntenna= %s \n", 
 					//(DM_SWAT_Table.PreAntenna == Antenna_A?"A":"B"), (DM_SWAT_Table.CurAntenna == Antenna_A?"A":"B")));
 
 				if(nextAntenna != pDM_SWAT_Table->CurAntenna)
 				{
-					printk("SWAS: Switch back to another antenna\n");
+					DBG_8192C("SWAS: Switch back to another antenna\n");
 				}
 				else
 				{
-					printk("SWAS: current anntena is good\n");
+					DBG_8192C("SWAS: current anntena is good\n");
 				}	
 			}
 
 			if(pDM_SWAT_Table->TestMode == RSSI_MODE)
 			{	
-				printk("SWAS: TestMode = RSSI_MODE\n");
+				DBG_8192C("SWAS: TestMode = RSSI_MODE\n");
 				pDM_SWAT_Table->SelectAntennaMap=0xAA;
 				if(curRSSI < pDM_SWAT_Table->PreRSSI) //Current antenna is worse than previous antenna
 				{
-					printk("SWAS: Switch back to another antenna\n");
+					DBG_8192C("SWAS: Switch back to another antenna\n");
 					nextAntenna = (pDM_SWAT_Table->CurAntenna == Antenna_A)? Antenna_B : Antenna_A;
 				}
 				else // current anntena is good
 				{
 					nextAntenna = pDM_SWAT_Table->CurAntenna;
-					//printk("SWAS: current anntena is good\n");
+					//DBG_8192C("SWAS: current anntena is good\n");
 				}
 				}
 				pDM_SWAT_Table->try_flag = 0;
@@ -3958,7 +4031,7 @@ dm_SW_AntennaSwitch(
 			}
 			if(pdmpriv->TrafficLoad == TRAFFIC_HIGH)
 				pDM_SWAT_Table->bTriggerAntennaSwitch = 0;
-			//printk("Normal:TrafficLoad = %lld\n", curTxOkCnt+curRxOkCnt);
+			//DBG_8192C("Normal:TrafficLoad = %lld\n", curTxOkCnt+curRxOkCnt);
 
 			//Prepare To Try Antenna		
 					nextAntenna = (pDM_SWAT_Table->CurAntenna == Antenna_A)? Antenna_B : Antenna_A;
@@ -3975,7 +4048,7 @@ dm_SW_AntennaSwitch(
 				pDM_SWAT_Table->TestMode = RSSI_MODE;
 
 			}
-			//printk("SWAS: Normal State -> Begin Trying! TestMode=%s\n",(pDM_SWAT_Table->TestMode == TP_MODE)?"TP":"RSSI");
+			//DBG_8192C("SWAS: Normal State -> Begin Trying! TestMode=%s\n",(pDM_SWAT_Table->TestMode == TP_MODE)?"TP":"RSSI");
 			
 			
 			pHalData->RSSI_sum_A = 0;
@@ -3988,8 +4061,8 @@ dm_SW_AntennaSwitch(
 	//1 4.Change TRX antenna
 	if(nextAntenna != pDM_SWAT_Table->CurAntenna)
 	{
-		printk("@@@@@@@@ SWAS: Change TX Antenna!\n ");		
-		antenna_select_cmd(Adapter, nextAntenna, 1);
+		DBG_8192C("@@@@@@@@ SWAS: Change TX Antenna!\n ");		
+		rtw_antenna_select_cmd(Adapter, nextAntenna, 1);
 	}
 
 	//1 5.Reset Statistics
@@ -4010,18 +4083,18 @@ dm_SW_AntennaSwitch(
 			if(pdmpriv->TrafficLoad == TRAFFIC_HIGH)
 			{
 				_set_timer(&pdmpriv->SwAntennaSwitchTimer,10 ); //ms
-				//printk("dm_SW_AntennaSwitch(): Test another antenna for 10 ms\n");
+				//DBG_8192C("dm_SW_AntennaSwitch(): Test another antenna for 10 ms\n");
 			}
 			else if(pdmpriv->TrafficLoad == TRAFFIC_LOW)
-	{
+			{
 				_set_timer(&pdmpriv->SwAntennaSwitchTimer, 50 ); //ms
-				//printk("dm_SW_AntennaSwitch(): Test another antenna for 50 ms\n");
+				//DBG_8192C("dm_SW_AntennaSwitch(): Test another antenna for 50 ms\n");
 			}
 	}
 	else
 	{
 			_set_timer(&pdmpriv->SwAntennaSwitchTimer, 500 ); //ms
-			//printk("dm_SW_AntennaSwitch(): Test another antenna for 500 ms\n");
+			//DBG_8192C("dm_SW_AntennaSwitch(): Test another antenna for 500 ms\n");
 		}
 	}
 	else
@@ -4036,7 +4109,7 @@ dm_SW_AntennaSwitch(
 		else
 		{
 			_set_timer(&pdmpriv->SwAntennaSwitchTimer,500 ); //ms
-			//printk("dm_SW_AntennaSwitch(): Test another antenna for 500 ms\n");
+			//DBG_8192C("dm_SW_AntennaSwitch(): Test another antenna for 500 ms\n");
 		}
 	}
 
@@ -4088,7 +4161,7 @@ void SwAntDivRSSICheck8192C(_adapter *padapter ,u32 RxPWDBAll)
 			pHalData->RSSI_cnt_B++;
 		
 		}
-		//printk("%s Ant_(%s),RSSI_sum(%d),RSSI_cnt(%d)\n",__FUNCTION__,(2==pHalData->CurAntenna)?"A":"B",pHalData->RSSI_sum,pHalData->RSSI_cnt);
+		//DBG_8192C("%s Ant_(%s),RSSI_sum(%d),RSSI_cnt(%d)\n",__FUNCTION__,(2==pHalData->CurAntenna)?"A":"B",pHalData->RSSI_sum,pHalData->RSSI_cnt);
 	}
 	
 }
@@ -4158,7 +4231,7 @@ void rtl8192c_init_dm_priv(IN PADAPTER Adapter)
 	PHAL_DATA_TYPE	pHalData = GET_HAL_DATA(Adapter);
 	struct dm_priv	*pdmpriv = &pHalData->dmpriv;
 
-	_memset(pdmpriv, 0, sizeof(struct dm_priv));
+	_rtw_memset(pdmpriv, 0, sizeof(struct dm_priv));
 
 #ifdef CONFIG_ANTENNA_DIVERSITY
 	_init_timer(&(pdmpriv->SwAntennaSwitchTimer),  Adapter->pnetdev , dm_SW_AntennaSwitchCallback, Adapter);
@@ -4184,7 +4257,7 @@ rtl8192c_InitHalDm(
 	struct dm_priv	*pdmpriv = &pHalData->dmpriv;
 	u8	i;
 
-#if DEV_BUS_TYPE==DEV_BUS_USB_INTERFACE
+#ifdef CONFIG_USB_HCI
 	dm_InitGPIOSetting(Adapter);
 #endif
 
@@ -4230,7 +4303,7 @@ rtl8192c_InitHalDm(
 	// Save REG_INIDATA_RATE_SEL value for TXDESC.
 	for(i = 0 ; i<32 ; i++)
 	{
-		pdmpriv->INIDATA_RATE[i] = read8(Adapter, REG_INIDATA_RATE_SEL+i);
+		pdmpriv->INIDATA_RATE[i] = rtw_read8(Adapter, REG_INIDATA_RATE_SEL+i);
 	}
 }
 
@@ -4333,14 +4406,14 @@ rtl8192c_HalDmWatchDog(
 		// Read REG_INIDATA_RATE_SEL value for TXDESC.
 		if(check_fwstate(&Adapter->mlmepriv, WIFI_STATION_STATE) == _TRUE)
 		{
-			pdmpriv->INIDATA_RATE[0] = read8(Adapter, REG_INIDATA_RATE_SEL);
+			pdmpriv->INIDATA_RATE[0] = rtw_read8(Adapter, REG_INIDATA_RATE_SEL);
 		}
 		else
 		{
 			u8	i;
 			for(i=1 ; i < (Adapter->stapriv.asoc_sta_count + 1); i++)
 			{
-				pdmpriv->INIDATA_RATE[i] = read8(Adapter, (REG_INIDATA_RATE_SEL+i));
+				pdmpriv->INIDATA_RATE[i] = rtw_read8(Adapter, (REG_INIDATA_RATE_SEL+i));
 			}
 		}
 	}

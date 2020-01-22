@@ -157,16 +157,17 @@ struct tx_invite_resp_info{
 
 struct wifidirect_info{
 	_adapter*				padapter;
-	u8 device_addr[ETH_ALEN];
+	u8 						device_addr[ETH_ALEN];	//	The device address should be the mac address of this device.
 	u8 interface_addr[ETH_ALEN];
 	u8						social_chan[3];
 	u8						listen_channel;
 	u8 	operating_channel;
 	u8						listen_dwell;		//	This value should be between 1 and 3
 	enum P2P_ROLE			role;
-	u8						support_rate[7];
+	u8						support_rate[8];
 	u8						p2p_wildcard_ssid[P2P_WILDCARD_SSID_LEN];
 	u8						intent;		//	should only include the intent value.
+	enum P2P_STATE			pre_p2p_state;
 	enum P2P_STATE			p2p_state;
 	u8						p2p_peer_interface_addr[ ETH_ALEN ];
 	u8						peer_intent;	//	Included the intent value and tie breaker value.
@@ -182,13 +183,22 @@ struct wifidirect_info{
 	u8					find_phase_state_exchange_cnt;
 	u16						wps_config_method_request;	//	Used when sending the provisioning request frame
 	u16						device_password_id_for_nego;	//	The device password ID for group negotation
-	_timer					enter_listen_state_timer;
-	_workitem				enter_listen_state_workitem;
+	_timer					restore_p2p_state_timer;
+	_workitem				restore_p2p_state_workitem;
 	u8						negotiation_dialog_token;
 	u8						nego_ssid[ WLAN_SSID_MAXLEN ];	//	SSID information for group negotitation
 	u8						nego_ssidlen;
-	u8 						p2p_group_ssid[P2P_WILDCARD_SSID_LEN+2];
+	u8 						p2p_group_ssid[WLAN_SSID_MAXLEN];
+	u8 						p2p_group_ssid_len;
 
+	enum	P2P_WPSINFO		ui_got_wps_info;	//	This field will store the WPS value (PIN value or PBC) that UI had got from the user.
+	u16						supported_wps_cm;	//	This field describes the WPS config method which this driver supported.
+												//	The value should be the combination of config method defined in page104 of WPS v2.0 spec.												
+	u8						channel_cnt;		//	This field is the count number for P2P Channel List attribute of group negotitation response frame.
+	u8						channel_list[13];		//	This field will contain the channel number of P2P Channel List attribute of group negotitation response frame.
+												//	We will use the channel_cnt and channel_list fields when constructing the group negotitation confirm frame.
+	u8						strconfig_method_desc_of_prov_disc_req[4];	//	description for the config method located in the provisioning discovery request frame.
+																		//	The UI must know this information to know which config method the remote p2p device is requiring.
 	u8						p2p_ps_enable;
 	enum P2P_PS				p2p_ps; // indicate p2p ps state
 	u8						noa_index; // Identifies and instance of Notice of Absence timing.
@@ -258,6 +268,10 @@ struct mlme_priv {
 	u8	ChannelPlan;
 	u8 	scan_mode; // active: 1, passive: 0
 
+
+	u8 probereq_wpsie[MAX_WPS_IE_LEN];//added in probe req	
+	int probereq_wpsie_len;
+
 #if defined (CONFIG_AP_MODE) && defined (CONFIG_NATIVEAP_MLME)
 	/* Number of associated Non-ERP stations (i.e., stations using 802.11b
 	 * in 802.11g BSS) */
@@ -289,8 +303,11 @@ struct mlme_priv {
 
 	u8 *wps_beacon_ie;	
 	u8 *wps_probe_resp_ie;
+	u8 *wps_assoc_resp_ie;
 	u32 wps_beacon_ie_len;
 	u32 wps_probe_resp_ie_len;
+	u32 wps_assoc_resp_ie_len;
+
 	
 	_lock	bcn_update_lock;
 	u8		update_bcn;
@@ -323,25 +340,25 @@ extern int hostapd_mode_init(_adapter *padapter);
 extern void hostapd_mode_unload(_adapter *padapter);
 #endif
 
-extern void survey_event_callback(_adapter *adapter, u8 *pbuf);
-extern void surveydone_event_callback(_adapter *adapter, u8 *pbuf);
-extern void joinbss_event_callback(_adapter *adapter, u8 *pbuf);
-extern void stassoc_event_callback(_adapter *adapter, u8 *pbuf);
-extern void stadel_event_callback(_adapter *adapter, u8 *pbuf);
-extern void atimdone_event_callback(_adapter *adapter, u8 *pbuf);
-extern void cpwm_event_callback(_adapter *adapter, u8 *pbuf);
+extern void rtw_survey_event_callback(_adapter *adapter, u8 *pbuf);
+extern void rtw_surveydone_event_callback(_adapter *adapter, u8 *pbuf);
+extern void rtw_joinbss_event_callback(_adapter *adapter, u8 *pbuf);
+extern void rtw_stassoc_event_callback(_adapter *adapter, u8 *pbuf);
+extern void rtw_stadel_event_callback(_adapter *adapter, u8 *pbuf);
+extern void rtw_atimdone_event_callback(_adapter *adapter, u8 *pbuf);
+extern void rtw_cpwm_event_callback(_adapter *adapter, u8 *pbuf);
 
 #ifdef PLATFORM_WINDOWS
 extern thread_return event_thread(void *context);
 
-extern void join_timeout_handler (
+extern void rtw_join_timeout_handler (
 	IN	PVOID					SystemSpecific1,
 	IN	PVOID					FunctionContext,
 	IN	PVOID					SystemSpecific2,
 	IN	PVOID					SystemSpecific3
 	);
 
-extern void _scan_timeout_handler (
+extern void _rtw_scan_timeout_handler (
 	IN	PVOID					SystemSpecific1,
 	IN	PVOID					FunctionContext,
 	IN	PVOID					SystemSpecific2,
@@ -352,19 +369,19 @@ extern void _scan_timeout_handler (
 
 #ifdef PLATFORM_LINUX
 extern int event_thread(void *context);
-extern void join_timeout_handler(void* FunctionContext);
-extern void _scan_timeout_handler(void* FunctionContext);
+extern void rtw_join_timeout_handler(void* FunctionContext);
+extern void _rtw_scan_timeout_handler(void* FunctionContext);
 #endif
 
-extern void free_network_queue(_adapter *adapter,u8 isfreeall);
-extern int init_mlme_priv(_adapter *adapter);// (struct mlme_priv *pmlmepriv);
+extern void rtw_free_network_queue(_adapter *adapter,u8 isfreeall);
+extern int rtw_init_mlme_priv(_adapter *adapter);// (struct mlme_priv *pmlmepriv);
 
-extern void free_mlme_priv (struct mlme_priv *pmlmepriv);
+extern void rtw_free_mlme_priv (struct mlme_priv *pmlmepriv);
 
 
-extern sint select_and_join_from_scanned_queue(struct mlme_priv *pmlmepriv);
-extern sint set_key(_adapter *adapter,struct security_priv *psecuritypriv,sint keyid);
-extern sint set_auth(_adapter *adapter,struct security_priv *psecuritypriv);
+extern sint rtw_select_and_join_from_scanned_queue(struct mlme_priv *pmlmepriv);
+extern sint rtw_set_key(_adapter *adapter,struct security_priv *psecuritypriv,sint keyid);
+extern sint rtw_set_auth(_adapter *adapter,struct security_priv *psecuritypriv);
 
 __inline static u8 *get_bssid(struct mlme_priv *pmlmepriv)
 {	//if sta_mode:pmlmepriv->cur_network.network.MacAddress=> bssid
@@ -452,68 +469,68 @@ __inline static void set_scanned_network_val(struct mlme_priv *pmlmepriv, sint v
 	_exit_critical_bh(&pmlmepriv->lock, &irqL);
 }
 
-extern u16 get_capability(WLAN_BSSID_EX *bss);
-extern void update_scanned_network(_adapter *adapter, WLAN_BSSID_EX *target);
-extern void disconnect_hdl_under_linked(_adapter* adapter, struct sta_info *psta, u8 free_assoc);
-extern void generate_random_ibss(u8 *pibss);
-extern struct wlan_network* find_network(_queue *scanned_queue, u8 *addr);
-extern struct wlan_network* get_oldest_wlan_network(_queue *scanned_queue);
+extern u16 rtw_get_capability(WLAN_BSSID_EX *bss);
+extern void rtw_update_scanned_network(_adapter *adapter, WLAN_BSSID_EX *target);
+extern void rtw_disconnect_hdl_under_linked(_adapter* adapter, struct sta_info *psta, u8 free_assoc);
+extern void rtw_generate_random_ibss(u8 *pibss);
+extern struct wlan_network* rtw_find_network(_queue *scanned_queue, u8 *addr);
+extern struct wlan_network* rtw_get_oldest_wlan_network(_queue *scanned_queue);
 
-extern void free_assoc_resources(_adapter* adapter);
-extern void indicate_disconnect(_adapter* adapter);
-extern void indicate_connect(_adapter* adapter);
+extern void rtw_free_assoc_resources(_adapter* adapter);
+extern void rtw_indicate_disconnect(_adapter* adapter);
+extern void rtw_indicate_connect(_adapter* adapter);
 
-extern int restruct_sec_ie(_adapter *adapter,u8 *in_ie,u8 *out_ie,uint in_len);
-extern int restruct_wmm_ie(_adapter *adapter, u8 *in_ie, u8 *out_ie, uint in_len, uint initial_out_len);
-extern void init_registrypriv_dev_network(_adapter *adapter);
+extern int rtw_restruct_sec_ie(_adapter *adapter,u8 *in_ie,u8 *out_ie,uint in_len);
+extern int rtw_restruct_wmm_ie(_adapter *adapter, u8 *in_ie, u8 *out_ie, uint in_len, uint initial_out_len);
+extern void rtw_init_registrypriv_dev_network(_adapter *adapter);
 
-extern void update_registrypriv_dev_network(_adapter *adapter);
+extern void rtw_update_registrypriv_dev_network(_adapter *adapter);
 
-extern void get_encrypt_decrypt_from_registrypriv(_adapter *adapter);
+extern void rtw_get_encrypt_decrypt_from_registrypriv(_adapter *adapter);
 
-extern void _join_timeout_handler(_adapter *adapter);
-extern void scan_timeout_handler(_adapter *adapter);
+extern void _rtw_join_timeout_handler(_adapter *adapter);
+extern void rtw_scan_timeout_handler(_adapter *adapter);
 
-extern void dynamic_check_timer_handlder(_adapter *adapter);
-
-
-extern int _init_mlme_priv(_adapter *padapter);
-
-extern void _free_mlme_priv(struct mlme_priv *pmlmepriv);
-
-extern int _enqueue_network(_queue *queue, struct wlan_network *pnetwork);
-
-extern struct wlan_network* _dequeue_network(_queue *queue);
-
-extern struct wlan_network* _alloc_network(struct mlme_priv *pmlmepriv);
+extern void rtw_dynamic_check_timer_handlder(_adapter *adapter);
 
 
-extern void _free_network(struct mlme_priv *pmlmepriv, struct wlan_network *pnetwork, u8 isfreeall);
-extern void _free_network_nolock(struct mlme_priv *pmlmepriv, struct wlan_network *pnetwork);
+extern int _rtw_init_mlme_priv(_adapter *padapter);
+
+extern void _rtw_free_mlme_priv(struct mlme_priv *pmlmepriv);
+
+extern int _rtw_enqueue_network(_queue *queue, struct wlan_network *pnetwork);
+
+extern struct wlan_network* _rtw_dequeue_network(_queue *queue);
+
+extern struct wlan_network* _rtw_alloc_network(struct mlme_priv *pmlmepriv);
 
 
-extern struct wlan_network* _find_network(_queue *scanned_queue, u8 *addr);
-
-extern void _free_network_queue(_adapter* padapter, u8 isfreeall);
-
-extern sint if_up(_adapter *padapter);
+extern void _rtw_free_network(struct mlme_priv *pmlmepriv, struct wlan_network *pnetwork, u8 isfreeall);
+extern void _rtw_free_network_nolock(struct mlme_priv *pmlmepriv, struct wlan_network *pnetwork);
 
 
-u8 *get_capability_from_ie(u8 *ie);
-u8 *get_timestampe_from_ie(u8 *ie);
-u8 *get_beacon_interval_from_ie(u8 *ie);
+extern struct wlan_network* _rtw_find_network(_queue *scanned_queue, u8 *addr);
+
+extern void _rtw_free_network_queue(_adapter* padapter, u8 isfreeall);
+
+extern sint rtw_if_up(_adapter *padapter);
 
 
-void joinbss_reset(_adapter *padapter);
+u8 *rtw_get_capability_from_ie(u8 *ie);
+u8 *rtw_get_timestampe_from_ie(u8 *ie);
+u8 *rtw_get_beacon_interval_from_ie(u8 *ie);
+
+
+void rtw_joinbss_reset(_adapter *padapter);
 
 #ifdef CONFIG_80211N_HT
-unsigned int restructure_ht_ie(_adapter *padapter, u8 *in_ie, u8 *out_ie, uint in_len, uint *pout_len);
-void update_ht_cap(_adapter *padapter, u8 *pie, uint ie_len);
-void issue_addbareq_cmd(_adapter *padapter, struct xmit_frame *pxmitframe);
+unsigned int rtw_restructure_ht_ie(_adapter *padapter, u8 *in_ie, u8 *out_ie, uint in_len, uint *pout_len);
+void rtw_update_ht_cap(_adapter *padapter, u8 *pie, uint ie_len);
+void rtw_issue_addbareq_cmd(_adapter *padapter, struct xmit_frame *pxmitframe);
 #endif
 
 
-int is_same_ibss(_adapter *adapter, struct wlan_network *pnetwork);
+int rtw_is_same_ibss(_adapter *adapter, struct wlan_network *pnetwork);
 
 #endif //__RTL871X_MLME_H_
 

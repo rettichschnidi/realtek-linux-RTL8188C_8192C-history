@@ -127,6 +127,8 @@ enum WIFI_REASON_CODE	{
 
 	//belowing are Realtek definition
 	_RSON_PMK_NOT_AVAILABLE_		= 24,
+	_RSON_TDLS_TEAR_TOOFAR_			= 25,
+	_RSON_TDLS_TEAR_UN_RSN_			= 26,
 };
 
 /* Reason codes (IEEE 802.11-2007, 7.3.1.7, Table 7-22) */
@@ -547,23 +549,32 @@ __inline static int IsFrameTypeCtrl(unsigned char *pframe)
 #define _DSSET_IE_				3
 #define _TIM_IE_					5
 #define _IBSS_PARA_IE_			6
+#define _COUNTRY_IE_			7
 #define _CHLGETXT_IE_			16
+#define _SUPPORTED_CH_IE_		36
+#define _CH_SWTICH_ANNOUNCE_	37	//Secondary Channel Offset
 #define _RSN_IE_2_				48
 #define _SSN_IE_1_					221
 #define _ERPINFO_IE_			42
 #define _EXT_SUPPORTEDRATES_IE_	50
 
 #define _HT_CAPABILITY_IE_			45
+#define _FTIE_						55
+#define _TIMEOUT_ITVL_IE_			56
 #define _HT_EXTRA_INFO_IE_			61
 #define _HT_ADD_INFO_IE_			61 //_HT_EXTRA_INFO_IE_
 
 #define	EID_BSSCoexistence			72 // 20/40 BSS Coexistence
 #define	EID_BSSIntolerantChlReport	73
+#define _RIC_Descriptor_IE_			75
 
+#define _LINK_ID_IE_					101
+#define _CH_SWITCH_TIMING_		104
+#define _PTI_BUFFER_STATUS_		106
+#define _EXT_CAP_IE_				127
 #define _VENDOR_SPECIFIC_IE_		221
 
 #define	_RESERVED47_				47
-
 
 /* ---------------------------------------------------------------------------
 					Below is the fixed elements...
@@ -1062,7 +1073,7 @@ struct ADDBA_request
 #define	P2P_WILDCARD_SSID_LEN				7
 #define	P2P_FINDPHASE_EX_CNT					3
 
-#define	P2P_PROVISION_TIMEOUT				3000	//	3 seconds timeout for sending the provision discovery request
+#define	P2P_PROVISION_TIMEOUT				5000	//	5 seconds timeout for sending the provision discovery request
 #define	P2P_GO_NEGO_TIMEOUT					2000	//	2 seconds timeout for receiving the group negotation response
 
 #define	P2P_MAX_INTENT						15
@@ -1107,6 +1118,15 @@ enum P2P_STATE {
 	P2P_STATE_PROVISIONING_ING = 13,		//	Doing the P2P WPS
 	P2P_STATE_PROVISIONING_DONE = 14,	//	Finish the P2P WPS
 };
+
+enum P2P_WPSINFO {
+	P2P_NO_WPSINFO						= 0,
+	P2P_GOT_WPSINFO_PEER_DISPLAY_PIN	= 1,
+	P2P_GOT_WPSINFO_SELF_DISPLAY_PIN	= 2,
+	P2P_GOT_WPSINFO_PBC					= 3,
+};
+
+#define	P2P_PRIVATE_IOCTL_SET_LEN		64
 
 enum P2P_PS
 {

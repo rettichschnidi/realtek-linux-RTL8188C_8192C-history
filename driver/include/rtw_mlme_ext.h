@@ -201,6 +201,24 @@ struct	ss_res
 
 #define	WIFI_FW_LINKING_STATE		(WIFI_FW_AUTH_NULL | WIFI_FW_AUTH_STATE | WIFI_FW_AUTH_SUCCESS |WIFI_FW_ASSOC_STATE)
 
+#ifdef CONFIG_TDLS
+/* TDLS STA state */
+#define	UN_TDLS_STATE					0x00000000	//default state
+#define	TDLS_INITIATOR_STATE			0x10000000
+#define	TDLS_RESPONDER_STATE			0x20000000
+#define	TDLS_LINKED_STATE				0x40000000
+#define	TDLS_CH_SWITCH_ON_STATE		0x01000000
+#define	TDLS_PEER_AT_OFF_STATE		0x02000000	//could send pkt on target ch
+#define	TDLS_AT_OFF_CH_STATE			0x04000000
+#define	TDLS_CH_SW_INITIATOR_STATE	0x08000000	//avoiding duplicated or unconditional ch. switch rsp.
+#define	TDLS_APSD_CHSW_STATE		0x00100000	//in APSD and want to setup channel switch
+#define	TDLS_PEER_SLEEP_STATE		0x00200000	//peer sta is sleeping
+#define	TDLS_SW_OFF_STATE			0x00400000	//terminate channel swithcing
+#define	TPK_RESEND_COUNT				301
+#define 	CH_SWITCH_TIME				10
+#define 	CH_SWITCH_TIMEOUT			30
+#endif
+
 struct FW_Sta_Info
 {
 	struct sta_info	*psta;
@@ -246,6 +264,18 @@ struct mlme_ext_info
 	// Accept ADDBA Request
 	BOOLEAN bAcceptAddbaReq;
 	u8	bwmode_updated;
+
+#ifdef CONFIG_TDLS
+	uint				tdls_setup_state;
+	u8				tdls_sta_cnt;
+	u8				tdls_dis_req;
+	u8				tdls_cam_entry_to_write;	//cam entry that is empty to write
+	u8				tdls_cam_entry_to_clear;	//cam entry that is trying to clear, using in direct link teardown
+	u8				tdls_ch_sensing;
+	u8				tdls_cur_channel;
+	u8				tdls_candidate_ch;
+	u8				tdls_collect_pkt_num[14];
+#endif
 
 	struct ADDBA_request		ADDBA_req;
 	struct WMM_para_element	WMM_param;
@@ -303,6 +333,10 @@ struct mlme_ext_priv
 	u32	retry; //retry for issue probereq
 	
 	u64 TSFValue;
+
+#ifdef CONFIG_TDLS
+	_workitem TDLS_restore_workitem;
+#endif
 	
 #ifdef CONFIG_AP_MODE	
 	unsigned char bstart_bss;
@@ -404,13 +438,34 @@ unsigned int setup_beacon_frame(_adapter *padapter, unsigned char *beacon_frame)
 void update_mgntframe_attrib(_adapter *padapter, struct pkt_attrib *pattrib);
 void dump_mgntframe(_adapter *padapter, struct xmit_frame *pmgntframe);
 
-#if ( P2P_INCLUDED == 1 )
+#ifdef CONFIG_P2P
 void issue_probersp_p2p(_adapter *padapter, unsigned char *da);
-void issue_p2p_provision_request(_adapter *padapter, u8* raddr);
+void issue_p2p_provision_request( _adapter *padapter, u8* pinterface_raddr, u8* pssid, u8 ussidlen, u8* pdev_raddr);
 void issue_p2p_GO_request(_adapter *padapter, u8* raddr);
 void issue_probereq_p2p(_adapter *padapter);
 void issue_p2p_invitation_response(_adapter *padapter, u8* raddr, u8 dialogToken, u8 success);
 void issue_p2p_invitation_request(_adapter *padapter, u8* raddr );
+#endif
+#ifdef CONFIG_TDLS
+void issue_nulldata_to_TDLS_peer_STA(_adapter *padapter, struct sta_info *ptdls_sta, unsigned int power_mode);
+extern void TDLS_restore_workitem_callback(struct work_struct *work);
+void init_TPK_timer(_adapter *padapter, struct sta_info *psta);
+extern void TDLS_option_workitem_callback(struct work_struct *work);
+void init_ch_switch_timer(_adapter *padapter, struct sta_info *psta);
+void init_base_ch_timer(_adapter *padapter, struct sta_info *psta);
+void init_off_ch_timer(_adapter *padapter, struct sta_info *psta);
+extern void base_channel_workitem_callback(struct work_struct *work);
+extern void off_channel_workitem_callback(struct work_struct *work);
+void issue_tdls_dis_req(_adapter *padapter);
+void issue_tdls_setup_req(_adapter *padapter, u8 *mac_addr);
+void issue_tdls_setup_rsp(_adapter *padapter, union recv_frame *precv_frame);
+void issue_tdls_setup_cfm(_adapter *padapter, union recv_frame *precv_frame);
+void issue_tdls_dis_rsp(_adapter * padapter, union recv_frame * precv_frame);
+void issue_tdls_teardown(_adapter *padapter, u8 *mac_addr);
+void issue_tdls_peer_traffic_indication(_adapter *padapter, struct sta_info *psta);
+void issue_tdls_ch_switch_req(_adapter *padapter, u8 *mac_addr);
+void issue_tdls_ch_switch_rsp(_adapter *padapter, u8 *mac_addr);
+sint On_TDLS_Dis_Rsp(_adapter *adapter, union recv_frame *precv_frame);
 #endif
 void issue_beacon(_adapter *padapter);
 void issue_probersp(_adapter *padapter, unsigned char *da, u8 is_valid_p2p_probereq);
@@ -589,7 +644,7 @@ struct cmd_hdl wlancmds[] =
 	GEN_MLME_EXT_HANDLER(sizeof(struct Tx_Beacon_param), tx_beacon_hdl) /*55*/
 
 	GEN_MLME_EXT_HANDLER(0, mlme_evt_hdl) /*56*/
-	GEN_MLME_EXT_HANDLER(0, drvextra_cmd_hdl) /*57*/
+	GEN_MLME_EXT_HANDLER(0, rtw_drvextra_cmd_hdl) /*57*/
 
 	GEN_MLME_EXT_HANDLER(0, h2c_msg_hdl) /*58*/
 
@@ -622,8 +677,8 @@ struct C2HEvent_Header
 
 };
 
-void dummy_event_callback(_adapter *adapter , u8 *pbuf);
-void fwdbg_event_callback(_adapter *adapter , u8 *pbuf);
+void rtw_dummy_event_callback(_adapter *adapter , u8 *pbuf);
+void rtw_fwdbg_event_callback(_adapter *adapter , u8 *pbuf);
 
 enum rtw_c2h_event
 {
@@ -659,9 +714,9 @@ enum rtw_c2h_event
 
 #ifdef _RTW_MLME_EXT_C_		
 
-struct fwevent wlanevents[] = 
+static struct fwevent wlanevents[] = 
 {
-	{0, dummy_event_callback}, 	/*0*/
+	{0, rtw_dummy_event_callback}, 	/*0*/
 	{0, NULL},
 	{0, NULL},
 	{0, NULL},
@@ -669,23 +724,23 @@ struct fwevent wlanevents[] =
 	{0, NULL},
 	{0, NULL},
 	{0, NULL},
-	{0, &survey_event_callback},		/*8*/
-	{sizeof (struct surveydone_event), &surveydone_event_callback},	/*9*/
+	{0, &rtw_survey_event_callback},		/*8*/
+	{sizeof (struct surveydone_event), &rtw_surveydone_event_callback},	/*9*/
 		
-	{0, &joinbss_event_callback},		/*10*/
-	{sizeof(struct stassoc_event), &stassoc_event_callback},
-	{sizeof(struct stadel_event), &stadel_event_callback},	
-	{0, &atimdone_event_callback},
-	{0, dummy_event_callback},
+	{0, &rtw_joinbss_event_callback},		/*10*/
+	{sizeof(struct stassoc_event), &rtw_stassoc_event_callback},
+	{sizeof(struct stadel_event), &rtw_stadel_event_callback},	
+	{0, &rtw_atimdone_event_callback},
+	{0, rtw_dummy_event_callback},
 	{0, NULL},	/*15*/
 	{0, NULL},
 	{0, NULL},
 	{0, NULL},
-	{0, fwdbg_event_callback},
+	{0, rtw_fwdbg_event_callback},
 	{0, NULL},	 /*20*/
 	{0, NULL},
 	{0, NULL},	
-	{0, &cpwm_event_callback},
+	{0, &rtw_cpwm_event_callback},
 };
 
 #endif//_RTL8192C_CMD_C_

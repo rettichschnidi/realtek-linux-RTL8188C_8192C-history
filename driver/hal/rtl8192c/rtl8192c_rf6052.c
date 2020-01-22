@@ -219,7 +219,7 @@ rtl8192c_PHY_RF6052SetCckTxPower(
 
 	// 2010/10/18 MH Accorsing to SD3 eechou's suggestion, we need to disable turbo scan for RU.	
 	// Otherwise, external PA will be broken if power index > 0x20.
-#if (DEV_BUS_TYPE == DEV_BUS_USB_INTERFACE)
+#ifdef CONFIG_USB_HCI
 	if (pHalData->EEPROMRegulatory != 0 || pHalData->ExternalPA)
 #else
 	if (pHalData->EEPROMRegulatory != 0)
@@ -243,7 +243,7 @@ rtl8192c_PHY_RF6052SetCckTxPower(
 				TxAGC[idx1] = 
 					pPowerlevel[idx1] | (pPowerlevel[idx1]<<8) |
 					(pPowerlevel[idx1]<<16) | (pPowerlevel[idx1]<<24);
-#if (DEV_BUS_TYPE == DEV_BUS_USB_INTERFACE)
+#ifdef CONFIG_USB_HCI
 				// 2010/10/18 MH For external PA module. We need to limit power index to be less than 0x20.
 				if (TxAGC[idx1] > 0x20 && pHalData->ExternalPA)
 					TxAGC[idx1] = 0x20;
@@ -546,7 +546,7 @@ static void writeOFDMPowerReg(
 					writeVal = (writeVal>8)?(writeVal-8):0;
 				else
 					writeVal = (writeVal>6)?(writeVal-6):0;
-				write8(Adapter, (u32)(RegOffset+i), (u8)writeVal);
+				rtw_write8(Adapter, (u32)(RegOffset+i), (u8)writeVal);
 			}
 		}
 	}
@@ -622,7 +622,7 @@ phy_RF6052_Config_ParaFile(
 	HAL_DATA_TYPE		*pHalData = GET_HAL_DATA(Adapter);
 	static char			sz88CRadioAFile[] = RTL8188C_PHY_RADIO_A;	
 	static char			sz88CRadioBFile[] = RTL8188C_PHY_RADIO_B;
-#if DEV_BUS_TYPE==DEV_BUS_USB_INTERFACE	
+#ifdef CONFIG_USB_HCI
 	static char			sz88CRadioAFile_mCard[] = RTL8188C_PHY_RADIO_A_mCard;	
 	static char			sz88CRadioBFile_mCard[] = RTL8188C_PHY_RADIO_B_mCard;
 	static char			sz88CRadioAFile_HP[] = RTL8188C_PHY_RADIO_A_HP;	
@@ -655,7 +655,7 @@ phy_RF6052_Config_ParaFile(
 			{
 				pszRadioAFile = sz88CRadioAFile;
 				pszRadioBFile = sz88CRadioBFile;
-#if DEV_BUS_TYPE==DEV_BUS_USB_INTERFACE
+#ifdef CONFIG_USB_HCI
 				if( BOARD_MINICARD == pHalData->BoardType)
 				{
 					pszRadioAFile = sz88CRadioAFile_mCard;
@@ -704,18 +704,18 @@ phy_RF6052_Config_ParaFile(
 
 		/*----Set RF_ENV enable----*/		
 		PHY_SetBBReg(Adapter, pPhyReg->rfintfe, bRFSI_RFENV<<16, 0x1);
-		udelay_os(1);//PlatformStallExecution(1);
+		rtw_udelay_os(1);//PlatformStallExecution(1);
 		
 		/*----Set RF_ENV output high----*/
 		PHY_SetBBReg(Adapter, pPhyReg->rfintfo, bRFSI_RFENV, 0x1);
-		udelay_os(1);//PlatformStallExecution(1);
+		rtw_udelay_os(1);//PlatformStallExecution(1);
 
 		/* Set bit number of Address and Data for RF register */
 		PHY_SetBBReg(Adapter, pPhyReg->rfHSSIPara2, b3WireAddressLength, 0x0); 	// Set 1 to 4 bits for 8255
-		udelay_os(1);//PlatformStallExecution(1);
+		rtw_udelay_os(1);//PlatformStallExecution(1);
 
 		PHY_SetBBReg(Adapter, pPhyReg->rfHSSIPara2, b3WireDataLength, 0x0);	// Set 0 to 12  bits for 8255
-		udelay_os(1);//PlatformStallExecution(1);
+		rtw_udelay_os(1);//PlatformStallExecution(1);
 
 		/*----Initialize RF fom connfiguration file----*/
 		switch(eRFPath)

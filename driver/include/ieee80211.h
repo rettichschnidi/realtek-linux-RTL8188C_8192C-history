@@ -69,6 +69,7 @@ enum {
 	RTL871X_HOSTAPD_SET_BEACON=16,
 	RTL871X_HOSTAPD_SET_WPS_BEACON = 17,
 	RTL871X_HOSTAPD_SET_WPS_PROBE_RESP = 18,
+	RTL871X_HOSTAPD_SET_WPS_ASSOC_RESP = 19,
 };
 
 /* STA flags */
@@ -845,6 +846,38 @@ struct ieee80211_info_element {
 } __attribute__ ((packed));
 #endif
 
+#ifdef CONFIG_TDLS
+/* TDLS */
+#define TDLS_MIC_LEN 16
+#define WPA_NONCE_LEN 32
+#define TDLS_TIMEOUT_LEN 4
+
+struct wpa_tdls_ftie {
+	u8 ie_type; /* FTIE */
+	u8 ie_len;
+	u8 mic_ctrl[2];
+	u8 mic[TDLS_MIC_LEN];
+	u8 Anonce[WPA_NONCE_LEN]; /* Responder Nonce in TDLS */
+	u8 Snonce[WPA_NONCE_LEN]; /* Initiator Nonce in TDLS */
+	/* followed by optional elements */
+} ;
+
+struct wpa_tdls_timeoutie {
+	u8 ie_type; /* Timeout IE */
+	u8 ie_len;
+	u8 interval_type;
+	u8 value[TDLS_TIMEOUT_LEN];
+} ;
+
+struct wpa_tdls_lnkid {
+	u8 ie_type; /* Link Identifier IE */
+	u8 ie_len;
+	u8 bssid[ETH_ALEN];
+	u8 init_sta[ETH_ALEN];
+	u8 resp_sta[ETH_ALEN];
+} ;
+#endif
+
 #ifdef PLATFORM_WINDOWS
 
 #pragma pack(1)
@@ -1005,7 +1038,7 @@ struct ieee80211_txb {
 #define CRC_LENGTH                 4U
 
 #define MAX_WPA_IE_LEN (128)
-#define MAX_WPS_IE_LEN (256)
+#define MAX_WPS_IE_LEN (512)
 #define MAX_P2P_IE_LEN (256)
 
 #define NETWORK_EMPTY_ESSID (1<<0)
@@ -1210,6 +1243,7 @@ enum ieee80211_category {
 	WLAN_CATEGORY_FT = 6,
 	WLAN_CATEGORY_HT = 7,
 	WLAN_CATEGORY_SA_QUERY = 8,
+	WLAN_CATEGORY_TDLS = 12,
 	WLAN_CATEGORY_WMM = 17,
 	WLAN_CATEGORY_P2P = 0x7f,//P2P action frames
 };
@@ -1229,6 +1263,23 @@ enum _PUBLIC_ACTION{
 	ACT_PUBLIC_MP = 7, // Measurement Pilot
 	ACT_PUBLIC_P2P = 9, // WIFI_DIRECT
 };
+
+#ifdef CONFIG_TDLS
+enum TDLS_ACTION_FIELD{
+	TDLS_SETUP_REQUEST = 0,
+	TDLS_SETUP_RESPONSE = 1,
+	TDLS_SETUP_CONFIRM = 2,
+	TDLS_TEARDOWN = 3,
+	TDLS_PEER_TRAFFIC_INDICATION = 4,
+	TDLS_CHANNEL_SWITCH_REQUEST = 5,
+	TDLS_CHANNEL_SWITCH_RESPONSE = 6,
+	TDLS_PEER_PSM_REQUEST = 7,
+	TDLS_PEER_PSM_RESPONSE = 8,
+	TDLS_PEER_TRAFFIC_RESPONSE = 9,
+	TDLS_DISCOVERY_REQUEST = 10,
+	TDLS_DISCOVERY_RESPONSE = 14,	//it's used in public action frame
+};
+#endif
 
 /* BACK action code */
 enum ieee80211_back_actioncode {
@@ -1340,40 +1391,42 @@ ParseRes rtw_ieee802_11_parse_elems(u8 *start, uint len,
 				struct ieee802_11_elems *elems,
 				int show_errors);
 
-u8 *set_fixed_ie(unsigned char *pbuf, unsigned int len, unsigned char *source, unsigned int *frlen);
-u8 *set_ie(u8 *pbuf, sint index, uint len, u8 *source, uint *frlen);
-u8 *get_ie(u8*pbuf, sint index, sint *len, sint limit);
-void set_supported_rate(u8* SupportedRates, uint mode) ;
+u8 *rtw_set_fixed_ie(unsigned char *pbuf, unsigned int len, unsigned char *source, unsigned int *frlen);
+u8 *rtw_set_ie(u8 *pbuf, sint index, uint len, u8 *source, uint *frlen);
+u8 *rtw_get_ie(u8*pbuf, sint index, sint *len, sint limit);
+void rtw_set_supported_rate(u8* SupportedRates, uint mode) ;
 
-unsigned char *get_wpa_ie(unsigned char *pie, int *wpa_ie_len, int limit);
-unsigned char *get_wpa2_ie(unsigned char *pie, int *rsn_ie_len, int limit);
-int get_wpa_cipher_suite(u8 *s);
-int get_wpa2_cipher_suite(u8 *s);
-int parse_wpa_ie(u8* wpa_ie, int wpa_ie_len, int *group_cipher, int *pairwise_cipher);
-int parse_wpa2_ie(u8* wpa_ie, int wpa_ie_len, int *group_cipher, int *pairwise_cipher);
+unsigned char *rtw_get_wpa_ie(unsigned char *pie, int *wpa_ie_len, int limit);
+unsigned char *rtw_get_wpa2_ie(unsigned char *pie, int *rsn_ie_len, int limit);
+int rtw_get_wpa_cipher_suite(u8 *s);
+int rtw_get_wpa2_cipher_suite(u8 *s);
+int rtw_parse_wpa_ie(u8* wpa_ie, int wpa_ie_len, int *group_cipher, int *pairwise_cipher);
+int rtw_parse_wpa2_ie(u8* wpa_ie, int wpa_ie_len, int *group_cipher, int *pairwise_cipher);
 
-int get_sec_ie(u8 *in_ie,uint in_len,u8 *rsn_ie,u16 *rsn_len,u8 *wpa_ie,u16 *wpa_len);
-u8 *get_wps_ie(u8 *in_ie, uint in_len, u8 *wps_ie, uint *wps_ielen);
-int get_p2p_ie(u8 *in_ie, uint in_len, u8 *p2p_ie, uint *p2p_ielen);
-int get_p2p_attr_content(u8 *p2p_ie, uint p2p_ielen, u8 target_attr_id ,u8 *attr_content, uint *attr_contentlen);
-u32 set_p2p_attr_content(u8 *pbuf, u8 attr_id, u16 attr_len, u8 *pdata_attr);
-int get_wps_attr_content(u8 *wps_ie, uint wps_ielen, u16 target_attr_id ,u8 *attr_content, uint *attr_contentlen);
-int get_wps_ie_p2p(u8 *in_ie, uint in_len, u8 *wps_ie, uint *wps_ielen);
+int rtw_get_sec_ie(u8 *in_ie,uint in_len,u8 *rsn_ie,u16 *rsn_len,u8 *wpa_ie,u16 *wpa_len);
+u8 *rtw_get_wps_ie(u8 *in_ie, uint in_len, u8 *wps_ie, uint *wps_ielen);
+u8 is_wps_ie(u8 *ie_ptr, uint *wps_ielen);
 
-uint	get_rateset_len(u8	*rateset);
+int rtw_get_p2p_ie(u8 *in_ie, uint in_len, u8 *p2p_ie, uint *p2p_ielen);
+int rtw_get_p2p_attr_content(u8 *p2p_ie, uint p2p_ielen, u8 target_attr_id ,u8 *attr_content, uint *attr_contentlen);
+u32 rtw_set_p2p_attr_content(u8 *pbuf, u8 attr_id, u16 attr_len, u8 *pdata_attr);
+int rtw_get_wps_attr_content(u8 *wps_ie, uint wps_ielen, u16 target_attr_id ,u8 *attr_content, uint *attr_contentlen);
+int rtw_get_wps_ie_p2p(u8 *in_ie, uint in_len, u8 *wps_ie, uint *wps_ielen);
+
+uint	rtw_get_rateset_len(u8	*rateset);
 
 struct registry_priv;
-int generate_ie(struct registry_priv *pregistrypriv);
+int rtw_generate_ie(struct registry_priv *pregistrypriv);
 
 
-int get_bit_value_from_ieee_value(u8 val);
+int rtw_get_bit_value_from_ieee_value(u8 val);
 
-uint	is_cckrates_included(u8 *rate);
+uint	rtw_is_cckrates_included(u8 *rate);
 
-uint	is_cckratesonly_included(u8 *rate);
+uint	rtw_is_cckratesonly_included(u8 *rate);
 
-int check_network_type(unsigned char *rate, int ratelen, int channel);
+int rtw_check_network_type(unsigned char *rate, int ratelen, int channel);
 
-
+void rtw_macaddr_cfg(u8 *mac_addr);
 #endif /* IEEE80211_H */
 

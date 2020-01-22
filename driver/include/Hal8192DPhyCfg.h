@@ -58,7 +58,7 @@
 #define IQK_Matrix_REG_NUM	8
 #define IQK_Matrix_Settings_NUM	1+24+21
 
-#if (DEV_BUS_TYPE == DEV_BUS_PCI_INTERFACE)
+#ifdef CONFIG_PCI_HCI
 #define	SET_RTL8192SE_RF_SLEEP(_pAdapter)							\
 {																	\
 	u1Byte		u1bTmp;												\

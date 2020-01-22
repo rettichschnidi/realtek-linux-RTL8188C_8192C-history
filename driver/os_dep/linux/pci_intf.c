@@ -44,13 +44,10 @@
 #endif
 
 #ifdef CONFIG_80211N_HT
-extern int ht_enable;
-extern int cbw40_enable;
-extern int ampdu_enable;//for enable tx_ampdu
+extern int rtw_ht_enable;
+extern int rtw_cbw40_enable;
+extern int rtw_ampdu_enable;//for enable tx_ampdu
 #endif
-
-extern char* initmac;
-
 
 #ifdef CONFIG_PM
 extern int pm_netdev_open(struct net_device *pnetdev);
@@ -128,7 +125,7 @@ static u8 rtw_pci_platform_switch_device_pci_aspm(_adapter *padapter, u8 value)
 	if(error != 0)
 	{
 		bresult = _FALSE;
-		printk("rtw_pci_platform_switch_device_pci_aspm error (%d)\n",error);
+		DBG_8192C("rtw_pci_platform_switch_device_pci_aspm error (%d)\n",error);
 	}
 
 	return bresult;
@@ -153,7 +150,7 @@ static u8 rtw_pci_switch_clk_req(_adapter *padapter, u8 value)
 	if(error != 0)
 	{
 		bresult = _FALSE;
-		printk("rtw_pci_switch_clk_req error (%d)\n",error);
+		DBG_8192C("rtw_pci_switch_clk_req error (%d)\n",error);
 	}
 
 	return bresult;
@@ -212,7 +209,7 @@ void rtw_pci_disable_aspm(_adapter *padapter)
 	pcibridge_linkctrlreg &= ~(BIT(0) | BIT(1));
 
 	rtw_pci_platform_switch_device_pci_aspm(padapter, linkctrl_reg);
-	udelay_os(50);
+	rtw_udelay_os(50);
 
 	//When there exists anyone's busnum, devnum, and funcnum that are set to 0xff,
 	// we do not execute any action and return.
@@ -244,7 +241,7 @@ void rtw_pci_disable_aspm(_adapter *padapter)
 			pcipriv->pcibridge_funcnum, 
 			(pcipriv->pcibridge_pciehdr_offset+0x10), pcibridge_linkctrlreg);
 
-		udelay_os(50);
+		rtw_udelay_os(50);
 	}
 }
 
@@ -303,7 +300,7 @@ void rtw_pci_enable_aspm(_adapter *padapter)
 		(pcipriv->pcibridge_pciehdr_offset+0x10), 
 		u_pcibridge_aspmsetting);
 
-	udelay_os(50);
+	rtw_udelay_os(50);
 
 	// Get ASPM level (with/without Clock Req)
 	aspmlevel |= pdvobjpriv->const_devicepci_aspm_setting;
@@ -317,7 +314,7 @@ void rtw_pci_enable_aspm(_adapter *padapter)
 		RT_SET_PS_LEVEL(pwrpriv, RT_RF_OFF_LEVL_CLK_REQ);
 	}
 
-	udelay_os(50);
+	rtw_udelay_os(50);
 }
 
 //
@@ -338,7 +335,7 @@ rtw_get_link_control_field(_adapter *padapter, u8 busnum, u8 devnum,
 
 	//If busnum, devnum, funcnum are set to 0xff.
 	if (busnum == 0xff && devnum == 0xff && funcnum == 0xff) {
-		printk("GetLinkControlField(): Fail to find PCIe Capability\n");
+		DBG_8192C("GetLinkControlField(): Fail to find PCIe Capability\n");
 		return _FALSE;
 	}
 
@@ -401,7 +398,7 @@ rtw_get_link_control_field(_adapter *padapter, u8 busnum, u8 devnum,
 	else
 	{
 		// We didn't find a PCIe capability. 
-		printk("GetLinkControlField(): Cannot Find PCIe Capability\n");
+		DBG_8192C("GetLinkControlField(): Cannot Find PCIe Capability\n");
 	}
 
 	return status;
@@ -434,7 +431,7 @@ rtw_get_pci_bus_info(_adapter *padapter,
 	*devnum = 0xFF;
 	*funcnum = 0xFF;
 
-	//printk("==============>vendorid:%x,deviceid:%x,irql:%x\n", vendorid,deviceid,irql);
+	//DBG_8192C("==============>vendorid:%x,deviceid:%x,irql:%x\n", vendorid,deviceid,irql);
 	if ((basecode == PCI_CLASS_BRIDGE_DEV) &&
 		(subclass == PCI_SUBCLASS_BR_PCI_TO_PCI)
 		&& (filed19val == U1DONTCARE))
@@ -537,7 +534,7 @@ rtw_get_pci_bus_info(_adapter *padapter,
 					*devnum = devicenum_idx;
 					*funcnum = functionnum_idx;
 
-					printk("GetPciBusInfo(): Find Device(%X:%X)  bus=%d dev=%d, func=%d\n",
+					DBG_8192C("GetPciBusInfo(): Find Device(%X:%X)  bus=%d dev=%d, func=%d\n",
 						vendorid, deviceid, busnum_idx, devicenum_idx, functionnum_idx);
 					return _TRUE;
 				}
@@ -545,7 +542,7 @@ rtw_get_pci_bus_info(_adapter *padapter,
 		}
 	}
 
-	printk("GetPciBusInfo(): Cannot Find Device(%X:%X:%X)\n", vendorid, deviceid, dev_venid);
+	DBG_8192C("GetPciBusInfo(): Cannot Find Device(%X:%X:%X)\n", vendorid, deviceid, dev_venid);
 
 	return _FALSE;
 }
@@ -639,7 +636,7 @@ rtw_get_pci_brideg_info(_adapter *padapter,
 					*vendorid = venId;
 					*deviceid = devId;
 
-					printk("GetPciBridegInfo : Find Device(%X:%X)  bus=%d dev=%d, func=%d\n",
+					DBG_8192C("GetPciBridegInfo : Find Device(%X:%X)  bus=%d dev=%d, func=%d\n",
 						venId, devId, busnum_idx, devicenum_idx, functionnum_idx);
 
 					return _TRUE;
@@ -648,7 +645,7 @@ rtw_get_pci_brideg_info(_adapter *padapter,
 		}
 	}
 
-	printk("GetPciBridegInfo(): Cannot Find PciBridge for Device\n");
+	DBG_8192C("GetPciBridegInfo(): Cannot Find PciBridge for Device\n");
 
 	return _FALSE;
 }				// end of GetPciBridegInfo
@@ -682,11 +679,11 @@ static void rtw_find_bridge_info(_adapter *padapter)
 	for (tmp = 0; tmp < PCI_BRIDGE_VENDOR_MAX; tmp++) {
 		if (pcibridge_vendorid == pcibridge_vendors[tmp]) {
 			pcipriv->pcibridge_vendor = tmp;
-			printk("Pci Bridge Vendor is found index: %d\n", tmp);
+			DBG_8192C("Pci Bridge Vendor is found index: %d\n", tmp);
 			break;
 		}
 	}
-	printk("Pci Bridge Vendor is %x\n", pcibridge_vendors[tmp]);
+	DBG_8192C("Pci Bridge Vendor is %x\n", pcibridge_vendors[tmp]);
 
 	// Update corresponding PCI bus info.
 	pcipriv->pcibridge_busnum = pcibridge_busnum;
@@ -771,7 +768,7 @@ void rtw_pci_disable_aspm(_adapter *padapter)
 	}
 
 	rtw_pci_platform_switch_device_pci_aspm(padapter, linkctrl_reg);
-	udelay_os(50);
+	rtw_udelay_os(50);
 
 	//When there exists anyone's BusNum, DevNum, and FuncNum that are set to 0xff,
 	// we do not execute any action and return. Added by tynli.
@@ -792,7 +789,7 @@ void rtw_pci_disable_aspm(_adapter *padapter)
 			pcipriv->pcibridge_funcnum, 
 			(pcipriv->pcibridge_pciehdr_offset+0x10), pcibridge_linkctrlreg);
 
-		udelay_os(50);
+		rtw_udelay_os(50);
 	}
 
 }
@@ -892,7 +889,7 @@ void rtw_pci_enable_aspm(_adapter *padapter)
 		(pcipriv->pcibridge_pciehdr_offset+0x10), 
 		u_pcibridge_aspmsetting);
 
-	udelay_os(50);
+	rtw_udelay_os(50);
 
 	/*Get ASPM level (with/without Clock Req)*/ 
 	aspmlevel |= pdvobjpriv->const_devicepci_aspm_setting;
@@ -906,7 +903,7 @@ void rtw_pci_enable_aspm(_adapter *padapter)
 		RT_SET_PS_LEVEL(pwrpriv, RT_RF_OFF_LEVL_CLK_REQ);
 	}
 
-	udelay_os(50);
+	rtw_udelay_os(50);
 }
 
 static u8 rtw_pci_get_amd_l1_patch(_adapter *padapter)
@@ -1140,7 +1137,7 @@ _func_enter_;
 		for (tmp = 0; tmp < PCI_BRIDGE_VENDOR_MAX; tmp++) {
 			if (bridge_pdev->vendor == pcibridge_vendors[tmp]) {
 				pcipriv->pcibridge_vendor = tmp;
-				printk("Pci Bridge Vendor is found index: %d, %x\n", tmp, pcibridge_vendors[tmp]);
+				DBG_8192C("Pci Bridge Vendor is found index: %d, %x\n", tmp, pcibridge_vendors[tmp]);
 				break;
 			}
 		}
@@ -1200,7 +1197,7 @@ _func_enter_;
 	//
 	rtw_pci_parse_configuration(pdev, padapter);
 
-	printk("pcidev busnumber:devnumber:funcnumber:"
+	DBG_8192C("pcidev busnumber:devnumber:funcnumber:"
 		"vendor:link_ctl %d:%d:%d:%x:%x\n",
 		pcipriv->busnumber,
 		pcipriv->devnumber,
@@ -1208,7 +1205,7 @@ _func_enter_;
 		pdev->vendor,
 		pcipriv->linkctrl_reg);
 
-	printk("pci_bridge busnumber:devnumber:funcnumber:vendor:"
+	DBG_8192C("pci_bridge busnumber:devnumber:funcnumber:vendor:"
 		"pcie_cap:link_ctl_reg: %d:%d:%d:%x:%x:%x:%x\n", 
 		pcipriv->pcibridge_busnum,
 		pcipriv->pcibridge_devnum,
@@ -1270,7 +1267,7 @@ static void decide_chip_type_by_pci_device_id(_adapter *padapter, struct pci_dev
 	    deviceid == HAL_HW_PCI_8188_DEVICE_ID ||
 	    deviceid == HAL_HW_PCI_8198_DEVICE_ID)
 	{
-		printk("Adapter (8185/8185B) is found- VendorID/DeviceID=%x/%x\n", venderid, deviceid);
+		DBG_8192C("Adapter (8185/8185B) is found- VendorID/DeviceID=%x/%x\n", venderid, deviceid);
 		padapter->HardwareType=HARDWARE_TYPE_RTL8185;
 	}
 	else if (deviceid == HAL_HW_PCI_8190_DEVICE_ID ||
@@ -1278,7 +1275,7 @@ static void decide_chip_type_by_pci_device_id(_adapter *padapter, struct pci_dev
 		deviceid == HAL_HW_PCI_0046_DEVICE_ID ||
 		deviceid == HAL_HW_PCI_DLINK_DEVICE_ID)
 	{
-		printk("Adapter(8190 PCI) is found - vendorid/deviceid=%x/%x\n", venderid, deviceid);
+		DBG_8192C("Adapter(8190 PCI) is found - vendorid/deviceid=%x/%x\n", venderid, deviceid);
 		padapter->HardwareType = HARDWARE_TYPE_RTL8190P;
 	}
 	else if (deviceid == HAL_HW_PCI_8192_DEVICE_ID ||
@@ -1295,19 +1292,19 @@ static void decide_chip_type_by_pci_device_id(_adapter *padapter, struct pci_dev
 		// Added for 92DE. We deferentiate it from SVID,SDID.
 		if( pdev->subsystem_vendor == 0x10EC && pdev->subsystem_device == 0xE020){
 			padapter->HardwareType = HARDWARE_TYPE_RTL8192DE;
-			printk("Adapter(8192DE) is found - VendorID/DeviceID/RID=%X/%X/%X\n", venderid, deviceid, revisionid);
+			DBG_8192C("Adapter(8192DE) is found - VendorID/DeviceID/RID=%X/%X/%X\n", venderid, deviceid, revisionid);
 		}else{
 			switch (revisionid) {
 				case HAL_HW_PCI_REVISION_ID_8192PCIE:
-					printk("Adapter(8192 PCI-E) is found - vendorid/deviceid=%x/%x\n", venderid, deviceid);
+					DBG_8192C("Adapter(8192 PCI-E) is found - vendorid/deviceid=%x/%x\n", venderid, deviceid);
 					padapter->HardwareType = HARDWARE_TYPE_RTL8192E;
 					break;
 				case HAL_HW_PCI_REVISION_ID_8192SE:
-					printk("Adapter(8192SE) is found - vendorid/deviceid=%x/%x\n", venderid, deviceid);
+					DBG_8192C("Adapter(8192SE) is found - vendorid/deviceid=%x/%x\n", venderid, deviceid);
 					padapter->HardwareType = HARDWARE_TYPE_RTL8192SE;
 					break;
 				default:
-					printk("Err: Unknown device - vendorid/deviceid=%x/%x\n", venderid, deviceid);
+					DBG_8192C("Err: Unknown device - vendorid/deviceid=%x/%x\n", venderid, deviceid);
 					padapter->HardwareType = HARDWARE_TYPE_RTL8192SE;
 					break;
 			}
@@ -1316,24 +1313,24 @@ static void decide_chip_type_by_pci_device_id(_adapter *padapter, struct pci_dev
 	else if(deviceid==HAL_HW_PCI_8723E_DEVICE_ID )
 	{//RTL8723E may have the same device ID with RTL8192CET
 		padapter->HardwareType = HARDWARE_TYPE_RTL8723E;
-		printk("Adapter(8723 PCI-E) is found - VendorID/DeviceID=%x/%x\n", venderid, deviceid);
+		DBG_8192C("Adapter(8723 PCI-E) is found - VendorID/DeviceID=%x/%x\n", venderid, deviceid);
 	}
 	else if (deviceid == HAL_HW_PCI_8192CET_DEVICE_ID ||
 		deviceid == HAL_HW_PCI_8192CE_DEVICE_ID ||
 		deviceid == HAL_HW_PCI_8191CE_DEVICE_ID ||
 		deviceid == HAL_HW_PCI_8188CE_DEVICE_ID) 
 	{
-		printk("Adapter(8192C PCI-E) is found - vendorid/deviceid=%x/%x\n", venderid, deviceid);
+		DBG_8192C("Adapter(8192C PCI-E) is found - vendorid/deviceid=%x/%x\n", venderid, deviceid);
 		padapter->HardwareType = HARDWARE_TYPE_RTL8192CE;
 	}
 	else if (deviceid == HAL_HW_PCI_8192DE_DEVICE_ID ||
 		deviceid == HAL_HW_PCI_002B_DEVICE_ID ){
 		padapter->HardwareType = HARDWARE_TYPE_RTL8192DE;
-		printk("Adapter(8192DE) is found - VendorID/DeviceID/RID=%X/%X/%X\n", venderid, deviceid, revisionid);
+		DBG_8192C("Adapter(8192DE) is found - VendorID/DeviceID/RID=%X/%X/%X\n", venderid, deviceid, revisionid);
 	}
 	else
 	{
-		printk("Err: Unknown device - vendorid/deviceid=%x/%x\n", venderid, deviceid);
+		DBG_8192C("Err: Unknown device - vendorid/deviceid=%x/%x\n", venderid, deviceid);
 		//padapter->HardwareType = HAL_DEFAULT_HARDWARE_TYPE;
 	}
 
@@ -1358,13 +1355,13 @@ static void pci_intf_start(_adapter *padapter)
 {
 
 	RT_TRACE(_module_hci_intfs_c_,_drv_err_,("+pci_intf_start\n"));
-	printk("+pci_intf_start\n");
+	DBG_8192C("+pci_intf_start\n");
 
 	//Enable hw interrupt
 	padapter->HalFunc.enable_interrupt(padapter);
 
 	RT_TRACE(_module_hci_intfs_c_,_drv_err_,("-pci_intf_start\n"));
-	printk("-pci_intf_start\n");
+	DBG_8192C("-pci_intf_start\n");
 }
 
 static void pci_intf_stop(_adapter *padapter)
@@ -1398,7 +1395,7 @@ static void rtw_dev_unload(_adapter *padapter)
 
 	if(padapter->bup == _TRUE)
 	{
-		printk("+rtw_dev_unload\n");
+		DBG_8192C("+rtw_dev_unload\n");
 		//s1.
 /*		if(pnetdev)
 		{
@@ -1407,14 +1404,14 @@ static void rtw_dev_unload(_adapter *padapter)
 		}
 
 		//s2.
-		//s2-1.  issue disassoc_cmd to fw
-		disassoc_cmd(padapter);
+		//s2-1.  issue rtw_disassoc_cmd to fw
+		rtw_disassoc_cmd(padapter);
 		//s2-2.  indicate disconnect to os
-		indicate_disconnect(padapter);
+		rtw_indicate_disconnect(padapter);
 		//s2-3.
-		free_assoc_resources(padapter);
+		rtw_free_assoc_resources(padapter);
 		//s2-4.
-		free_network_queue(padapter, _TRUE);*/
+		rtw_free_network_queue(padapter, _TRUE);*/
 
 		padapter->bDriverStopped = _TRUE;
 
@@ -1425,13 +1422,13 @@ static void rtw_dev_unload(_adapter *padapter)
 		}
 
 		//s4.
-		stop_drv_threads(padapter);
+		rtw_stop_drv_threads(padapter);
 
 
 		//s5.
 		if(padapter->bSurpriseRemoved == _FALSE)
 		{
-			printk("r871x_dev_unload()->rtl871x_hal_deinit()\n");
+			DBG_8192C("r871x_dev_unload()->rtl871x_hal_deinit()\n");
 			rtw_hal_deinit(padapter);
 
 			padapter->bSurpriseRemoved = _TRUE;
@@ -1455,7 +1452,7 @@ static void rtw_dev_unload(_adapter *padapter)
 		RT_TRACE(_module_hci_intfs_c_,_drv_err_,("r871x_dev_unload():padapter->bup == _FALSE\n" ));
 	}
 
-	printk("-rtw_dev_unload\n");
+	DBG_8192C("-rtw_dev_unload\n");
 
 	RT_TRACE(_module_hci_intfs_c_,_drv_err_,("-rtw_dev_unload\n"));
 
@@ -1477,9 +1474,9 @@ static void disable_ht_for_spec_devid(const struct pci_device_id *pdid)
 
 		if((pdid->vendor==vid) && (pdid->device==pid) && (flags&SPEC_DEV_ID_DISABLE_HT))
 		{
-			 ht_enable = 0;
-			 cbw40_enable = 0;
-			 ampdu_enable = 0;
+			 rtw_ht_enable = 0;
+			 rtw_cbw40_enable = 0;
+			 rtw_ampdu_enable = 0;
 		}
 
 	}
@@ -1507,24 +1504,6 @@ static int rtw_resume(struct pci_dev *pdev)
 }
 #endif
 
-
-u8 key_char2num(u8 ch)
-{
-    if((ch>='0')&&(ch<='9'))
-        return ch - '0';
-    else if ((ch>='a')&&(ch<='f'))
-        return ch - 'a' + 10;
-    else if ((ch>='A')&&(ch<='F'))
-        return ch - 'A' + 10;
-    else
-	 return 0xff;
-}
-
-u8 key_2char2num(u8 hch, u8 lch)
-{
-    return ((key_char2num(hch) << 4) | key_char2num(lch));
-}
-
 #ifdef RTK_DMP_PLATFORM
 #define pci_iounmap(x,y) iounmap(y)
 #endif
@@ -1538,7 +1517,7 @@ u8 key_2char2num(u8 hch, u8 lch)
 static int rtw_drv_init(struct pci_dev *pdev, const struct pci_device_id *pdid)
 {
 	int i, err = -ENODEV;
-	u8 mac[ETH_ALEN];
+
 	uint status;
 	_adapter *padapter = NULL;
 	struct dvobj_priv *pdvobjpriv;
@@ -1547,19 +1526,19 @@ static int rtw_drv_init(struct pci_dev *pdev, const struct pci_device_id *pdid)
 	u8	bdma64 = _FALSE;
 
 	RT_TRACE(_module_hci_intfs_c_, _drv_err_, ("+rtw_drv_init\n"));
-	//printk("+rtw_drv_init\n");
+	//DBG_8192C("+rtw_drv_init\n");
 
 	err = pci_enable_device(pdev);
 	if (err) {
-		printk(KERN_ERR "%s : Cannot enable new PCI device\n", pci_name(pdev));
+		DBG_8192C(KERN_ERR "%s : Cannot enable new PCI device\n", pci_name(pdev));
 		return err;
 	}
 
 #ifdef CONFIG_64BIT_DMA
 	if (!pci_set_dma_mask(pdev, DMA_BIT_MASK(64))) {
-		printk("RTL819xCE: Using 64bit DMA\n");
+		DBG_8192C("RTL819xCE: Using 64bit DMA\n");
 		if (pci_set_consistent_dma_mask(pdev, DMA_BIT_MASK(64))) {
-			printk(KERN_ERR "Unable to obtain 64bit DMA for consistent allocations\n");
+			DBG_8192C(KERN_ERR "Unable to obtain 64bit DMA for consistent allocations\n");
 			err = -ENOMEM;
 			pci_disable_device(pdev);
 			return err;
@@ -1570,7 +1549,7 @@ static int rtw_drv_init(struct pci_dev *pdev, const struct pci_device_id *pdid)
 	{
 		if (!pci_set_dma_mask(pdev, DMA_BIT_MASK(32))) {
 			if (pci_set_consistent_dma_mask(pdev, DMA_BIT_MASK(32))) {
-				printk(KERN_ERR "Unable to obtain 32bit DMA for consistent allocations\n");
+				DBG_8192C(KERN_ERR "Unable to obtain 32bit DMA for consistent allocations\n");
 				err = -ENOMEM;
 				pci_disable_device(pdev);
 				return err;
@@ -1586,12 +1565,12 @@ static int rtw_drv_init(struct pci_dev *pdev, const struct pci_device_id *pdid)
 
 	//step 1. set USB interface data
 	// init data
-	pnetdev = init_netdev();
+	pnetdev = rtw_init_netdev();
 	if (!pnetdev){
 		err = -ENOMEM;
 		goto fail1;
 	}
-	init_netdev_name(pnetdev);
+	rtw_init_netdev_name(pnetdev);
 
 	if(bdma64){
 		pnetdev->features |= NETIF_F_HIGHDMA;
@@ -1601,7 +1580,7 @@ static int rtw_drv_init(struct pci_dev *pdev, const struct pci_device_id *pdid)
 	SET_NETDEV_DEV(pnetdev, &pdev->dev);
 #endif
 
-	padapter = netdev_priv(pnetdev);
+	padapter = rtw_netdev_priv(pnetdev);
 	pdvobjpriv = &padapter->dvobjpriv;
 	pdvobjpriv->padapter = padapter;
 	pdvobjpriv->ppcidev = pdev;
@@ -1611,7 +1590,7 @@ static int rtw_drv_init(struct pci_dev *pdev, const struct pci_device_id *pdid)
 
 	err = pci_request_regions(pdev, DRV_NAME);
 	if (err) {
-		printk(KERN_ERR "Can't obtain PCI resources\n");
+		DBG_8192C(KERN_ERR "Can't obtain PCI resources\n");
 		goto fail1;
 	}
 	//MEM map
@@ -1625,11 +1604,11 @@ static int rtw_drv_init(struct pci_dev *pdev, const struct pci_device_id *pdid)
 	pdvobjpriv->pci_mem_start = (unsigned long)pci_iomap(pdev, 2, pmem_len);	// shared mem start
 #endif
 	if (pdvobjpriv->pci_mem_start == 0) {
-		printk(KERN_ERR "Can't map PCI mem\n");
+		DBG_8192C(KERN_ERR "Can't map PCI mem\n");
 		goto fail2;
 	}
 
-	printk("Memory mapped space start: 0x%08lx len:%08lx flags:%08lx, after map:0x%08lx\n",
+	DBG_8192C("Memory mapped space start: 0x%08lx len:%08lx flags:%08lx, after map:0x%08lx\n",
 		pmem_start, pmem_len, pmem_flags, pdvobjpriv->pci_mem_start);
 
 	// Disable Clk Request */
@@ -1685,7 +1664,7 @@ static int rtw_drv_init(struct pci_dev *pdev, const struct pci_device_id *pdid)
 	pnetdev->irq = pdev->irq;
 
 	//step 4.
-	status = init_drv_sw(padapter);
+	status = rtw_init_drv_sw(padapter);
 	if(status ==_FAIL){
 		RT_TRACE(_module_hci_intfs_c_,_drv_err_,("Initialize driver software resource Failed!\n"));
 		goto error;
@@ -1702,35 +1681,13 @@ static int rtw_drv_init(struct pci_dev *pdev, const struct pci_device_id *pdid)
 	//step 5. read efuse/eeprom data and get mac_addr
 	intf_read_chip_info(padapter);	
 
-	if ( initmac )
-	{	//	Users specify the mac address
-		int jj,kk;
+	rtw_macaddr_cfg(padapter->eeprompriv.mac_addr);
 
-		for( jj = 0, kk = 0; jj < ETH_ALEN; jj++, kk += 3 )
-		{
-			mac[jj] = key_2char2num(initmac[kk], initmac[kk+ 1]);
-		}
-	}
-	else
-	{	//	Use the mac address stored in the Efuse
-		_memcpy(mac, padapter->eeprompriv.mac_addr, ETH_ALEN);
-	}
+	_rtw_memcpy(pnetdev->dev_addr, padapter->eeprompriv.mac_addr, ETH_ALEN);
+	DBG_8192C("MAC Address from pnetdev->dev_addr= %02x:%02x:%02x:%02x:%02x:%02x\n",
+				pnetdev->dev_addr[0], pnetdev->dev_addr[1], pnetdev->dev_addr[2], 
+				pnetdev->dev_addr[3], pnetdev->dev_addr[4], pnetdev->dev_addr[5]);	
 
-	if (((mac[0]==0xff) &&(mac[1]==0xff) && (mac[2]==0xff) &&
-	     (mac[3]==0xff) && (mac[4]==0xff) &&(mac[5]==0xff)) ||
-	    ((mac[0]==0x0) && (mac[1]==0x0) && (mac[2]==0x0) &&
-	     (mac[3]==0x0) && (mac[4]==0x0) &&(mac[5]==0x0)))
-	{
-		mac[0] = 0x00;
-		mac[1] = 0xe0;
-		mac[2] = 0x4c;
-		mac[3] = 0x87;
-		mac[4] = 0x00;
-		mac[5] = 0x00;
-	}
-	_memcpy(pnetdev->dev_addr, mac, ETH_ALEN);
-	printk("MAC Address from efuse= %02x:%02x:%02x:%02x:%02x:%02x\n",
-				mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 
 	padapter->HalFunc.disable_interrupt(padapter);
 
@@ -1740,11 +1697,11 @@ static int rtw_drv_init(struct pci_dev *pdev, const struct pci_device_id *pdid)
 	err = request_irq(pdev->irq, &rtw_pci_interrupt, SA_SHIRQ, DRV_NAME, padapter);
 #endif
 	if (err) {
-		printk("Error allocating IRQ %d",pdev->irq);
+		DBG_8192C("Error allocating IRQ %d",pdev->irq);
 		goto error;
 	} else {
 		pdvobjpriv->irq_alloc = 1;
-		printk("Request_irq OK, IRQ %d\n",pdev->irq);
+		DBG_8192C("Request_irq OK, IRQ %d\n",pdev->irq);
 	}
 
 	//step 6. Init pci related configuration
@@ -1759,7 +1716,7 @@ static int rtw_drv_init(struct pci_dev *pdev, const struct pci_device_id *pdid)
 
 	RT_TRACE(_module_hci_intfs_c_,_drv_err_,("-drv_init - Adapter->bDriverStopped=%d, Adapter->bSurpriseRemoved=%d\n",padapter->bDriverStopped, padapter->bSurpriseRemoved));
 	RT_TRACE(_module_hci_intfs_c_,_drv_err_,("-871x_drv - drv_init, success!\n"));
-	//printk("-871x_drv - drv_init, success!\n");
+	//DBG_8192C("-871x_drv - drv_init, success!\n");
 
 #ifdef CONFIG_PROC_DEBUG
 #ifdef RTK_DMP_PLATFORM
@@ -1772,7 +1729,7 @@ static int rtw_drv_init(struct pci_dev *pdev, const struct pci_device_id *pdid)
 #endif
 
 #ifdef CONFIG_PLATFORM_RTD2880B
-	printk("wlan link up\n");
+	DBG_8192C("wlan link up\n");
 	rtd2885_wlan_netlink_sendMsg("linkup", "8712");
 #endif
 
@@ -1796,7 +1753,7 @@ error:
 	if (pnetdev)
 	{
 		//unregister_netdev(pnetdev);
-		free_netdev(pnetdev);
+		rtw_free_netdev(pnetdev);
 	}
 
 fail2:
@@ -1805,7 +1762,7 @@ fail2:
 fail1:
 	pci_disable_device(pdev);
 
-	printk("-871x_pci - drv_init, fail!\n");
+	DBG_8192C("-871x_pci - drv_init, fail!\n");
 
 	return err;
 }
@@ -1817,7 +1774,7 @@ fail1:
 static void rtw_dev_remove(struct pci_dev *pdev)
 {
 	struct net_device *pnetdev=pci_get_drvdata(pdev);
-	_adapter *padapter = (_adapter*)netdev_priv(pnetdev);
+	_adapter *padapter = (_adapter*)rtw_netdev_priv(pnetdev);
 	struct dvobj_priv *pdvobjpriv = &padapter->dvobjpriv;
 
 _func_exit_;
@@ -1826,7 +1783,7 @@ _func_exit_;
 		return;
 	}
 
-	printk("+rtw_dev_remove\n");
+	DBG_8192C("+rtw_dev_remove\n");
 
 #ifdef CONFIG_HOSTAPD_MLME
 	hostapd_mode_unload(padapter);
@@ -1839,12 +1796,12 @@ _func_exit_;
 #else	
 	if(drvpriv.drv_registered == _TRUE)
 	{
-		//printk("r871xu_dev_remove():padapter->bSurpriseRemoved == _TRUE\n");
+		//DBG_8192C("r871xu_dev_remove():padapter->bSurpriseRemoved == _TRUE\n");
 		padapter->bSurpriseRemoved = _TRUE;
 	}
 	/*else
 	{
-		//printk("r871xu_dev_remove():module removed\n");
+		//DBG_8192C("r871xu_dev_remove():module removed\n");
 		padapter->hw_init_completed = _FALSE;
 	}*/
 #endif
@@ -1856,11 +1813,11 @@ _func_exit_;
 #endif
 	}
 
-	cancel_all_timer(padapter);
+	rtw_cancel_all_timer(padapter);
 
 	rtw_dev_unload(padapter);
 
-	printk("+r871xu_dev_remove, hw_init_completed=%d\n", padapter->hw_init_completed);
+	DBG_8192C("+r871xu_dev_remove, hw_init_completed=%d\n", padapter->hw_init_completed);
 
 	if (pdvobjpriv->irq_alloc) {
 		free_irq(pdev->irq, padapter);
@@ -1877,14 +1834,14 @@ _func_exit_;
 
 	padapter->HalFunc.inirp_deinit(padapter);
 
-	free_drv_sw(padapter);
+	rtw_free_drv_sw(padapter);
 
-	//after free_drv_sw(), padapter has beed freed, don't refer to it.
+	//after rtw_free_drv_sw(), padapter has beed freed, don't refer to it.
 
-	printk("-r871xu_dev_remove, done\n");
+	DBG_8192C("-r871xu_dev_remove, done\n");
 
 #ifdef CONFIG_PLATFORM_RTD2880B
-	printk("wlan link down\n");
+	DBG_8192C("wlan link down\n");
 	rtd2885_wlan_netlink_sendMsg("linkdown", "8712");
 #endif
 
@@ -1900,7 +1857,7 @@ static int __init rtw_drv_entry(void)
 	int ret = 0;
 
 	RT_TRACE(_module_hci_intfs_c_,_drv_err_,("+rtw_drv_entry\n"));
-	printk("rtw driver version=%s\n", DRIVERVERSION);
+	DBG_8192C("rtw driver version=%s\n", DRIVERVERSION);
 	drvpriv.drv_registered = _TRUE;
 	ret = pci_register_driver(&drvpriv.rtw_pci_drv);
 	if (ret) {
@@ -1913,10 +1870,10 @@ static int __init rtw_drv_entry(void)
 static void __exit rtw_drv_halt(void)
 {
 	RT_TRACE(_module_hci_intfs_c_,_drv_err_,("+rtw_drv_halt\n"));
-	printk("+rtw_drv_halt\n");
+	DBG_8192C("+rtw_drv_halt\n");
 	drvpriv.drv_registered = _FALSE;
 	pci_unregister_driver(&drvpriv.rtw_pci_drv);
-	printk("-rtw_drv_halt\n");
+	DBG_8192C("-rtw_drv_halt\n");
 }
 
 
