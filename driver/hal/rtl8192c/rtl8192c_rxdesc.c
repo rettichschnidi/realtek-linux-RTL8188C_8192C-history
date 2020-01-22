@@ -117,8 +117,6 @@ void rtl8192c_query_rx_phy_status(union recv_frame *prframe, struct recv_stat *p
 	struct phy_stat		*pphy_stat = (struct phy_stat *)(prxstat+1);
 	u8	*pphy_head=(u8 *)(prxstat+1);
 
-		
-
 	// Record it for next packet processing
 	bcck_rate=(pattrib->mcs_rate<=3? 1:0);
 
@@ -258,7 +256,7 @@ void rtl8192c_query_rx_phy_status(union recv_frame *prframe, struct recv_stat *p
 	}
 	else //OFDM/HT
 	{
-		//Adapter->RxStats.NumQryPhyStatusHT++;
+	
 		//
 		// (1)Get RSSI per-path
 		//
@@ -389,7 +387,7 @@ static void process_rssi(_adapter *padapter,union recv_frame *prframe)
 	struct rx_pkt_attrib *pattrib = &prframe->u.hdr.attrib;
 
 	//printk("process_rssi=> pattrib->rssil(%d) signal_strength(%d)\n ",pattrib->RecvSignalPower,pattrib->signal_strength);
-	
+	//if(pRfd->Status.bPacketToSelf || pRfd->Status.bPacketBeacon)
 	{
 		//Adapter->RxStats.RssiCalculateCnt++;	//For antenna Test
 		if(padapter->recvpriv.signal_strength_data.total_num++ >= PHY_RSSI_SLID_WIN_MAX)
@@ -412,7 +410,8 @@ static void process_rssi(_adapter *padapter,union recv_frame *prframe)
 		RT_TRACE(_module_rtl871x_recv_c_,_drv_info_,("UI RSSI = %d, ui_rssi.TotalVal = %d, ui_rssi.TotalNum = %d\n", tmp_val, padapter->recvpriv.signal_strength_data.total_val,padapter->recvpriv.signal_strength_data.total_num));
 	}
 
-}
+}// Process_UI_RSSI_8192C
+
 
 static void process_PWDB(_adapter *padapter, union recv_frame *prframe)
 {
@@ -469,7 +468,7 @@ static void process_PWDB(_adapter *padapter, union recv_frame *prframe)
 
 static void process_link_qual(_adapter *padapter,union recv_frame *prframe)
 {
-	u32	last_evm=0, nSpatialStream, tmpVal;
+	u32	last_evm=0, tmpVal;
  	struct rx_pkt_attrib *pattrib;
 
 	if(prframe == NULL || padapter==NULL){

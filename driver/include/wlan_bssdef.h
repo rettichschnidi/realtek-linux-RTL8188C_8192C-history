@@ -106,8 +106,6 @@ partial sum.
 
 */
 #if 0
-#define BCN_FRAM_IDX 0
-#define OPT_ANT_IDX	1
 typedef struct _NDIS_WLAN_BSSID_EX
 {
   ULONG  Length;
@@ -131,6 +129,7 @@ typedef struct _NDIS_802_11_BSSID_LIST_EX
   NDIS_WLAN_BSSID_EX  Bssid[1];
 } NDIS_802_11_BSSID_LIST_EX, *PNDIS_802_11_BSSID_LIST_EX;
 #endif
+
 typedef enum _NDIS_802_11_AUTHENTICATION_MODE
 {
     Ndis802_11AuthModeOpen,
@@ -280,6 +279,7 @@ typedef struct _NDIS_802_11_TEST
 #ifndef Ndis802_11APMode
 #define Ndis802_11APMode (Ndis802_11InfrastructureMax+1)
 #endif
+
 typedef struct _WLAN_PHY_INFO
 {
 	u8	SignalStrength;//(in percentage)
@@ -305,7 +305,7 @@ typedef struct _WLAN_BSSID_EX
   UCHAR  IEs[MAX_IE_SZ];	//(timestamp, beacon interval, and capability information)
 } WLAN_BSSID_EX, *PWLAN_BSSID_EX;
 
-static __inline  uint get_WLAN_BSSID_EX_sz(WLAN_BSSID_EX *bss)
+__inline  static uint get_WLAN_BSSID_EX_sz(WLAN_BSSID_EX *bss)
 {
 	uint t_len;
 	

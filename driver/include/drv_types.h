@@ -119,6 +119,7 @@ struct registry_priv
 	 u8                  long_retry_lmt;
 	 u8                  short_retry_lmt;
   	 u16                 busy_thresh;
+
     	 u8                  ack_policy;
 	 u8		     mp_mode;	
 	 u8 		     software_encrypt;
@@ -158,6 +159,12 @@ struct registry_priv
 
 #ifdef CONFIG_ANTENNA_DIVERSITY
 	u8		antdiv_cfg;
+#endif
+	  
+#ifdef CONFIG_AUTOSUSPEND
+	u8		usbss_enable;//0:disable,1:enable
+	u8		hwpdn_mode;//0:disable,1:enable,2:deside by EFUSE config
+	u8		hwpwrp_detect;//0:disable,1:enable
 #endif
 	  
 };
@@ -241,12 +248,15 @@ struct dvobj_priv {
 #ifdef PLATFORM_OS_CE
 	WCHAR			active_path[MAX_ACTIVE_REG_PATH];	// adapter regpath
 	USB_EXTENSION	usb_extension;
+
+	_nic_hdl		pipehdls_r8192c[0x10];
 #endif
 
 	u32	config_descriptor_len;//ULONG UsbConfigurationDescriptorLength;	
 #endif//PLATFORM_WINDOWS
 
 #ifdef PLATFORM_LINUX
+	struct usb_interface *pusbintf;
 	struct usb_device *pusbdev;
 #endif//PLATFORM_LINUX
 
@@ -339,7 +349,7 @@ struct _ADAPTER{
 	u8 bWritePortCancel;
 };	
   
-static __inline u8 *myid(struct eeprom_priv *peepriv)
+__inline static u8 *myid(struct eeprom_priv *peepriv)
 {
 	return (peepriv->mac_addr);
 }

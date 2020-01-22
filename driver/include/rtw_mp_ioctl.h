@@ -538,7 +538,7 @@ struct mp_ioctl_handler mp_ioctl_hdl[] = {
 	GEN_MP_IOCTL_HANDLER(sizeof(u32), oid_rt_get_thermal_meter_hdl, OID_RT_PRO_GET_THERMAL_METER)/*25*/
 	GEN_MP_IOCTL_HANDLER(sizeof(u32), oid_rt_get_power_mode_hdl, OID_RT_GET_POWER_MODE)/*26*/
 	GEN_MP_IOCTL_HANDLER(sizeof(EFUSE_ACCESS_STRUCT), oid_rt_pro_efuse_hdl, OID_RT_PRO_EFUSE)/*27*/
-	GEN_MP_IOCTL_HANDLER(EFUSE_MAP_MAX_SIZE, oid_rt_pro_efuse_map_hdl, OID_RT_PRO_EFUSE_MAP)/*28*/
+	GEN_MP_IOCTL_HANDLER(EFUSE_MAX_LOGICAL_SIZE, oid_rt_pro_efuse_map_hdl, OID_RT_PRO_EFUSE_MAP)/*28*/
 	GEN_MP_IOCTL_HANDLER(sizeof(u32), oid_rt_get_efuse_max_size_hdl, OID_RT_GET_EFUSE_MAX_SIZE)/*29*/
 	GEN_MP_IOCTL_HANDLER(sizeof(u32), oid_rt_get_efuse_current_size_hdl, OID_RT_GET_EFUSE_CURRENT_SIZE)/*30*/
 	GEN_MP_IOCTL_HANDLER(sizeof(u32), oid_rt_pro_set_single_carrier_tx_hdl, OID_RT_PRO_SET_SINGLE_CARRIER_TX)/*31*/

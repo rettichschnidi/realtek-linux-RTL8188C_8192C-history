@@ -27,8 +27,8 @@ struct C2HEvent_Header
 
 };
 
-void dummy_event_callback(_adapter *adapter , u8 *pbuf);
-void fwdbg_event_callback(_adapter *adapter , u8 *pbuf);
+void rtw_dummy_event_callback(_adapter *adapter , u8 *pbuf);
+static void fwdbg_event_callback(_adapter *adapter , u8 *pbuf);
 
 enum rtl8192c_c2h_event
 {
@@ -64,9 +64,9 @@ enum rtl8192c_c2h_event
 
 #ifdef _RTL8192C_CMD_C_		
 
-struct fwevent wlanevents[] = 
+struct fwevent rtw_wlanevents[] = 
 {
-	{0, dummy_event_callback}, 	/*0*/
+	{0, rtw_dummy_event_callback}, 	/*0*/
 	{0, NULL},
 	{0, NULL},
 	{0, NULL},
@@ -74,14 +74,14 @@ struct fwevent wlanevents[] =
 	{0, NULL},
 	{0, NULL},
 	{0, NULL},
-	{0, &survey_event_callback},		/*8*/
-	{sizeof (struct surveydone_event), &surveydone_event_callback},	/*9*/
+	{0, &rtw_survey_event_callback},		/*8*/
+	{sizeof (struct surveydone_event), &rtw_surveydone_event_callback},	/*9*/
 		
-	{0, &joinbss_event_callback},		/*10*/
-	{sizeof(struct stassoc_event), &stassoc_event_callback},
-	{sizeof(struct stadel_event), &stadel_event_callback},	
-	{0, &atimdone_event_callback},
-	{0, dummy_event_callback},
+	{0, &rtw_joinbss_event_callback},		/*10*/
+	{sizeof(struct stassoc_event), &rtw_stassoc_event_callback},
+	{sizeof(struct stadel_event), &rtw_stadel_event_callback},	
+	{0, &rtw_atimdone_event_callback},
+	{0, rtw_dummy_event_callback},
 	{0, NULL},	/*15*/
 	{0, NULL},
 	{0, NULL},
@@ -90,7 +90,7 @@ struct fwevent wlanevents[] =
 	{0, NULL},	 /*20*/
 	{0, NULL},
 	{0, NULL},	
-	{0, &cpwm_event_callback},
+	{0, &rtw_cpwm_event_callback},
 };
 
 #endif//_RTL8192C_CMD_C_

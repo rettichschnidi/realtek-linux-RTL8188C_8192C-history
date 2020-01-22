@@ -40,17 +40,6 @@ struct zero_bulkout_context{
 
 #define REALTEK_USB_VENQT_MAX_BUF_SIZE	254
 
-#define REALTEK_USB_VENQT_READ		0xC0
-#define REALTEK_USB_VENQT_WRITE		0x40
-#define REALTEK_USB_VENQT_CMD_REQ	0x05
-#define REALTEK_USB_VENQT_CMD_IDX	0x00
-
-enum{
-	VENDOR_WRITE = 0x00,
-	VENDOR_READ = 0x01,
-};
-
-
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)) || (LINUX_VERSION_CODE > KERNEL_VERSION(2,6,18))
 #define _usbctrl_vendorreq_async_callback(urb, regs)	_usbctrl_vendorreq_async_callback(urb)
 #define usb_bulkout_zero_complete(purb, regs)	usb_bulkout_zero_complete(purb)
@@ -74,7 +63,7 @@ static int usbctrl_vendorreq(struct dvobj_priv  *pdvobjpriv, u8 request, u16 val
 
 	u8 *palloc_buf, *pIo_buf;
 
-	palloc_buf = _malloc( (u32) len + 16);
+	palloc_buf = _rtw_malloc( (u32) len + 16);
 	
 	if ( palloc_buf== NULL)
 	{
@@ -94,7 +83,7 @@ static int usbctrl_vendorreq(struct dvobj_priv  *pdvobjpriv, u8 request, u16 val
 	{
 		pipe = usb_sndctrlpipe(udev, 0);//write_out
 		reqtype =  REALTEK_USB_VENQT_WRITE;		
-		_memcpy( pIo_buf, pdata, len);
+		_rtw_memcpy( pIo_buf, pdata, len);
 	}		
 	
 	status = usb_control_msg(udev, pipe, request, reqtype, value, index, pIo_buf, len, HZ/2);
@@ -108,11 +97,11 @@ static int usbctrl_vendorreq(struct dvobj_priv  *pdvobjpriv, u8 request, u16 val
 	{
                if ( requesttype == 0x01 )
                {   // For Control read transfer, we have to copy the read data from pIo_buf to pdata.
-                       _memcpy( pdata, pIo_buf,  status );
+                       _rtw_memcpy( pdata, pIo_buf,  status );
                }
 	}
 
-	_mfree( palloc_buf, (u32) len + 16 );
+	_rtw_mfree( palloc_buf, (u32) len + 16 );
 
 	return status;
 
@@ -384,7 +373,7 @@ void usb_writeN(struct intf_hdl *pintfhdl, u32 addr, u32 length, u8 *pdata)
 
 	wvalue = (u16)(addr&0x0000ffff);
 	len = length;
-	 _memcpy(buf, pdata, len );
+	 _rtw_memcpy(buf, pdata, len );
 	
 	usbctrl_vendorreq(pdvobjpriv, request, wvalue, index, buf, len, requesttype);
 	
@@ -472,7 +461,7 @@ static void usb_bulkout_zero_complete(struct urb *purb, struct pt_regs *regs)
 	{
 		if(pcontext->pbuf)
 		{			
-			_mfree(pcontext->pbuf, sizeof(int));	
+			_rtw_mfree(pcontext->pbuf, sizeof(int));	
 		}	
 
 		if(pcontext->purb && (pcontext->purb==purb))
@@ -481,7 +470,7 @@ static void usb_bulkout_zero_complete(struct urb *purb, struct pt_regs *regs)
 		}
 
 	
-		_mfree((u8*)pcontext, sizeof(struct zero_bulkout_context));	
+		_rtw_mfree((u8*)pcontext, sizeof(struct zero_bulkout_context));	
 	}	
 	
 
@@ -507,9 +496,9 @@ static u32 usb_bulkout_zero(struct intf_hdl *pintfhdl, u32 addr)
 	}
 	
 
-	pcontext = (struct zero_bulkout_context *)_malloc(sizeof(struct zero_bulkout_context));
+	pcontext = (struct zero_bulkout_context *)_rtw_malloc(sizeof(struct zero_bulkout_context));
 
-	pbuf = (unsigned char *)_malloc(sizeof(int));	
+	pbuf = (unsigned char *)_rtw_malloc(sizeof(int));	
     	purb = usb_alloc_urb(0, GFP_ATOMIC);
       	
 	len = 0;
@@ -559,7 +548,8 @@ static int recvbuf2recvframe(_adapter *padapter, _pkt *pskb)
 	u8	*pbuf;
 	u8	qos, shift_sz = 0;
 	u16	pkt_cnt, drvinfo_sz;
-	u32	pkt_len, pkt_offset, transfer_len, tmpaddr = 0;
+	u32	pkt_len, pkt_offset,  tmpaddr = 0;
+	s32	transfer_len;
 	int	alignment = 0;
 	struct recv_stat	*prxstat;
 	_pkt			*pkt_copy = NULL;	
@@ -569,7 +559,7 @@ static int recvbuf2recvframe(_adapter *padapter, _pkt *pskb)
 	_queue			*pfree_recv_queue = &precvpriv->free_recv_queue;
 
 
-	transfer_len = pskb->len;	
+	transfer_len = (s32)pskb->len;	
 	pbuf = pskb->data;
 
 	prxstat = (struct recv_stat *)pbuf;	
@@ -590,16 +580,19 @@ static int recvbuf2recvframe(_adapter *padapter, _pkt *pskb)
 		prxstat = (struct recv_stat *)pbuf;	   
 		pkt_len =  le32_to_cpu(prxstat->rxdw0)&0x00003fff;	
 		
-		if((pkt_len<=0) || (pkt_len>transfer_len))
-		{	
-			RT_TRACE(_module_rtl871x_recv_c_,_drv_info_,("recvbuf2recvframe: pkt_len<=0\n"));
-			goto _exit_recvbuf2recvframe;
-		}		
 
 		drvinfo_sz = (le32_to_cpu(prxstat->rxdw0) & 0x000f0000) >> 16;//uint 2^3 = 8 bytes
 		drvinfo_sz = drvinfo_sz << 3;
 		RT_TRACE(_module_rtl871x_recv_c_,_drv_info_,("recvbuf2recvframe: DRV_INFO_SIZE=%d\n", drvinfo_sz));
 
+		pkt_offset = pkt_len + drvinfo_sz + RXDESC_SIZE;
+
+		if((pkt_len<=0) || (pkt_offset>transfer_len))
+		{	
+			RT_TRACE(_module_rtl871x_recv_c_,_drv_info_,("recvbuf2recvframe: pkt_len<=0\n"));
+			goto _exit_recvbuf2recvframe;
+		}		
+	
 #if 0
 		shift_sz = (le32_to_cpu(prxstat->rxdw0) & 0x03000000) >> 24;
 #else
@@ -608,18 +601,16 @@ static int recvbuf2recvframe(_adapter *padapter, _pkt *pskb)
 		shift_sz = (qos==1) ? 2:0;	
 #endif
 
-		precvframe = alloc_recvframe(pfree_recv_queue);
+		precvframe = rtw_alloc_recvframe(pfree_recv_queue);
 		if(precvframe==NULL)
 		{
 			RT_TRACE(_module_rtl871x_recv_c_,_drv_err_,("recvbuf2recvframe: precvframe==NULL\n"));
 			goto _exit_recvbuf2recvframe;
 		}
 
-		_init_listhead(&precvframe->u.hdr.list);	
+		_rtw_init_listhead(&precvframe->u.hdr.list);	
 		precvframe->u.hdr.precvbuf = NULL;	//can't access the precvbuf for new arch.
 		precvframe->u.hdr.len=0;
-
-		pkt_offset = pkt_len + drvinfo_sz + RXDESC_SIZE;
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,18)) // http://www.mail-archive.com/netdev@vger.kernel.org/msg17214.html
 		pkt_copy = dev_alloc_skb((pkt_offset>1612?pkt_offset:1612) + shift_sz + 4);		
@@ -637,7 +628,7 @@ static int recvbuf2recvframe(_adapter *padapter, _pkt *pskb)
 			
 			//pkt_copy->dev = padapter->pnetdev;
 			
-			_memcpy(pkt_copy->data, pbuf, pkt_offset);
+			_rtw_memcpy(pkt_copy->data, pbuf, pkt_offset);
 			precvframe->u.hdr.pkt = pkt_copy;
 			precvframe->u.hdr.rx_head = precvframe->u.hdr.rx_data = precvframe->u.hdr.rx_tail = pkt_copy->data;
 			precvframe->u.hdr.rx_end = pkt_copy->data + (pkt_offset>1612?pkt_offset:1612);
@@ -670,11 +661,11 @@ static int recvbuf2recvframe(_adapter *padapter, _pkt *pskb)
 #endif
 
 		//because the endian issue, driver avoid reference to the rxstat after calling update_recvframe_attrib_from_recvstat();
-		rtl8192cu_update_recvframe_attrib_from_recvstat(padapter,precvframe, prxstat);		
+		rtl8192cu_update_recvframe_attrib_from_recvstat(precvframe, prxstat);		
 		
-		if(recv_entry(precvframe) != _SUCCESS)
+		if(rtw_recv_entry(precvframe) != _SUCCESS)
 		{
-			RT_TRACE(_module_rtl871x_recv_c_,_drv_err_,("recvbuf2recvframe: recv_entry(precvframe) != _SUCCESS\n"));
+			RT_TRACE(_module_rtl871x_recv_c_,_drv_err_,("recvbuf2recvframe: rtw_recv_entry(precvframe) != _SUCCESS\n"));
 		}
 
 		pkt_cnt--;
@@ -747,7 +738,7 @@ static void usb_read_port_complete(struct urb *purb, struct pt_regs *regs)
 	//if(precvpriv->rx_pending_cnt== 0)
 	//{		
 	//	RT_TRACE(_module_hci_ops_os_c_,_drv_err_,("usb_read_port_complete: rx_pending_cnt== 0, set allrxreturnevt!\n"));
-	//	_up_sema(&precvpriv->allrxreturnevt);	
+	//	_rtw_up_sema(&precvpriv->allrxreturnevt);	
 	//}
 
 	if(padapter->bSurpriseRemoved || padapter->bDriverStopped||padapter->bReadPortCancel)
@@ -772,7 +763,7 @@ static void usb_read_port_complete(struct urb *purb, struct pt_regs *regs)
 		{
 			RT_TRACE(_module_hci_ops_os_c_,_drv_err_,("usb_read_port_complete: (purb->actual_length > MAX_RECVBUF_SZ) || (purb->actual_length < RXDESC_SIZE)\n"));
 			precvbuf->reuse = _TRUE;
-			read_port(padapter, precvpriv->ff_hwaddr, 0, (unsigned char *)precvbuf);
+			rtw_read_port(padapter, precvpriv->ff_hwaddr, 0, (unsigned char *)precvbuf);
 		}
 		else 
 		{	
@@ -786,7 +777,7 @@ static void usb_read_port_complete(struct urb *purb, struct pt_regs *regs)
 
 			precvbuf->pskb = NULL;
 			precvbuf->reuse = _FALSE;
-			read_port(padapter, precvpriv->ff_hwaddr, 0, (unsigned char *)precvbuf);			
+			rtw_read_port(padapter, precvpriv->ff_hwaddr, 0, (unsigned char *)precvbuf);			
 		}		
 	}
 	else
@@ -808,7 +799,7 @@ static void usb_read_port_complete(struct urb *purb, struct pt_regs *regs)
 				break;
 			case -EPROTO:
 				precvbuf->reuse = _TRUE;
-				read_port(padapter, precvpriv->ff_hwaddr, 0, (unsigned char *)precvbuf);			
+				rtw_read_port(padapter, precvpriv->ff_hwaddr, 0, (unsigned char *)precvbuf);			
 				break;
 			case -EINPROGRESS:
 				printk("ERROR: URB IS IN PROGRESS!/n");
@@ -861,7 +852,7 @@ _func_enter_;
 
 	if(precvbuf !=NULL)
 	{	
-		init_recvbuf(adapter, precvbuf);		
+		rtw_init_recvbuf(adapter, precvbuf);		
 
 		//re-assign for linux based on skb
 		if((precvbuf->reuse == _FALSE) || (precvbuf->pskb == NULL))
@@ -874,7 +865,7 @@ _func_enter_;
 #endif			
 			if(precvbuf->pskb == NULL)		
 			{
-				RT_TRACE(_module_hci_ops_os_c_,_drv_err_,("init_recvbuf(): alloc_skb fail!\n"));
+				RT_TRACE(_module_hci_ops_os_c_,_drv_err_,("rtw_init_recvbuf(): alloc_skb fail!\n"));
 				return _FAIL;
 			}	
 
@@ -979,7 +970,7 @@ void xmit_tasklet(void *priv)
 			break;
 		}
 
-		ret = xmitframe_complete(padapter, pxmitpriv, NULL);
+		ret = rtw_xmitframe_complete(padapter, pxmitpriv, NULL);
 
 		if(ret==_FALSE)
 			break;
@@ -1002,7 +993,7 @@ static void usb_write_port_complete(struct urb *purb, struct pt_regs *regs)
 _func_enter_;
 
 	RT_TRACE(_module_hci_ops_os_c_,_drv_err_,("+usb_write_port_complete\n"));
-
+	
 /*
 	_enter_critical(&pxmitpriv->lock, &irqL);
 
@@ -1040,12 +1031,12 @@ _func_enter_;
 	if(pxmitpriv->txirp_cnt==0)
 	{
 		RT_TRACE(_module_hci_ops_os_c_,_drv_err_,("usb_write_port_complete: txirp_cnt== 0, set allrxreturnevt!\n"));		
-		_up_sema(&(pxmitpriv->tx_retevt));
+		_rtw_up_sema(&(pxmitpriv->tx_retevt));
 	}
 */
-        //free_xmitframe_ex(pxmitpriv, pxmitframe);
+        //rtw_free_xmitframe_ex(pxmitpriv, pxmitframe);
 
-	free_xmitbuf(pxmitpriv, pxmitbuf);
+	rtw_free_xmitbuf(pxmitpriv, pxmitbuf);
 	
 	if(padapter->bSurpriseRemoved || padapter->bDriverStopped ||padapter->bWritePortCancel)
 	{
@@ -1092,7 +1083,7 @@ _func_enter_;
 	}
 
 	
-	if(txframes_pending(padapter))	
+	if(rtw_txframes_pending(padapter))	
 	{
 		tasklet_hi_schedule(&pxmitpriv->xmit_tasklet);
 	}
@@ -1285,7 +1276,7 @@ void rtl8192cu_set_intf_ops(struct _io_ops	*pops)
 {
 	_func_enter_;
 	
-	_memset((u8 *)pops, 0, sizeof(struct _io_ops));	
+	_rtw_memset((u8 *)pops, 0, sizeof(struct _io_ops));	
 
 	pops->_read8 = &usb_read8;
 	pops->_read16 = &usb_read16;

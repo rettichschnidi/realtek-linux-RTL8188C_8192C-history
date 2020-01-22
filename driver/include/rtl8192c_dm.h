@@ -244,19 +244,24 @@ typedef struct _RATE_ADAPTIVE
 #define SWAW_STEP_PEAK		0
 #define SWAW_STEP_DETERMINE	1
 
+#define	TP_MODE		0
+#define	RSSI_MODE		1
+#define	TRAFFIC_LOW	0
+#define	TRAFFIC_HIGH	1
+
 typedef struct _SW_Antenna_Switch_
 {
-	u8		failure_cnt;
 	u8		try_flag;
-	u8		stop_trying;
-	u8		penalty;
 	s32		PreRSSI;
-	s32		Trying_Threshold;
 	u8		CurAntenna;
 	u8		PreAntenna;
-
+	u8		RSSI_Trying;
+	u8		TestMode;
+	u8		bTriggerAntennaSwitch;
+	u8		SelectAntennaMap;
 	// Before link Antenna Switch check
 	u8		SWAS_NoLink_State;
+	
 }SWAT_T;
 typedef enum tag_SW_Antenna_Switch_Definition
 {
@@ -314,7 +319,22 @@ struct 	dm_priv
 #ifdef CONFIG_ANTENNA_DIVERSITY
 	_timer SwAntennaSwitchTimer;
 	SWAT_T DM_SWAT_Table;
+	
+	u64	lastTxOkCnt;
+	u64	lastRxOkCnt;
+	u64	TXByteCnt_A;
+	u64	TXByteCnt_B;
+	u64	RXByteCnt_A;
+	u64	RXByteCnt_B;
+	u8	DoubleComfirm;
+	u8	TrafficLoad;
 #endif
+
+	u8		initial_gain_Multi_STA_binitialized ;
+	u8		TM_Trigger;
+	u8		BT_ServiceTypeCnt;
+	u8		BT_LastServiceType;
+	BOOLEAN		BT_bMediaConnect;
 };
 
 
@@ -348,7 +368,7 @@ void issue_delete_ba(_adapter *padapter, u8 dir);
 
 #ifdef CONFIG_ANTENNA_DIVERSITY
 void SwAntDivRSSICheck(_adapter *padapter ,u32 RxPWDBAll); 
-void SwAntDivResetBeforeLink(IN PADAPTER Adapter);
+
 bool SwAntDivBeforeLink8192C(IN PADAPTER Adapter);
 void dm_SW_AntennaSwitchCallback(void *FunctionContext);
 void SwAntDivRestAfterLink(	IN	PADAPTER	Adapter);

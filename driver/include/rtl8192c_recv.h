@@ -251,11 +251,11 @@ union recv_frame{
 };
 
 
-int init_recvbuf(_adapter *padapter, struct recv_buf *precvbuf);
+int rtw_init_recvbuf(_adapter *padapter, struct recv_buf *precvbuf);
 
-void rtl8192cu_update_recvframe_attrib_from_recvstat(_adapter *padapter,union recv_frame *precvframe, struct recv_stat *prxstat);
+void rtl8192cu_update_recvframe_attrib_from_recvstat(union recv_frame *precvframe, struct recv_stat *prxstat);
 
-void reordering_ctrl_timeout_handler(void *pcontext);
+void rtw_reordering_ctrl_timeout_handler(void *pcontext);
 
 void rtl8192c_query_rx_phy_status(union recv_frame *prframe, struct recv_stat *prxstat);
 

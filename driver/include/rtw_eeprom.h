@@ -75,7 +75,7 @@ typedef enum _RT_CUSTOMER_ID
 
 struct eeprom_priv 
 {    
-	u8		bautoload_fail_flag;
+	u8		bAutoload;
 	u8		bempty;
 	u8		sys_config;
 	u8		mac_addr[6];	//PermanentAddress
@@ -86,10 +86,10 @@ struct eeprom_priv
 	u8		tx_power_g[15];
 	u8		tx_power_a[201];
 
-	u8		EepromOrEfuse;
-
+	u8		bBootFromEEPROM;
+	
 	u8		efuse_eeprom_data[EEPROM_MAX_SIZE];
-
+	u16		efuse_phy_max_size;
 #ifdef CONFIG_SDIO_HCI
 	u8		sdio_setting;	
 	u32		ocr;

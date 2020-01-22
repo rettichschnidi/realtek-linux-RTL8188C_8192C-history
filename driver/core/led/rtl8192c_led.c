@@ -79,7 +79,7 @@ BlinkWorkItemCallback(
 //	Description:
 //		Initialize an LED_871x object.
 //
-void
+static void
 InitLed871x(
 	_adapter			*padapter,
 	PLED_871x		pLed,
@@ -107,7 +107,7 @@ InitLed871x(
 //	Description:
 //		DeInitialize an LED_871x object.
 //
-void
+static void
 DeInitLed871x(
 	PLED_871x			pLed
 	)
@@ -123,7 +123,7 @@ DeInitLed871x(
 //	Description:
 //		Turn on LED according to LedPin specified.
 //
-void
+static void
 SwLedOn(
 	_adapter			*padapter, 
 	PLED_871x		pLed
@@ -142,18 +142,18 @@ SwLedOn(
 		(BOARD_USB_SOLO == pHalData->BoardType)||
 		(BOARD_USB_COMBO == pHalData->BoardType))
 	{
-		LedCfg = read8(padapter, REG_LEDCFG2);
+		LedCfg = rtw_read8(padapter, REG_LEDCFG2);
 		switch(pLed->LedPin)
 		{	
 			case LED_PIN_GPIO0:
 				break;
 
 			case LED_PIN_LED0:
-				write8(padapter, REG_LEDCFG2, (LedCfg&0xf0)|BIT5|BIT6); // SW control led0 on.
+				rtw_write8(padapter, REG_LEDCFG2, (LedCfg&0xf0)|BIT5|BIT6); // SW control led0 on.
 				break;
 
 			case LED_PIN_LED1:
-				write8(padapter, REG_LEDCFG2, (LedCfg&0x0f)|BIT5); // SW control led1 on.
+				rtw_write8(padapter, REG_LEDCFG2, (LedCfg&0x0f)|BIT5); // SW control led1 on.
 				break;
 
 			default:
@@ -170,18 +170,18 @@ SwLedOn(
 
 		case LED_PIN_LED0:
 #if 1
-				LedCfg = read8(padapter, REG_LEDCFG0);
-				write8(padapter,REG_LEDCFG0, LedCfg&0x70); // SW control led0 on.
+				LedCfg = rtw_read8(padapter, REG_LEDCFG0);
+				rtw_write8(padapter,REG_LEDCFG0, LedCfg&0x70); // SW control led0 on.
 #else				//RT_TRACE(COMP_LED, DBG_LOUD, ("SwLedOn LED0 0x%lx\n", PlatformEFIORead4Byte(Adapter, REG_LEDCFG0)));
 
-				//LedCfg = read8(padapter, REG_LEDCFG2);
-				//write8(padapter,REG_LEDCFG2, (LedCfg&0xe0)|BIT7|BIT6|BIT5); // SW control led0 on.
+				//LedCfg = rtw_read8(padapter, REG_LEDCFG2);
+				//rtw_write8(padapter,REG_LEDCFG2, (LedCfg&0xe0)|BIT7|BIT6|BIT5); // SW control led0 on.
 #endif
 		break;
 
 		case LED_PIN_LED1:
-				LedCfg = read8(padapter,(REG_LEDCFG1));
-				write8(padapter,(REG_LEDCFG1), LedCfg&0x70); // SW control led1 on.
+				LedCfg = rtw_read8(padapter,(REG_LEDCFG1));
+				rtw_write8(padapter,(REG_LEDCFG1), LedCfg&0x70); // SW control led1 on.
 				//RT_TRACE(COMP_LED, DBG_LOUD, ("SwLedOn LED1 0x%lx\n", PlatformEFIORead4Byte(Adapter, REG_LEDCFG0)));
 			
 			break;
@@ -199,7 +199,7 @@ SwLedOn(
 //	Description:
 //		Turn off LED according to LedPin specified.
 //
-void
+static void
 SwLedOff(
 	_adapter			*padapter, 
 	PLED_871x		pLed
@@ -217,7 +217,7 @@ SwLedOff(
 		(BOARD_USB_SOLO == pHalData->BoardType)||
 		(BOARD_USB_COMBO == pHalData->BoardType))
 	{
-		LedCfg = read8(padapter, REG_LEDCFG2);//0x4E
+		LedCfg = rtw_read8(padapter, REG_LEDCFG2);//0x4E
 
 	switch(pLed->LedPin)
 	{
@@ -227,12 +227,12 @@ SwLedOff(
 
 		case LED_PIN_LED0:
 			LedCfg &= 0xf0; // Set to software control.
-				write8(padapter, REG_LEDCFG2, (LedCfg|BIT3|BIT5|BIT6));
+				rtw_write8(padapter, REG_LEDCFG2, (LedCfg|BIT3|BIT5|BIT6));
 			break;
 
 		case LED_PIN_LED1:
 			LedCfg &= 0x0f; // Set to software control.
-				write8(padapter, REG_LEDCFG2, (LedCfg|BIT3));
+				rtw_write8(padapter, REG_LEDCFG2, (LedCfg|BIT3));
 			break;
 
 		default:
@@ -248,22 +248,22 @@ SwLedOff(
 
 			case LED_PIN_LED0:
 #if 1
-				LedCfg = read8(padapter, REG_LEDCFG0);
+				LedCfg = rtw_read8(padapter, REG_LEDCFG0);
 				LedCfg &= 0x70; // Set to software control. 			
-				write8(padapter, REG_LEDCFG0, (LedCfg|BIT3));
+				rtw_write8(padapter, REG_LEDCFG0, (LedCfg|BIT3));
 				//RT_TRACE(COMP_LED, DBG_LOUD, ("SwLedOff LED0 0x%lx\n", PlatformEFIORead4Byte(Adapter, REG_LEDCFG0)));
 #else		
-				LedCfg = read8(padapter, REG_LEDCFG2);
+				LedCfg = rtw_read8(padapter, REG_LEDCFG2);
 				LedCfg &= 0xe0; // Set to software control. 			
-				write8(padapter, REG_LEDCFG2, (LedCfg|BIT3|BIT7|BIT6|BIT5));
+				rtw_write8(padapter, REG_LEDCFG2, (LedCfg|BIT3|BIT7|BIT6|BIT5));
 				//RT_TRACE(COMP_LED, DBG_LOUD, ("SwLedOff LED0 0x%x\n", PlatformEFIORead4Byte(Adapter, REG_LEDCFG2)));
 #endif				
 				break;
 
 			case LED_PIN_LED1:
-				LedCfg = read8(padapter, (REG_LEDCFG1));
+				LedCfg = rtw_read8(padapter, (REG_LEDCFG1));
 				LedCfg &= 0x70; // Set to software control.
-				write8(padapter,  (REG_LEDCFG1), (LedCfg|BIT3));
+				rtw_write8(padapter,  (REG_LEDCFG1), (LedCfg|BIT3));
 				//RT_TRACE(COMP_LED, DBG_LOUD, ("SwLedOff LED1 0x%lx\n", PlatformEFIORead4Byte(Adapter, REG_LEDCFG0)));
 				break;
 
@@ -285,13 +285,13 @@ SwLedOff(
 //		Initialize all LED_871x objects.
 //
 void
-InitSwLeds(
+rtw_InitSwLeds(
 	_adapter	*padapter
 	)
 {
 	struct led_priv *pledpriv = &(padapter->ledpriv);
 
-	pledpriv->LedControlHandler = LedControl871x;
+	pledpriv->LedControlHandler = rtw_LedControl871x;
 
 	InitLed871x(padapter, &(pledpriv->SwLed0), LED_PIN_LED0);
 
@@ -304,7 +304,7 @@ InitSwLeds(
 //		DeInitialize all LED_819xUsb objects.
 //
 void
-DeInitSwLeds(
+rtw_DeInitSwLeds(
 	_adapter	*padapter
 	)
 {
@@ -320,7 +320,7 @@ DeInitSwLeds(
 //		Implementation of LED blinking behavior.
 //		It toggle off LED and schedule corresponding timer if necessary.
 //
-void
+static void
 SwLedBlink(
 	PLED_871x			pLed
 	)
@@ -439,7 +439,7 @@ SwLedBlink(
 }
 
 
-void
+static void
 SwLedBlink1(
 	PLED_871x			pLed
 	)
@@ -672,7 +672,7 @@ SwLedBlink1(
 
 }
 
-void
+static void
 SwLedBlink2(
 	PLED_871x			pLed
 	)
@@ -798,7 +798,7 @@ SwLedBlink2(
 
 }
 
-void
+static void
 SwLedBlink3(
 	PLED_871x			pLed
 	)
@@ -974,7 +974,7 @@ SwLedBlink3(
 }
 
 
-void
+static void
 SwLedBlink4(
 	PLED_871x			pLed
 	)
@@ -1177,7 +1177,7 @@ SwLedBlink4(
 
 }
 
-void
+static void
 SwLedBlink5(
 	PLED_871x			pLed
 	)
@@ -1299,7 +1299,7 @@ SwLedBlink5(
 
 }
 
-void
+static void
 SwLedBlink6(
 	PLED_871x			pLed
 	)
@@ -1474,7 +1474,7 @@ void BlinkWorkItemCallback(struct work_struct *work)
 //		Implement each led action for SW_LED_MODE0.
 //		This is default strategy.
 //
-void
+static void
 SwLedControlMode0(
 	_adapter		*padapter,
 	LED_CTL_MODE		LedAction
@@ -1593,7 +1593,7 @@ SwLedControlMode0(
 }
 
  //ALPHA, added by chiyoko, 20090106
-void
+static void
 SwLedControlMode1(
 	_adapter		*padapter,
 	LED_CTL_MODE		LedAction
@@ -1865,7 +1865,7 @@ SwLedControlMode1(
 }
 
  //Arcadyan/Sitecom , added by chiyoko, 20090216
-void
+static void
 SwLedControlMode2(
 	_adapter				*padapter,
 	LED_CTL_MODE		LedAction
@@ -2032,7 +2032,7 @@ SwLedControlMode2(
 }
 
   //COREGA, added by chiyoko, 20090316
- void
+static void
  SwLedControlMode3(
 	_adapter				*padapter,
 	LED_CTL_MODE		LedAction
@@ -2211,7 +2211,7 @@ SwLedControlMode2(
 
 
  //Edimax-Belkin, added by chiyoko, 20090413
-void
+static void
 SwLedControlMode4(
 	_adapter				*padapter,
 	LED_CTL_MODE		LedAction
@@ -2543,7 +2543,7 @@ SwLedControlMode4(
 
 
  //Sercomm-Belkin, added by chiyoko, 20090415
-void
+static void
 SwLedControlMode5(
 	_adapter				*padapter,
 	LED_CTL_MODE		LedAction
@@ -2633,7 +2633,7 @@ SwLedControlMode5(
 }
 
  //WNC-Corega, added by chiyoko, 20090902
-void
+static void
 SwLedControlMode6(
 	_adapter				*padapter,
 	LED_CTL_MODE		LedAction
@@ -2671,7 +2671,7 @@ SwLedControlMode6(
 //		Dispatch LED action according to pHalData->LedStrategy. 
 //
 void
-LedControl871x(
+rtw_LedControl871x(
 	_adapter				*padapter,
 	LED_CTL_MODE		LedAction
 	)
@@ -2683,6 +2683,8 @@ LedControl871x(
              return;
        }
 
+	if(padapter->hw_init_completed == _FALSE)	return; 
+	
 	if( ledpriv->bRegUseLed == _FALSE)
 		return;
 

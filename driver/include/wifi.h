@@ -273,7 +273,7 @@ enum WIFI_REG_DOMAIN {
 
 #define SetDuration(pbuf, dur) \
 	do {    \
-		*(unsigned short *)((unsigned int)(pbuf) + 2) |= cpu_to_le16(0xffff & (dur)); \
+		*(unsigned short *)((unsigned int)(pbuf) + 2) = cpu_to_le16(0xffff & (dur)); \
 	} while(0)
 
 
@@ -310,9 +310,15 @@ enum WIFI_REG_DOMAIN {
 
 #define GetAddr4Ptr(pbuf)	((unsigned char *)((unsigned int)(pbuf) + 24))
 
+#define MacAddr_isBcst(addr) \
+( \
+	( (addr[0] == 0xff) && (addr[1] == 0xff) && \
+		(addr[2] == 0xff) && (addr[3] == 0xff) && \
+		(addr[4] == 0xff) && (addr[5] == 0xff) )  ? _TRUE : _FALSE \
+)
 
 
-static __inline int IS_MCAST(unsigned char *da)
+__inline static int IS_MCAST(unsigned char *da)
 {
 	if ((*da) & 0x01)
 		return _TRUE;
@@ -321,7 +327,7 @@ static __inline int IS_MCAST(unsigned char *da)
 }
 
 
-static __inline unsigned char * get_da(unsigned char *pframe)
+__inline static unsigned char * get_da(unsigned char *pframe)
 {
 	unsigned char 	*da;
 	unsigned int	to_fr_ds	= (GetToDs(pframe) << 1) | GetFrDs(pframe);
@@ -345,7 +351,7 @@ static __inline unsigned char * get_da(unsigned char *pframe)
 }
 
 
-static __inline unsigned char * get_sa(unsigned char *pframe)
+__inline static unsigned char * get_sa(unsigned char *pframe)
 {
 	unsigned char 	*sa;
 	unsigned int	to_fr_ds	= (GetToDs(pframe) << 1) | GetFrDs(pframe);
@@ -368,7 +374,7 @@ static __inline unsigned char * get_sa(unsigned char *pframe)
 	return sa;
 }
 
-static __inline unsigned char * get_hdr_bssid(unsigned char *pframe)
+__inline static unsigned char * get_hdr_bssid(unsigned char *pframe)
 {
 	unsigned char 	*sa;
 	unsigned int	to_fr_ds	= (GetToDs(pframe) << 1) | GetFrDs(pframe);
@@ -392,7 +398,7 @@ static __inline unsigned char * get_hdr_bssid(unsigned char *pframe)
 }
 
 
-static __inline int IsFrameTypeCtrl(unsigned char *pframe)
+__inline static int IsFrameTypeCtrl(unsigned char *pframe)
 {
 	if(WIFI_CTRL_TYPE == GetFrameType(pframe))
 		return _TRUE;

@@ -27,7 +27,7 @@
 
 #define RT_TAG	'1178'
 
-u8* _malloc(u32 sz)
+u8* _rtw_malloc(u32 sz)
 {
 
 	u8 	*pbuf;
@@ -48,7 +48,7 @@ u8* _malloc(u32 sz)
 	
 }
 
-void	_mfree(u8 *pbuf, u32 sz)
+void	_rtw_mfree(u8 *pbuf, u32 sz)
 {
 
 #ifdef	PLATFORM_LINUX
@@ -65,7 +65,7 @@ void	_mfree(u8 *pbuf, u32 sz)
 	
 	
 }
-void _memcpy(void* dst, void* src, u32 sz)
+void _rtw_memcpy(void* dst, void* src, u32 sz)
 {
 
 #ifdef PLATFORM_LINUX
@@ -82,7 +82,7 @@ void _memcpy(void* dst, void* src, u32 sz)
 
 }
 
-int	_memcmp(void *dst, void *src, u32 sz)
+int	_rtw_memcmp(void *dst, void *src, u32 sz)
 {
 
 #ifdef PLATFORM_LINUX
@@ -109,7 +109,7 @@ int	_memcmp(void *dst, void *src, u32 sz)
 	
 }
 
-void _memset(void *pbuf, int c, u32 sz)
+void _rtw_memset(void *pbuf, int c, u32 sz)
 {
 
 #ifdef PLATFORM_LINUX
@@ -129,7 +129,7 @@ void _memset(void *pbuf, int c, u32 sz)
 
 }
 
-void _init_listhead(_list *list)
+void _rtw_init_listhead(_list *list)
 {
 
 #ifdef PLATFORM_LINUX
@@ -152,7 +152,7 @@ For the following list_xxx operations,
 caller must guarantee the atomic context.
 Otherwise, there will be racing condition.
 */
-u32	is_list_empty(_list *phead)
+u32	rtw_is_list_empty(_list *phead)
 {
 
 #ifdef PLATFORM_LINUX
@@ -178,7 +178,7 @@ u32	is_list_empty(_list *phead)
 }
 
 
-void list_insert_tail(_list *plist, _list *phead)
+void rtw_list_insert_tail(_list *plist, _list *phead)
 {
 
 #ifdef PLATFORM_LINUX	
@@ -203,7 +203,7 @@ Caller must check if the list is empty before calling list_delete
 */
 
 
-void _init_sema(_sema	*sema, int init_val)
+void _rtw_init_sema(_sema	*sema, int init_val)
 {
 
 #ifdef PLATFORM_LINUX
@@ -225,7 +225,7 @@ void _init_sema(_sema	*sema, int init_val)
 
 }
 
-void _free_sema(_sema	*sema)
+void _rtw_free_sema(_sema	*sema)
 {
 
 #ifdef PLATFORM_OS_CE
@@ -234,7 +234,7 @@ void _free_sema(_sema	*sema)
 
 }
 
-void _up_sema(_sema	*sema)
+void _rtw_up_sema(_sema	*sema)
 {
 
 #ifdef PLATFORM_LINUX
@@ -254,7 +254,7 @@ void _up_sema(_sema	*sema)
 #endif
 }
 
-u32 _down_sema(_sema *sema)
+u32 _rtw_down_sema(_sema *sema)
 {
 
 #ifdef PLATFORM_LINUX
@@ -284,7 +284,7 @@ u32 _down_sema(_sema *sema)
 
 
 
-void	_rwlock_init(_rwlock *prwlock)
+void	_rtw_rwlock_init(_rwlock *prwlock)
 {
 #ifdef PLATFORM_LINUX
 
@@ -303,7 +303,7 @@ void	_rwlock_init(_rwlock *prwlock)
 }
 
 
-void	_spinlock_init(_lock *plock)
+void	_rtw_spinlock_init(_lock *plock)
 {
 
 #ifdef PLATFORM_LINUX
@@ -320,7 +320,7 @@ void	_spinlock_init(_lock *plock)
 	
 }
 
-void	_spinlock_free(_lock *plock)
+void	_rtw_spinlock_free(_lock *plock)
 {
 
 	
@@ -333,7 +333,7 @@ void	_spinlock_free(_lock *plock)
 }
 
 
-void	_spinlock(_lock	*plock)
+void	_rtw_spinlock(_lock	*plock)
 {
 
 #ifdef PLATFORM_LINUX
@@ -350,7 +350,7 @@ void	_spinlock(_lock	*plock)
 	
 }
 
-void	_spinunlock(_lock *plock)
+void	_rtw_spinunlock(_lock *plock)
 {
 
 #ifdef PLATFORM_LINUX
@@ -367,7 +367,7 @@ void	_spinunlock(_lock *plock)
 }
 
 
-void	_spinlock_ex(_lock	*plock)
+void	_rtw_spinlock_ex(_lock	*plock)
 {
 
 #ifdef PLATFORM_LINUX
@@ -384,7 +384,7 @@ void	_spinlock_ex(_lock	*plock)
 	
 }
 
-void	_spinunlock_ex(_lock *plock)
+void	_rtw_spinunlock_ex(_lock *plock)
 {
 
 #ifdef PLATFORM_LINUX
@@ -402,22 +402,22 @@ void	_spinunlock_ex(_lock *plock)
 
 
 
-void	_init_queue(_queue	*pqueue)
+void	_rtw_init_queue(_queue	*pqueue)
 {
 
-	_init_listhead(&(pqueue->queue));
+	_rtw_init_listhead(&(pqueue->queue));
 
-	_spinlock_init(&(pqueue->lock));
+	_rtw_spinlock_init(&(pqueue->lock));
 
 }
 
-u32	  _queue_empty(_queue	*pqueue)
+u32	  _rtw_queue_empty(_queue	*pqueue)
 {
-	return (is_list_empty(&(pqueue->queue)));
+	return (rtw_is_list_empty(&(pqueue->queue)));
 }
 
 
-u32 end_of_queue_search(_list *head, _list *plist)
+u32 rtw_end_of_queue_search(_list *head, _list *plist)
 {
 
 	if (head == plist)
@@ -428,7 +428,7 @@ u32 end_of_queue_search(_list *head, _list *plist)
 }
 
 
-u32	get_current_time(void)
+u32	rtw_get_current_time(void)
 {
 	
 #ifdef PLATFORM_LINUX
@@ -448,7 +448,7 @@ u32	get_current_time(void)
 	
 }
 
-void sleep_schedulable(int ms)	
+void rtw_sleep_schedulable(int ms)	
 {
 
 #ifdef PLATFORM_LINUX
@@ -476,7 +476,7 @@ void sleep_schedulable(int ms)
 }
 
 
-void msleep_os(int ms)
+void rtw_msleep_os(int ms)
 {
 
 #ifdef PLATFORM_LINUX
@@ -493,7 +493,7 @@ void msleep_os(int ms)
 
 
 }
-void usleep_os(int us)
+void rtw_usleep_os(int us)
 {
 
 #ifdef PLATFORM_LINUX
@@ -515,7 +515,7 @@ void usleep_os(int us)
 
 }
 
-void mdelay_os(int ms)
+void rtw_mdelay_os(int ms)
 {
 
 #ifdef PLATFORM_LINUX
@@ -532,7 +532,7 @@ void mdelay_os(int ms)
 
 
 }
-void udelay_os(int us)
+void rtw_udelay_os(int us)
 {
 
 #ifdef PLATFORM_LINUX

@@ -28,7 +28,7 @@ struct pkt_file {
 
 #define ETH_ALEN	6
 
-extern NDIS_STATUS xmit_entry(
+extern NDIS_STATUS rtw_xmit_entry(
 IN _nic_hdl		cnxt,
 IN NDIS_PACKET		*pkt,
 IN UINT				flags
@@ -47,7 +47,7 @@ struct sta_xmit_priv;
 struct xmit_frame;
 struct xmit_buf;
 
-extern int xmit_entry(_pkt *pkt, _nic_hdl pnetdev);
+extern int rtw_xmit_entry(_pkt *pkt, _nic_hdl pnetdev);
 
 #ifdef CONFIG_USB_HCI
 extern void xmit_tasklet(void *priv);
@@ -56,17 +56,18 @@ extern void xmit_tasklet(void *priv);
 #endif
 
 
-int os_xmit_resource_alloc(_adapter *padapter, struct xmit_buf *pxmitbuf);
-void os_xmit_resource_free(_adapter *padapter, struct xmit_buf *pxmitbuf);
+int rtw_os_xmit_resource_alloc(_adapter *padapter, struct xmit_buf *pxmitbuf);
+void rtw_os_xmit_resource_free(_adapter *padapter, struct xmit_buf *pxmitbuf);
 
 extern void set_tx_chksum_offload(_pkt *pkt, struct pkt_attrib *pattrib);
 
-extern uint remainder_len(struct pkt_file *pfile);
-extern void _open_pktfile(_pkt *pkt, struct pkt_file *pfile);
-extern uint _pktfile_read (struct pkt_file *pfile, u8 *rmem, uint rlen);
-extern sint endofpktfile (struct pkt_file *pfile);
+extern uint rtw_remainder_len(struct pkt_file *pfile);
+extern void _rtw_open_pktfile(_pkt *pkt, struct pkt_file *pfile);
+extern uint _rtw_pktfile_read (struct pkt_file *pfile, u8 *rmem, uint rlen);
+extern sint rtw_endofpktfile (struct pkt_file *pfile);
 
-extern void os_xmit_complete(_adapter *padapter, struct xmit_frame *pxframe);
+extern void os_pkt_complete(_adapter *padapter, _pkt *pkt);
+extern void rtw_os_xmit_complete(_adapter *padapter, struct xmit_frame *pxframe);
 
 #endif //
 

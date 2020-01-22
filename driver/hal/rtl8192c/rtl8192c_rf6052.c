@@ -170,8 +170,7 @@ VOID
 PHY_RF6052SetBandwidth(
 	IN	PADAPTER				Adapter,
 	IN	HT_CHANNEL_WIDTH		Bandwidth)	//20M or 40M
-{	
-	u8			eRFPath;	
+{		
 	HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(Adapter);
 	
 	switch(Bandwidth)
@@ -491,7 +490,6 @@ void writeOFDMPowerReg(
 							rTxAGC_B_Mcs03_Mcs00, rTxAGC_B_Mcs07_Mcs04,
 							rTxAGC_B_Mcs11_Mcs08, rTxAGC_B_Mcs15_Mcs12};
 	u8 i, rf, pwr_val[4];
-	u8 rfa_lower_bound, rfa_upper_bound, rf_pwr_diff;
 	u32 writeVal;
 	u16 RegOffset;
 
@@ -545,8 +543,7 @@ PHY_RF6052SetOFDMTxPower(
 {
 	//HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(Adapter);
 	u32 writeVal[2], powerBase0[2], powerBase1[2];
-	u8 index = 0;
-	u8 i;
+	u8 index = 0;	
 
 	getPowerBase(Adapter, pPowerLevel, Channel, &powerBase0[0], &powerBase1[0]);
 
@@ -633,7 +630,7 @@ phy_RF6052_Config_ParaFile(
 	HAL_DATA_TYPE			*pHalData = GET_HAL_DATA(Adapter);
 	static u8				sz88CRadioAFile[] = RTL8188C_PHY_RADIO_A;	
 	static u8				sz88CRadioBFile[] = RTL8188C_PHY_RADIO_B;
-#if DEV_BUS_TYPE==USB_INTERFACE	
+#if DEV_BUS_TYPE==DEV_BUS_USB_INTERFACE	
 	static u8				sz88CRadioAFile_mCard[] = RTL8188C_PHY_RADIO_A_mCard;	
 	static u8				sz88CRadioBFile_mCard[] = RTL8188C_PHY_RADIO_B_mCard;
 #endif
@@ -647,7 +644,7 @@ phy_RF6052_Config_ParaFile(
 		pszRadioBFile = (u8*)&sz92CRadioBFile;
 	}
 	else{
-#if DEV_BUS_TYPE==USB_INTERFACE
+#if DEV_BUS_TYPE==DEV_BUS_USB_INTERFACE
 		if( BOARD_MINICARD == pHalData->BoardType)
 		{
 			pszRadioAFile = sz88CRadioAFile_mCard;
@@ -685,18 +682,18 @@ phy_RF6052_Config_ParaFile(
 
 		/*----Set RF_ENV enable----*/		
 		PHY_SetBBReg(Adapter, pPhyReg->rfintfe, bRFSI_RFENV<<16, 0x1);
-		udelay_os(1);//PlatformStallExecution(1);
+		rtw_udelay_os(1);//PlatformStallExecution(1);
 		
 		/*----Set RF_ENV output high----*/
 		PHY_SetBBReg(Adapter, pPhyReg->rfintfo, bRFSI_RFENV, 0x1);
-		udelay_os(1);//PlatformStallExecution(1);
+		rtw_udelay_os(1);//PlatformStallExecution(1);
 
 		/* Set bit number of Address and Data for RF register */
 		PHY_SetBBReg(Adapter, pPhyReg->rfHSSIPara2, b3WireAddressLength, 0x0); 	// Set 1 to 4 bits for 8255
-		udelay_os(1);//PlatformStallExecution(1);
+		rtw_udelay_os(1);//PlatformStallExecution(1);
 
 		PHY_SetBBReg(Adapter, pPhyReg->rfHSSIPara2, b3WireDataLength, 0x0);	// Set 0 to 12  bits for 8255
-		udelay_os(1);//PlatformStallExecution(1);
+		rtw_udelay_os(1);//PlatformStallExecution(1);
 
 		/*----Initialize RF fom connfiguration file----*/
 		switch(eRFPath)

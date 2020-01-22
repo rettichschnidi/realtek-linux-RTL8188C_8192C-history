@@ -78,6 +78,9 @@ struct sta_info {
 
 	struct stainfo_stats sta_stats;
 
+	//for A-MPDU TX, ADDBA timeout check	
+	_timer addba_retry_timer;
+	
 	//for A-MPDU Rx reordering buffer control 
 	struct recv_reorder_ctrl recvreorder_ctrl[16];
 
@@ -132,6 +135,12 @@ struct	sta_priv {
 	
 	_adapter *padapter;
 	
+
+#ifdef CONFIG_AP_MODE
+	u16 sta_dz_bitmap;//only support 16 stations, staion aid bitmap for sleeping sta.
+	u16 tim_bitmap;//only support 16 stations, aid=1~16 mapping bit0~bit15
+#endif	
+	
 #ifdef CONFIG_NATIVEAP_MLME
     	
 	_list asoc_list;
@@ -146,7 +155,7 @@ struct	sta_priv {
 };
 
 
-static __inline u32 wifi_mac_hash(u8 *mac)
+__inline static u32 wifi_mac_hash(u8 *mac)
 {
         u32 x;
 
@@ -164,14 +173,14 @@ static __inline u32 wifi_mac_hash(u8 *mac)
 }
 
 
-extern u32	_init_sta_priv(struct sta_priv *pstapriv);
-extern u32	_free_sta_priv(struct sta_priv *pstapriv);
-extern struct sta_info *alloc_stainfo(struct	sta_priv *pstapriv, u8 *hwaddr);
-extern u32	free_stainfo(_adapter *padapter , struct sta_info *psta);
-extern void free_all_stainfo(_adapter *padapter);
-extern struct sta_info *get_stainfo(struct sta_priv *pstapriv, u8 *hwaddr);
-extern u32 init_bcmc_stainfo(_adapter* padapter);
-extern struct sta_info* get_bcmc_stainfo(_adapter* padapter);
-extern u8 access_ctrl(struct wlan_acl_pool* pacl_list, u8 * mac_addr);
+extern u32	_rtw_init_sta_priv(struct sta_priv *pstapriv);
+extern u32	_rtw_free_sta_priv(struct sta_priv *pstapriv);
+extern struct sta_info *rtw_alloc_stainfo(struct	sta_priv *pstapriv, u8 *hwaddr);
+extern u32	rtw_free_stainfo(_adapter *padapter , struct sta_info *psta);
+extern void rtw_free_all_stainfo(_adapter *padapter);
+extern struct sta_info *rtw_get_stainfo(struct sta_priv *pstapriv, u8 *hwaddr);
+extern u32 rtw_init_bcmc_stainfo(_adapter* padapter);
+extern struct sta_info* rtw_get_bcmc_stainfo(_adapter* padapter);
+extern u8 rtw_access_ctrl(struct wlan_acl_pool* pacl_list, u8 * mac_addr);
 
 #endif //_STA_INFO_H_

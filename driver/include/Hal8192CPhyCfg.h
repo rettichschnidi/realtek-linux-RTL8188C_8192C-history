@@ -33,7 +33,7 @@
 #define PHY_SetMacReg			PHY_SetBBReg
 
 
-#if (DEV_BUS_TYPE == PCI_INTERFACE)
+#if (DEV_BUS_TYPE == DEV_BUS_PCI_INTERFACE)
 #define	SET_RTL8192SE_RF_SLEEP(_pAdapter)							\
 {																	\
 	u1Byte		u1bTmp;												\
@@ -377,7 +377,7 @@ extern	BOOLEAN	PHY_CheckIsLegalRfPath8192C(IN	PADAPTER	pAdapter,
 //
 // IQ calibrate
 //
-void	PHY_IQCalibrate(	IN	PADAPTER	pAdapter);
+void	PHY_IQCalibrate(	IN	PADAPTER	pAdapter, IN BOOLEAN bReCovery);
 
 
 //

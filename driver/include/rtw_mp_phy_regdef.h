@@ -225,6 +225,7 @@
 #define		rOFDM0_XCTxAFE            			0xc94
 #define		rOFDM0_XDTxIQImbalance		0xc98
 #define		rOFDM0_XDTxAFE				0xc9c
+#define		rOFDM0_RxIQExtAnta				0xca0
 
 #define		rOFDM0_RxHPParameter			0xce0
 #define		rOFDM0_TxPseudoNoiseWgt		0xce4
@@ -996,6 +997,9 @@
 #define		bMaskHWord                0xffff0000
 #define		bMaskLWord                0x0000ffff
 #define		bMaskDWord                0xffffffff
+#define		bMaskH4Bits		  0xf0000000	
+#define 		bMaskOFDM_D	  0xffc00000
+#define		bMaskCCK		  0x3f3f3f3f
 
 //for PutRFRegsetting & GetRFRegSetting BitMask
 #if (RTL92SE_FPGA_VERIFY == 1)

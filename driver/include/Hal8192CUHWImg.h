@@ -3,7 +3,7 @@
 
 /*Created on  2010/ 5/25,  2:21*/
 
-#define ImgArrayLength 13540
+#define ImgArrayLength 16278 
 extern unsigned char Rtl8192CUFwImgArray[ImgArrayLength];
 #define MainArrayLength 1
 extern unsigned char Rtl8192CUFwMainArray[MainArrayLength];

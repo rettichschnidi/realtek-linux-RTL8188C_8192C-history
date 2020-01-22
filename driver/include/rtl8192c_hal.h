@@ -5,7 +5,7 @@
 #include "Hal8192CPhyCfg.h"
 #include "rtl8192c_dm.h"
 
-#if (DEV_BUS_TYPE == PCI_INTERFACE)
+#if (DEV_BUS_TYPE == DEV_BUS_PCI_INTERFACE)
 
 	#define RTL819X_DEFAULT_RF_TYPE			RF_2T2R
 	//#define RTL819X_DEFAULT_RF_TYPE			RF_1T2R
@@ -60,7 +60,7 @@
 	#define Rtl819XRadioB_1TArray				Rtl8192CERadioB_1TArray
 	#define Rtl819XPHY_REG_Array_PG 			Rtl8192CEPHY_REG_Array_PG
 
-#elif (DEV_BUS_TYPE == USB_INTERFACE)
+#elif (DEV_BUS_TYPE == DEV_BUS_USB_INTERFACE)
 
 	#include "Hal8192CUHWImg.h"
 
@@ -139,7 +139,7 @@ enum RTL871X_HCI_TYPE {
 
 #define PageNum_128(_Len)		(u32)(((_Len)>>7) + ((_Len)&0x7F ? 1:0))
 
-#define FW_8192C_SIZE					13540
+#define FW_8192C_SIZE					16384//16k
 #define FW_8192C_START_ADDRESS		0x1000
 #define FW_8192C_END_ADDRESS		0x3FFF
 
@@ -352,7 +352,7 @@ struct hal_priv
 	u8					framesyncMonitor;
 	u8					DefaultInitialGain[4];
 	u8					pwrGroupCnt;
-	u32					MCSTxPowerLevelOriginalOffset[4][7];
+	u32					MCSTxPowerLevelOriginalOffset[4][16];
 	u32					CCKTxPowerLevelOriginalOffset;
 	u8					TxPowerLevelCCK[14];			// CCK channel 1~14
 	u8					TxPowerLevelOFDM24G[14];		// OFDM 2.4G channel 1~14
@@ -407,12 +407,13 @@ struct hal_priv
 	int					RegEBC;
 
 	//for IQK
+	u32				IQKInitialized;
 	unsigned int		RegC04;
 	unsigned int		Reg874;
 	unsigned int		RegC08;
 	unsigned int		ADDA_backup[16];
 	unsigned int		IQK_MAC_backup[4];
-
+	u32				IQK_BB_backup[10];
 	//RDG enable
 	BOOLEAN	 	bRDGEnable;
 
@@ -463,8 +464,10 @@ struct hal_priv
 	u8				AntDivCfg;
 
 	//SW Antenna Switch
-	s32				RSSI_sum;
-	s32				RSSI_cnt;
+	s32				RSSI_sum_A;
+	s32				RSSI_sum_B;
+	s32				RSSI_cnt_A;
+	s32				RSSI_cnt_B;
 	BOOLEAN			RSSI_test;
 	
 #endif

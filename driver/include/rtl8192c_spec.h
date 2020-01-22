@@ -98,8 +98,11 @@
 #define REG_LEDCFG2					0x004E
 #define REG_LEDCFG3					0x004F
 #define REG_LEDCFG					REG_LEDCFG2
+
 #define REG_FSIMR					0x0050
 #define REG_FSISR					0x0054
+#define REG_HSIMR					0x0058
+#define REG_HSISR					0x005c
 
 #define REG_MCUFWDL					0x0080
 
@@ -828,12 +831,15 @@ Default: 00b.
 
 //should be renamed and moved to another file
 typedef	enum _BOARD_TYPE_8192CUSB{
-	BOARD_USB_DONGLE 			= 0,		// USB
-	BOARD_USB_High_PA 			= 1,		// USB with high power PA
+	BOARD_USB_DONGLE 			= 0,		// USB dongle
+	BOARD_USB_High_PA 			= 1,		// USB dongle with high power PA
 	BOARD_MINICARD		  	= 2,		// Minicard
 	BOARD_USB_SOLO 		 	= 3,		// USB solo-Slim module
 	BOARD_USB_COMBO			= 4,		// USB Combo-Slim module
 } BOARD_TYPE_8192CUSB, *PBOARD_TYPE_8192CUSB;
+
+#define	SUPPORT_HW_RADIO_DETECT(Adapter) 	((BOARD_MINICARD == Adapter->halpriv.BoardType )||	(BOARD_USB_SOLO == Adapter->halpriv.BoardType)||(BOARD_USB_COMBO == Adapter->halpriv.BoardType))
+
 //---------------------------------------------------------------
 // EEPROM address for Test chip
 //---------------------------------------------------------------
@@ -1772,6 +1778,19 @@ Current IOREG MAP
 #define	MAX_MSS_DENSITY_2T				0x13
 #define	MAX_MSS_DENSITY_1T				0x0A
 
+//----------------------------------------------------------------------------
+//       8192C GPIO MUX Configuration Register (offset 0x40, 4 byte)
+//----------------------------------------------------------------------------
+#define	GPIOSEL_GPIO				0
+#define	GPIOSEL_ENBT				BIT5
+
+//----------------------------------------------------------------------------
+//       8192C GPIO PIN Control Register (offset 0x44, 4 byte)
+//----------------------------------------------------------------------------
+#define	GPIO_IN						REG_GPIO_PIN_CTRL		// GPIO pins input value
+#define	GPIO_OUT					(REG_GPIO_PIN_CTRL+1)	// GPIO pins output value
+#define	GPIO_IO_SEL				(REG_GPIO_PIN_CTRL+2)	// GPIO pins output enable when a bit is set to "1"; otherwise, input is configured.
+#define	GPIO_MOD					(REG_GPIO_PIN_CTRL+3)
 
 
 

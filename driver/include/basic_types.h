@@ -51,6 +51,7 @@
 
 	#endif
 
+	typedef NDIS_PROC proc_t;
 
 #endif
 
@@ -63,10 +64,8 @@
 	#define VOID void
 	#define NDIS_OID uint
 	#define NDIS_STATUS uint
-	
-	
+		
 	typedef	signed int sint;
-
 
 	#ifndef	PVOID
 	typedef void * PVOID;
@@ -77,6 +76,8 @@
 	#define USHORT u16
 	#define UINT u32
 	#define ULONG u32	
+
+	typedef void (*proc_t)(void*);
 
 	typedef 	__kernel_size_t	SIZE_T;	
 	#define FIELD_OFFSET(s,field)	((int)&((s*)(0))->field)

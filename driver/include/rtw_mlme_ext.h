@@ -11,7 +11,7 @@
 #define REAUTH_TO			(50)
 #define REASSOC_TO		(50)
 //#define DISCONNECT_TO	(3000)
-#define ADDBA_TO			(50)
+#define ADDBA_TO			(2000)
 
 #define LINKED_TO (1) //unit:2 sec, 1x2=2 sec
 
@@ -98,6 +98,12 @@ enum Associated_AP
 
 
 struct mlme_handler {
+	unsigned int   num;
+	char* str;
+	unsigned int (*func)(_adapter *padapter, union recv_frame *precv_frame);
+};
+
+struct action_handler {
 	unsigned int   num;
 	char* str;
 	unsigned int (*func)(_adapter *padapter, union recv_frame *precv_frame);
@@ -202,7 +208,7 @@ struct mlme_ext_priv
                                                      //for ap mode, network includes ap's cap_info
 	_timer		survey_timer;
 	_timer		link_timer;
-	_timer		ADDBA_timer;
+	//_timer		ADDBA_timer;
 	u8			chan_scan_time;
 
 	unsigned int	linked_to;//linked timeout
@@ -218,6 +224,7 @@ struct mlme_ext_priv
 int init_mlme_ext_priv(_adapter* padapter);
 void free_mlme_ext_priv (struct mlme_ext_priv *pmlmeext);
 extern void init_mlme_ext_timer(_adapter *padapter);
+extern void init_addba_retry_timer(_adapter *padapter, struct sta_info *psta);
 
 extern struct xmit_frame *alloc_mgtxmitframe(struct xmit_priv *pxmitpriv);
 
@@ -313,8 +320,8 @@ void issue_auth(_adapter *padapter, struct sta_info *psta, unsigned short status
 void issue_probereq(_adapter *padapter, u8 blnbc);
 void issue_nulldata(_adapter *padapter, unsigned int power_mode);
 void issue_deauth(_adapter *padapter, unsigned char *da, unsigned short reason);
-void issue_action_BA(_adapter *padapter, unsigned char category, unsigned char action, unsigned short status);
-unsigned int send_delba(_adapter *padapter, u8 initiator);
+void issue_action_BA(_adapter *padapter, unsigned char *raddr, unsigned char action, unsigned short status);
+unsigned int send_delba(_adapter *padapter, u8 initiator, u8 *addr);
 
 void start_clnt_assoc(_adapter *padapter);
 void start_clnt_auth(_adapter* padapter);
@@ -334,6 +341,12 @@ unsigned int OnAuthClient(_adapter *padapter, union recv_frame *precv_frame);
 unsigned int OnDeAuth(_adapter *padapter, union recv_frame *precv_frame);
 unsigned int OnAction(_adapter *padapter, union recv_frame *precv_frame);
 
+unsigned int OnAction_qos(_adapter *padapter, union recv_frame *precv_frame);
+unsigned int OnAction_dls(_adapter *padapter, union recv_frame *precv_frame);
+unsigned int OnAction_back(_adapter *padapter, union recv_frame *precv_frame);
+unsigned int OnAction_p2p(_adapter *padapter, union recv_frame *precv_frame);
+unsigned int OnAction_ht(_adapter *padapter, union recv_frame *precv_frame);
+unsigned int OnAction_wmm(_adapter *padapter, union recv_frame *precv_frame);
 
 void mlmeext_joinbss_event_callback(_adapter *padapter);
 void mlmeext_sta_del_event_callback(_adapter *padapter);
@@ -343,7 +356,7 @@ void linked_status_chk(_adapter *padapter);
 
 void survey_timer_hdl (_adapter *padapter);
 void link_timer_hdl (_adapter *padapter);
-void addba_timer_hdl(_adapter *padapter);
+void addba_timer_hdl(struct sta_info *psta);
 //void reauth_timer_hdl(_adapter *padapter);
 //void reassoc_timer_hdl(_adapter *padapter);
 

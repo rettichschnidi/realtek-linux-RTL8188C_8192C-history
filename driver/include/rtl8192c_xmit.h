@@ -97,19 +97,17 @@ union txdesc {
 };
 
 void cal_txdesc_chksum(struct tx_desc	*ptxdesc);
-s32 update_txdesc(struct xmit_frame *pxmitframe, u32 *ptxdesc, s32 sz);
-void dump_xframe(_adapter *padapter, struct xmit_frame *pxmitframe);
+s32 rtw_update_txdesc(struct xmit_frame *pxmitframe, u32 *ptxdesc, s32 sz);
+void rtw_dump_xframe(_adapter *padapter, struct xmit_frame *pxmitframe);
 
-s32 xmitframe_complete(_adapter *padapter, struct xmit_priv *pxmitpriv, struct xmit_buf *pxmitbuf);
+s32 rtw_xmitframe_complete(_adapter *padapter, struct xmit_priv *pxmitpriv, struct xmit_buf *pxmitbuf);
 
-void do_queue_select(_adapter *padapter, struct pkt_attrib *pattrib);
-u32 get_ff_hwaddr(struct xmit_frame	*pxmitframe);
+void rtw_do_queue_select(_adapter *padapter, struct pkt_attrib *pattrib);
+u32 rtw_get_ff_hwaddr(struct xmit_frame	*pxmitframe);
 
 s32 pre_xmitframe(_adapter *padapter, struct xmit_frame *pxmitframe);
-s32 xmitframe_enqueue(_adapter *padapter, struct xmit_frame *pxmitframe);
 s32 xmitframe_direct(_adapter *padapter, struct xmit_frame *pxmitframe);
 
-s32 hal_xmit(_adapter *padapter, struct xmit_frame *pxmitframe);
 
 #endif
 

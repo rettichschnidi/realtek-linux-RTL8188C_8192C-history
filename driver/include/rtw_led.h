@@ -95,9 +95,9 @@ struct led_priv{
 //================================================================================
 // Interface to manipulate LED objects.
 //================================================================================
-void InitSwLeds(_adapter *padapter);
-void DeInitSwLeds(_adapter *padapter);
-void LedControl871x(_adapter *padapter,LED_CTL_MODE LedAction);
+void rtw_InitSwLeds(_adapter *padapter);
+void rtw_DeInitSwLeds(_adapter *padapter);
+void rtw_LedControl871x(_adapter *padapter,LED_CTL_MODE LedAction);
 
 #endif
 

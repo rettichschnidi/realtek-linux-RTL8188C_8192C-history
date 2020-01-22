@@ -39,8 +39,8 @@ uint	 rtw_hal_init(_adapter *padapter)
 	uint	status = _SUCCESS;
 	HAL_DATA_TYPE *pHalData = GET_HAL_DATA(padapter);
 	
-	padapter->hw_init_completed=_FALSE;
-
+	padapter->hw_init_completed=_FALSE;	
+	
 	status = pHalData->hal_ops.hal_init(padapter);
 
 	if(status == _SUCCESS){

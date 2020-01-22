@@ -50,23 +50,23 @@ void sitesurvey_ctrl_handler(void *FunctionContext)
 {
 	_adapter *adapter = (_adapter *)FunctionContext;
 
-	_sitesurvey_ctrl_handler(adapter);
+	_rtw_sitesurvey_ctrl_handler(adapter);
 
 	_set_timer(&adapter->mlmepriv.sitesurveyctrl.sitesurvey_ctrl_timer, 3000);
 }
 */
 
-void join_timeout_handler (void *FunctionContext)
+void rtw_join_timeout_handler (void *FunctionContext)
 {
 	_adapter *adapter = (_adapter *)FunctionContext;
-	_join_timeout_handler(adapter);
+	_rtw_join_timeout_handler(adapter);
 }
 
 
-void _scan_timeout_handler (void *FunctionContext)
+void _rtw_scan_timeout_handler (void *FunctionContext)
 {
 	_adapter *adapter = (_adapter *)FunctionContext;
-	scan_timeout_handler(adapter);
+	rtw_scan_timeout_handler(adapter);
 }
 
 
@@ -74,33 +74,32 @@ void _dynamic_check_timer_handlder (void *FunctionContext)
 {
 	_adapter *adapter = (_adapter *)FunctionContext;
 		 
-	dynamic_check_timer_handlder(adapter);
-	
+	dynamic_check_timer_handlder(adapter);	
 	_set_timer(&adapter->mlmepriv.dynamic_chk_timer, 2000);
 }
 
 
-void init_mlme_timer(_adapter *padapter)
+void rtw_init_mlme_timer(_adapter *padapter)
 {
 	struct	mlme_priv *pmlmepriv = &padapter->mlmepriv;
 
-	_init_timer(&(pmlmepriv->assoc_timer), padapter->pnetdev, join_timeout_handler, (pmlmepriv->nic_hdl));
+	_init_timer(&(pmlmepriv->assoc_timer), padapter->pnetdev, rtw_join_timeout_handler, (pmlmepriv->nic_hdl));
 	//_init_timer(&(pmlmepriv->sitesurveyctrl.sitesurvey_ctrl_timer), padapter->pnetdev, sitesurvey_ctrl_handler, (u8 *)(pmlmepriv->nic_hdl));
-	_init_timer(&(pmlmepriv->scan_to_timer), padapter->pnetdev, _scan_timeout_handler, (pmlmepriv->nic_hdl));
+	_init_timer(&(pmlmepriv->scan_to_timer), padapter->pnetdev, _rtw_scan_timeout_handler, (pmlmepriv->nic_hdl));
 
 	_init_timer(&(pmlmepriv->dynamic_chk_timer), padapter->pnetdev, _dynamic_check_timer_handlder, (u8 *)(pmlmepriv->nic_hdl));
 
 }
 
-extern void indicate_wx_assoc_event(_adapter *padapter);
-extern void indicate_wx_disassoc_event(_adapter *padapter);
+extern void rtw_indicate_wx_assoc_event(_adapter *padapter);
+extern void rtw_indicate_wx_disassoc_event(_adapter *padapter);
 
-void os_indicate_connect(_adapter *adapter)
+void rtw_os_indicate_connect(_adapter *adapter)
 {
 
 _func_enter_;	
 
-        indicate_wx_assoc_event(adapter);
+        rtw_indicate_wx_assoc_event(adapter);
 	netif_carrier_on(adapter->pnetdev);
 
 _func_exit_;	
@@ -108,7 +107,7 @@ _func_exit_;
 }
 
 static RT_PMKID_LIST   backupPMKIDList[ NUM_PMKID_CACHE ];
-void os_indicate_disconnect( _adapter *adapter )
+void rtw_os_indicate_disconnect( _adapter *adapter )
 {
    //RT_PMKID_LIST   backupPMKIDList[ NUM_PMKID_CACHE ];
    u8              backupPMKIDIndex = 0;
@@ -116,7 +115,7 @@ void os_indicate_disconnect( _adapter *adapter )
       
 _func_enter_;
 
-   indicate_wx_disassoc_event(adapter);	
+   rtw_indicate_wx_disassoc_event(adapter);	
    netif_carrier_off(adapter->pnetdev);
 	
    if(adapter->securitypriv.dot11AuthAlgrthm == dot11AuthAlgrthm_8021X)//802.1x
@@ -127,18 +126,18 @@ _func_enter_;
         // Backup the btkip_countermeasure information.
         // When the countermeasure is trigger, the driver have to disconnect with AP for 60 seconds.
         
-        _memset( &backupPMKIDList[ 0 ], 0x00, sizeof( RT_PMKID_LIST ) * NUM_PMKID_CACHE );
+        _rtw_memset( &backupPMKIDList[ 0 ], 0x00, sizeof( RT_PMKID_LIST ) * NUM_PMKID_CACHE );
 
-        _memcpy( &backupPMKIDList[ 0 ], &adapter->securitypriv.PMKIDList[ 0 ], sizeof( RT_PMKID_LIST ) * NUM_PMKID_CACHE );
+        _rtw_memcpy( &backupPMKIDList[ 0 ], &adapter->securitypriv.PMKIDList[ 0 ], sizeof( RT_PMKID_LIST ) * NUM_PMKID_CACHE );
         backupPMKIDIndex = adapter->securitypriv.PMKIDIndex;
         backupTKIPCountermeasure = adapter->securitypriv.btkip_countermeasure;
 
-       _memset((unsigned char *)&adapter->securitypriv, 0, sizeof (struct security_priv));
-       _init_timer(&(adapter->securitypriv.tkip_timer),adapter->pnetdev, use_tkipkey_handler, adapter);
+       _rtw_memset((unsigned char *)&adapter->securitypriv, 0, sizeof (struct security_priv));
+       _init_timer(&(adapter->securitypriv.tkip_timer),adapter->pnetdev, rtw_use_tkipkey_handler, adapter);
 
        // Added by Albert 2009/02/18
        // Restore the PMK information to securitypriv structure for the following connection.
-       _memcpy( &adapter->securitypriv.PMKIDList[ 0 ], &backupPMKIDList[ 0 ], sizeof( RT_PMKID_LIST ) * NUM_PMKID_CACHE );
+       _rtw_memcpy( &adapter->securitypriv.PMKIDList[ 0 ], &backupPMKIDList[ 0 ], sizeof( RT_PMKID_LIST ) * NUM_PMKID_CACHE );
        adapter->securitypriv.PMKIDIndex = backupPMKIDIndex;
        adapter->securitypriv.btkip_countermeasure = backupTKIPCountermeasure;
 
@@ -169,7 +168,7 @@ _func_exit_;
 
 }
 
-void report_sec_ie(_adapter *adapter,u8 authmode,u8 *sec_ie)
+void rtw_report_sec_ie(_adapter *adapter,u8 authmode,u8 *sec_ie)
 {
 		uint len;
 		u8 *buff,*p,i;
@@ -177,16 +176,16 @@ void report_sec_ie(_adapter *adapter,u8 authmode,u8 *sec_ie)
 
 _func_enter_;
 
-	RT_TRACE(_module_mlme_osdep_c_,_drv_info_,("+report_sec_ie, authmode=%d\n", authmode));
+	RT_TRACE(_module_mlme_osdep_c_,_drv_info_,("+rtw_report_sec_ie, authmode=%d\n", authmode));
 
 	buff = NULL;
 	if(authmode==_WPA_IE_ID_)
 	{
-		RT_TRACE(_module_mlme_osdep_c_,_drv_info_,("report_sec_ie, authmode=%d\n", authmode));
+		RT_TRACE(_module_mlme_osdep_c_,_drv_info_,("rtw_report_sec_ie, authmode=%d\n", authmode));
 		
-		buff = _malloc(IW_CUSTOM_MAX);
+		buff = _rtw_malloc(IW_CUSTOM_MAX);
 		
-		_memset(buff,0,IW_CUSTOM_MAX);
+		_rtw_memset(buff,0,IW_CUSTOM_MAX);
 		
 		p=buff;
 		
@@ -201,7 +200,7 @@ _func_enter_;
 
 		p+=sprintf(p,")");
 		
-		_memset(&wrqu,0,sizeof(wrqu));
+		_rtw_memset(&wrqu,0,sizeof(wrqu));
 		
 		wrqu.data.length=p-buff;
 		
@@ -210,7 +209,7 @@ _func_enter_;
 		wireless_send_event(adapter->pnetdev,IWEVCUSTOM,&wrqu,buff);
 
 		if(buff)
-		    _mfree(buff, IW_CUSTOM_MAX);
+		    _rtw_mfree(buff, IW_CUSTOM_MAX);
 		
 	}
 
@@ -233,8 +232,14 @@ void _link_timer_hdl (void *FunctionContext)
 
 void _addba_timer_hdl(void *FunctionContext)
 {
-	_adapter *padapter = (_adapter *)FunctionContext;
-	addba_timer_hdl(padapter);
+	struct sta_info *psta = (struct sta_info *)FunctionContext;
+	addba_timer_hdl(psta);
+}
+
+void init_addba_retry_timer(_adapter *padapter, struct sta_info *psta)
+{
+
+	_init_timer(&psta->addba_retry_timer, padapter->pnetdev, _addba_timer_hdl, psta);
 }
 
 /*
@@ -257,7 +262,7 @@ void init_mlme_ext_timer(_adapter *padapter)
 
 	_init_timer(&pmlmeext->survey_timer, padapter->pnetdev, _survey_timer_hdl, padapter);
 	_init_timer(&pmlmeext->link_timer, padapter->pnetdev, _link_timer_hdl, padapter);
-	_init_timer(&pmlmeext->ADDBA_timer, padapter->pnetdev, _addba_timer_hdl, padapter);
+	//_init_timer(&pmlmeext->ADDBA_timer, padapter->pnetdev, _addba_timer_hdl, padapter);
 
 	//_init_timer(&pmlmeext->reauth_timer, padapter->pnetdev, _reauth_timer_hdl, padapter);
 	//_init_timer(&pmlmeext->reassoc_timer, padapter->pnetdev, _reassoc_timer_hdl, padapter);
@@ -322,7 +327,7 @@ static int mgnt_xmit_entry(struct sk_buff *skb, struct net_device *pnetdev)
 
 	// ----- fill tx desc -----	
 	ptxdesc = (struct tx_desc *)pxmitbuf;	
-	_memset(ptxdesc, 0, sizeof(*ptxdesc));
+	_rtw_memset(ptxdesc, 0, sizeof(*ptxdesc));
 		
 	//offset 0	
 	ptxdesc->txdw0 |= cpu_to_le32(len&0x0000ffff); 
@@ -357,7 +362,7 @@ static int mgnt_xmit_entry(struct sk_buff *skb, struct net_device *pnetdev)
 	//
 	skb_put(pxmit_skb, len + TXDESC_SIZE);
 	pxmitbuf = pxmitbuf + TXDESC_SIZE;
-	_memcpy(pxmitbuf, skb->data, len);
+	_rtw_memcpy(pxmitbuf, skb->data, len);
 
 	//printk("mgnt_xmit, len=%x\n", pxmit_skb->len);
 
@@ -406,7 +411,7 @@ static int mgnt_netdev_open(struct net_device *pnetdev)
 
 	netif_carrier_on(pnetdev);
 		
-	//write16(phostapdpriv->padapter, 0x0116, 0x0100);//only excluding beacon 
+	//rtw_write16(phostapdpriv->padapter, 0x0116, 0x0100);//only excluding beacon 
 		
 	return 0;	
 }
@@ -423,7 +428,7 @@ static int mgnt_netdev_close(struct net_device *pnetdev)
 	if (!netif_queue_stopped(pnetdev))
 		netif_stop_queue(pnetdev);
 	
-	//write16(phostapdpriv->padapter, 0x0116, 0x3f3f);
+	//rtw_write16(phostapdpriv->padapter, 0x0116, 0x3f3f);
 	
 	return 0;	
 }
@@ -509,7 +514,7 @@ int hostapd_mode_init(_adapter *padapter)
 	mac[4]=0x11;
 	mac[5]=0x12;
 				
-	_memcpy(pnetdev->dev_addr, mac, ETH_ALEN);
+	_rtw_memcpy(pnetdev->dev_addr, mac, ETH_ALEN);
 	
 
 	netif_carrier_off(pnetdev);

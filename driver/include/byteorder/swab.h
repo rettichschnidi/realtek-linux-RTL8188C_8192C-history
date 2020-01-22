@@ -18,7 +18,7 @@ typedef unsigned long long	__u64;
 #endif
 
 
-static __inline __u16  ___swab16(__u16 x)
+__inline static __u16  ___swab16(__u16 x)
 {
 	__u16 __x = x; 
 	return 
@@ -28,7 +28,7 @@ static __inline __u16  ___swab16(__u16 x)
 
 }
 
-static __inline __u32  ___swab32(__u32 x)
+__inline static __u32  ___swab32(__u32 x)
 {
 	__u32 __x = (x);
 	return ((__u32)(
@@ -38,7 +38,7 @@ static __inline __u32  ___swab32(__u32 x)
 		(((__u32)(__x) & (__u32)0xff000000UL) >> 24) ));
 }
 
-static __inline __u64  ___swab64(__u64 x)
+__inline static __u64  ___swab64(__u64 x)
 {
 	__u64 __x = (x);
 	
@@ -55,7 +55,7 @@ static __inline __u64  ___swab64(__u64 x)
 }
 
 #ifndef __arch__swab16
-static __inline __u16 __arch__swab16(__u16 x)
+__inline static __u16 __arch__swab16(__u16 x)
 {
 	return ___swab16(x);
 }
@@ -63,7 +63,7 @@ static __inline __u16 __arch__swab16(__u16 x)
 #endif
 
 #ifndef __arch__swab32
-static __inline __u32 __arch__swab32(__u32 x)
+__inline static __u32 __arch__swab32(__u32 x)
 {
 	__u32 __tmp = (x) ; 
 	return ___swab32(__tmp);
@@ -72,7 +72,7 @@ static __inline __u32 __arch__swab32(__u32 x)
 
 #ifndef __arch__swab64
 
-static __inline __u64 __arch__swab64(__u64 x)
+__inline static __u64 __arch__swab64(__u64 x)
 {
 	__u64 __tmp = (x) ; 
 	return ___swab64(__tmp);
@@ -85,11 +85,11 @@ static __inline __u64 __arch__swab64(__u64 x)
 #define __swab32(x) __fswab32(x)
 #define __swab64(x) __fswab64(x)
 
-static __inline const __u16 __fswab16(__u16 x)
+__inline static const __u16 __fswab16(__u16 x)
 {
 	return __arch__swab16(x);
 }
-static __inline const __u32 __fswab32(__u32 x)
+__inline static const __u32 __fswab32(__u32 x)
 {
 	return __arch__swab32(x);
 }

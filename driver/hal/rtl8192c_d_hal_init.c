@@ -41,9 +41,9 @@ _FWDownloadEnable(
 	IN	BOOLEAN			enable
 	)
 {
-#if DEV_BUS_TYPE == USB_INTERFACE
+#if DEV_BUS_TYPE == DEV_BUS_USB_INTERFACE
 
-	u32	value32 = read32(Adapter, REG_MCUFWDL);
+	u32	value32 = rtw_read32(Adapter, REG_MCUFWDL);
 
 	if(enable){
 		value32 |= MCUFWDL_EN;
@@ -52,7 +52,7 @@ _FWDownloadEnable(
 		value32 &= ~MCUFWDL_EN;
 	}
 
-	write32(Adapter, REG_MCUFWDL, value32);
+	rtw_write32(Adapter, REG_MCUFWDL, value32);
 
 #else
 	u8	tmp;
@@ -60,25 +60,25 @@ _FWDownloadEnable(
 	if(enable)
 	{
 		// 8051 enable
-		tmp = read8(Adapter, REG_SYS_FUNC_EN+1);
-		write8(Adapter, REG_SYS_FUNC_EN+1, tmp|0x04);
+		tmp = rtw_read8(Adapter, REG_SYS_FUNC_EN+1);
+		rtw_write8(Adapter, REG_SYS_FUNC_EN+1, tmp|0x04);
 
 		// MCU firmware download enable.
-		tmp = read8(Adapter, REG_MCUFWDL);
-		write8(Adapter, REG_MCUFWDL, tmp|0x01);
+		tmp = rtw_read8(Adapter, REG_MCUFWDL);
+		rtw_write8(Adapter, REG_MCUFWDL, tmp|0x01);
 
 		// 8051 reset
-		tmp = read8(Adapter, REG_MCUFWDL+2);
-		write8(Adapter, REG_MCUFWDL+2, tmp&0xf7);
+		tmp = rtw_read8(Adapter, REG_MCUFWDL+2);
+		rtw_write8(Adapter, REG_MCUFWDL+2, tmp&0xf7);
 	}
 	else
 	{
 		// MCU firmware download enable.
-		tmp = read8(Adapter, REG_MCUFWDL);
-		write8(Adapter, REG_MCUFWDL, tmp&0xfe);
+		tmp = rtw_read8(Adapter, REG_MCUFWDL);
+		rtw_write8(Adapter, REG_MCUFWDL, tmp&0xfe);
 
 		// Reserved for fw extension.
-		write8(Adapter, REG_MCUFWDL+1, 0x00);
+		rtw_write8(Adapter, REG_MCUFWDL+1, 0x00);
 	}
 #endif
 }
@@ -116,7 +116,7 @@ _BlockWrite(
 		#ifdef SUPPORTED_BLOCK_IO
 		writeN(Adapter, (FW_8192C_START_ADDRESS + offset), blockSize, (bufferPtr + offset));
 		#else
-		write32(Adapter, (FW_8192C_START_ADDRESS + offset), le32_to_cpu(*(pu4BytePtr + i)));
+		rtw_write32(Adapter, (FW_8192C_START_ADDRESS + offset), le32_to_cpu(*(pu4BytePtr + i)));
 		#endif
 	}
 
@@ -130,7 +130,7 @@ _BlockWrite(
 			#ifdef SUPPORTED_BLOCK_IO
 			writeN(Adapter, (FW_8192C_START_ADDRESS + offset), blockSize2, (bufferPtr + offset));
 			#else
-			write8(Adapter, (FW_8192C_START_ADDRESS + offset ), *(bufferPtr + offset));
+			rtw_write8(Adapter, (FW_8192C_START_ADDRESS + offset ), *(bufferPtr + offset));
 			#endif
 		}		
 
@@ -140,7 +140,7 @@ _BlockWrite(
 			bufferPtr += offset;
 			
 			for(i = 0 ; i < remainSize2 ; i++){
-				write8(Adapter, (FW_8192C_START_ADDRESS + offset + i), *(bufferPtr + i));
+				rtw_write8(Adapter, (FW_8192C_START_ADDRESS + offset + i), *(bufferPtr + i));
 			}
 		}
 	}
@@ -156,7 +156,7 @@ _BlockWrite(
 
 	for(i = 0 ; i < blockCount ; i++){
 		offset = i * blockSize;
-		write32(Adapter, (FW_8192C_START_ADDRESS + offset), le32_to_cpu(*(pu4BytePtr + i)));
+		rtw_write32(Adapter, (FW_8192C_START_ADDRESS + offset), le32_to_cpu(*(pu4BytePtr + i)));
 	}
 
 	if(remainSize){
@@ -164,7 +164,7 @@ _BlockWrite(
 		bufferPtr += offset;
 		
 		for(i = 0 ; i < remainSize ; i++){
-			write8(Adapter, (FW_8192C_START_ADDRESS + offset + i), *(bufferPtr + i));
+			rtw_write8(Adapter, (FW_8192C_START_ADDRESS + offset + i), *(bufferPtr + i));
 		}
 	}
 #endif
@@ -181,12 +181,12 @@ _PageWrite(
 	u8 value8;
 	u8 u8Page = (u8) (page & 0x07) ;
 
-	value8 = read8(Adapter, REG_MCUFWDL+2);
+	value8 = rtw_read8(Adapter, REG_MCUFWDL+2);
 	//printk("%s,REG_%02x(0x%02x),wvalue(0x%02x)\n",__FUNCTION__,(REG_MCUFWDL+2),value8,(value8 & 0xF8) |u8Page);
 
 	value8 = (value8 & 0xF8) |u8Page;
 	 
-	write8(Adapter, REG_MCUFWDL+2,value8);
+	rtw_write8(Adapter, REG_MCUFWDL+2,value8);
 	_BlockWrite(Adapter,buffer,size);
 }
 
@@ -240,7 +240,7 @@ static int _FWFreeToGo(
 	
 	// polling CheckSum report
 	do{
-		value32 = read32(Adapter, REG_MCUFWDL);
+		value32 = rtw_read32(Adapter, REG_MCUFWDL);
 	}while((counter ++ < POLLING_READY_TIMEOUT_COUNT) && (!(value32 & FWDL_ChkSum_rpt)));	
 
 	if(counter >= POLLING_READY_TIMEOUT_COUNT){	
@@ -250,20 +250,20 @@ static int _FWFreeToGo(
 	//RT_TRACE(COMP_INIT, DBG_LOUD, ("Checksum report OK ! REG_MCUFWDL:0x%08x .\n",value32));
 
 
-	value32 = read32(Adapter, REG_MCUFWDL);
+	value32 = rtw_read32(Adapter, REG_MCUFWDL);
 	value32 |= MCUFWDL_RDY;
 	value32 &= ~WINTINI_RDY;
-	write32(Adapter, REG_MCUFWDL, value32);
+	rtw_write32(Adapter, REG_MCUFWDL, value32);
 	
 	// polling for FW ready
 	counter = 0;
 	do
 	{
-		if(read32(Adapter, REG_MCUFWDL) & WINTINI_RDY){
+		if(rtw_read32(Adapter, REG_MCUFWDL) & WINTINI_RDY){
 			//RT_TRACE(COMP_INIT, DBG_SERIOUS, ("Polling FW ready success!! REG_MCUFWDL:0x%08x .\n",PlatformIORead4Byte(Adapter, REG_MCUFWDL)) );
 			return _SUCCESS;
 		}
-		mdelay_os(5);
+		rtw_mdelay_os(5);
 	}while(counter++ < POLLING_READY_TIMEOUT_COUNT);
 
 	//RT_TRACE(COMP_INIT, DBG_SERIOUS, ("Polling FW ready fail!! REG_MCUFWDL:0x%08x .\n",PlatformIORead4Byte(Adapter, REG_MCUFWDL)) );
@@ -286,9 +286,9 @@ _FirmwareSelfReset(
 		pHalData->FirmwareSubVersion >= 0x01))
 	{
 		//0x1cf=0x20. Inform 8051 to reset. 2009.12.25. tynli_test
-		write8(Adapter, REG_HMETFR+3, 0x20);
+		rtw_write8(Adapter, REG_HMETFR+3, 0x20);
 	
-		u1bTmp = read8(Adapter, REG_SYS_FUNC_EN+1);
+		u1bTmp = rtw_read8(Adapter, REG_SYS_FUNC_EN+1);
 		while(u1bTmp&BIT2)
 		{
 			Delay--;
@@ -296,8 +296,8 @@ _FirmwareSelfReset(
 			if(Delay == 0)
 				break;
 			//delay_us(50);
-			udelay_os(50);
-			u1bTmp = read8(Adapter, REG_SYS_FUNC_EN+1);
+			rtw_udelay_os(50);
+			u1bTmp = rtw_read8(Adapter, REG_SYS_FUNC_EN+1);
 		}
 	
 		if((u1bTmp&BIT2) && (Delay == 0))
@@ -332,7 +332,7 @@ int FirmwareDownload92C(
 	u8		*pFirmwareBuf;
 	u32		FirmwareLen;
 
-	pFirmware = (PRT_FIRMWARE_92C)_malloc(sizeof(RT_FIRMWARE_92C));
+	pFirmware = (PRT_FIRMWARE_92C)_rtw_malloc(sizeof(RT_FIRMWARE_92C));
 	if(!pFirmware)
 	{
 		rtStatus = _FAIL;
@@ -369,7 +369,7 @@ int FirmwareDownload92C(
 			}
 
 			//RtlCopyMemory(pFirmware->szFwBuffer, Rtl819XFwImageArray, ImgArrayLength);
-			_memcpy(pFirmware->szFwBuffer, Rtl819XFwImageArray, ImgArrayLength);
+			_rtw_memcpy(pFirmware->szFwBuffer, Rtl819XFwImageArray, ImgArrayLength);
 			pFirmware->ulFwLength = ImgArrayLength;
 			break;
 	}
@@ -398,10 +398,10 @@ int FirmwareDownload92C(
 		
 	// Suggested by Filen. If 8051 is running in RAM code, driver should inform Fw to reset by itself,
 	// or it will cause download Fw fail. 2010.02.01. by tynli.
-	if(read8(Adapter, REG_MCUFWDL)&BIT7) //8051 RAM code
+	if(rtw_read8(Adapter, REG_MCUFWDL)&BIT7) //8051 RAM code
 	{	
 		_FirmwareSelfReset(Adapter);
-		write8(Adapter, REG_MCUFWDL, 0x00);		
+		rtw_write8(Adapter, REG_MCUFWDL, 0x00);		
 	}
 
 		
@@ -419,7 +419,7 @@ int FirmwareDownload92C(
 Exit:
 
 	if(pFirmware)
-		_mfree((u8*)pFirmware, sizeof(RT_FIRMWARE_92C));
+		_rtw_mfree((u8*)pFirmware, sizeof(RT_FIRMWARE_92C));
 
 	//RT_TRACE(COMP_INIT, DBG_LOUD, (" <=== FirmwareDownload91C()\n"));
 	return rtStatus;
@@ -478,7 +478,7 @@ ReadChannelPlan(
 		channelPlan = CHPL_FCC;
 	}
 	else{
-#if (DEV_BUS_TYPE==USB_INTERFACE)		
+#if (DEV_BUS_TYPE==DEV_BUS_USB_INTERFACE)		
 		if(IS_NORMAL_CHIP(pHalData->VersionID))
 		 	channelPlan = PROMContent[EEPROM_NORMAL_CHANNEL_PLAN];
 		else
@@ -535,7 +535,7 @@ _ReadPowerValueFromPROM(
 {
 	u32 rfPath, eeAddr, group;
 
-	_memset(pwrInfo, 0, sizeof(TxPowerInfo));
+	_rtw_memset(pwrInfo, 0, sizeof(TxPowerInfo));
 
 	if(AutoLoadFail){		
 		for(group = 0 ; group < CHANNEL_GROUP_MAX ; group++){
@@ -700,7 +700,7 @@ ReadChipVersion(
 	u32			value32;
 	VERSION_8192C	version = VERSION_NORMAL_CHIP_88C;
 
-	value32 = read32(Adapter, REG_SYS_CFG);
+	value32 = rtw_read32(Adapter, REG_SYS_CFG);
 #if 0
 	if(value32 & TRP_VAUX_EN){		
 		//Test chip
@@ -879,13 +879,13 @@ _ReadMACAddress(
 
 	if(_FALSE == AutoloadFail){
 		//Read Permanent MAC address and set value to hardware
-		_memcpy(pEEPROM->mac_addr, &PROMContent[EEPROM_MAC_ADDR], ETH_ALEN);		
+		_rtw_memcpy(pEEPROM->mac_addr, &PROMContent[EEPROM_MAC_ADDR], ETH_ALEN);		
 	}
 	else{
 		//Random assigh MAC address
 		u8 sMacAddr[MAC_ADDR_LEN] = {0x00, 0xE0, 0x4C, 0x81, 0x92, 0x00};
 		//sMacAddr[5] = (u8)GetRandomNumber(1, 254);		
-		_memcpy(pEEPROM->mac_addr, sMacAddr, ETH_ALEN);	
+		_rtw_memcpy(pEEPROM->mac_addr, sMacAddr, ETH_ALEN);	
 	}
 	
 	//NicIFSetMacAddress(Adapter, Adapter->PermanentAddress);
@@ -1185,28 +1185,58 @@ _ReadPROMVersion(
 		pEEPROM->EEPROMVersion = *(u8 *)&PROMContent[EEPROM_VERSION];
 	}
 }
-
-static void _InitAdapterVariablesByPROM(
-	IN	PADAPTER	Adapter,	
-	IN	u8*		PROMContent,
-	IN	unsigned char AutoloadFail
-	)
+#ifdef CONFIG_AUTOSUSPEND
+// Read HW power down mode selection 
+static void _ReadHWPDSelection(IN PADAPTER Adapter,IN u8*PROMContent,IN	bool	AutoloadFail)
 {
-	_ReadPROMVersion(Adapter, PROMContent, AutoloadFail);
-	_ReadIDs(Adapter, PROMContent, AutoloadFail);
-	_ReadMACAddress(Adapter, PROMContent, AutoloadFail);	
+	if(AutoloadFail){
+		Adapter->pwrctrlpriv.bHWPowerdown = _FALSE;
+		Adapter->pwrctrlpriv.bSupportRemoteWakeup = _FALSE;
+	}
+	else	{
+		if(SUPPORT_HW_RADIO_DETECT(Adapter))
+			Adapter->pwrctrlpriv.bHWPwrPindetect = Adapter->registrypriv.hwpwrp_detect;
+		else
+			Adapter->pwrctrlpriv.bHWPwrPindetect = _FALSE;
+			
+		//hw power down mode selection , 0:rf-off / 1:power down
+		if(Adapter->registrypriv.hwpdn_mode==2)
+		Adapter->pwrctrlpriv.bHWPowerdown = (PROMContent[EEPROM_RF_OPT3] & BIT4);
+		else
+			Adapter->pwrctrlpriv.bHWPowerdown = Adapter->registrypriv.hwpdn_mode;
+		
+		// decide hw if support remote wakeup function
+		// if hw supported, 8051 (SIE) will generate WeakUP frame when autoresume
+		Adapter->pwrctrlpriv.bSupportRemoteWakeup = (PROMContent[EEPROM_TEST_USB_OPT] & BIT1)?_TRUE :_FALSE;
+	}
 	
-	ReadTxPowerInfo(Adapter, PROMContent, AutoloadFail);
+}
+#endif
+
+static void _InitAdapterVariablesByPROM(IN	PADAPTER Adapter)
+{
+	u8 *PROMContent = Adapter->eeprompriv.efuse_eeprom_data;
+	u8 bAutoload = Adapter->eeprompriv.bAutoload ;
 	
-	ReadChannelPlan(Adapter, PROMContent, AutoloadFail);//todo:	
-	_ReadBoardType(Adapter, PROMContent, AutoloadFail);//get rf_type !!!
+	_ReadPROMVersion(Adapter, PROMContent, !bAutoload);
+	_ReadIDs(Adapter, PROMContent, !bAutoload);
+	_ReadMACAddress(Adapter, PROMContent, !bAutoload);	
+	
+	ReadTxPowerInfo(Adapter, PROMContent, !bAutoload);
+	
+	ReadChannelPlan(Adapter, PROMContent, !bAutoload);//todo:	
+	_ReadBoardType(Adapter, PROMContent, !bAutoload);//get rf_type !!!
 #ifdef CONFIG_BT_COEXIST
-	_ReadBluetoothCoexistInfo(Adapter, PROMContent, AutoloadFail);
+	_ReadBluetoothCoexistInfo(Adapter, PROMContent, !bAutoload);
 #endif
 	
-	_ReadThermalMeter(Adapter, PROMContent, AutoloadFail);
-	_ReadLEDSetting(Adapter, PROMContent, AutoloadFail);	
-	_ReadRFSetting(Adapter, PROMContent, AutoloadFail);
+	_ReadThermalMeter(Adapter, PROMContent, !bAutoload);
+	_ReadLEDSetting(Adapter, PROMContent, !bAutoload);	
+	_ReadRFSetting(Adapter, PROMContent, !bAutoload);
+#ifdef CONFIG_AUTOSUSPEND
+	_ReadHWPDSelection(Adapter, PROMContent, !bAutoload);
+#endif
+	
 }
 
 static void efuse_ReadAllMap(
@@ -1215,21 +1245,20 @@ static void efuse_ReadAllMap(
 {	
 	int i, offset;	
 
-	// We must enable clock and LDO 2.5V otherwise, read all map will be fail!!!!
-	//
-	
-	//efuse_PowerSwitch(pAdapter, _TRUE);
-	//ReadEFuse(pAdapter, 0, 128, Efuse);
-	//efuse_PowerSwitch(pAdapter, _FALSE);
-
-	//efuse_reg_init(pAdapter);
+	rtw_efuse_reg_init(pAdapter);
+	rtw_efuse_get_max_phy_size(pAdapter);//init
 	
 	for(i=0, offset=0 ; i<128; i+=8, offset++)
-	{
-		efuse_pg_packet_read(pAdapter, offset, Efuse+i);			
+	{		
+		rtw_efuse_pg_packet_read(pAdapter, offset, Efuse+i);			
+/*
+		printk("offset(%d),data:[%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:]\n",offset,
+			*(Efuse+i),*(Efuse+i+1),*(Efuse+i+2),*(Efuse+i+3),
+			*(Efuse+i+4),	*(Efuse+i+5),*(Efuse+i+6),*(Efuse+i+7));
+*/
 	}
 	
-	//efuse_reg_uninit(pAdapter);
+	rtw_efuse_reg_uninit(pAdapter);
 
 }// efuse_ReadAllMap
 static void EFUSE_ShadowMapUpdate(
@@ -1237,17 +1266,10 @@ static void EFUSE_ShadowMapUpdate(
 {	
 	EEPROM_EFUSE_PRIV *pEEPROM = GET_EEPROM_EFUSE_PRIV(pAdapter);	
 		
-	if (pEEPROM->bautoload_fail_flag == _TRUE)
+	if (pEEPROM->bAutoload == _SUCCESS)
 	{			
-		_memset(pEEPROM->efuse_eeprom_data, 0xff, 128);
-	}
-	else
-	{
-		efuse_ReadAllMap(pAdapter, pEEPROM->efuse_eeprom_data);
-	}
-	
-	//PlatformMoveMemory((PVOID)&pHalData->EfuseMap[EFUSE_MODIFY_MAP][0], 
-	//(PVOID)&pHalData->EfuseMap[EFUSE_INIT_MAP][0], HWSET_MAX_SIZE);
+		efuse_ReadAllMap(pAdapter, pEEPROM->efuse_eeprom_data);		
+	}	
 	
 }// EFUSE_ShadowMapUpdate
 
@@ -1257,25 +1279,26 @@ static void _ReadPROMContent(
 {	
 	EEPROM_EFUSE_PRIV *pEEPROM = GET_EEPROM_EFUSE_PRIV(Adapter);
 	HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(Adapter);
-	u8			PROMContent[HWSET_MAX_SIZE]={0};
+	
 	u8			eeValue;
 	u32			i;
-	u16			value16;
 
-	eeValue = read8(Adapter, REG_9346CR);
+	_rtw_memset(pEEPROM->efuse_eeprom_data, 0xff, HWSET_MAX_SIZE);	
+	
+	eeValue = rtw_read8(Adapter, REG_9346CR);
 	// To check system boot selection.
-	pEEPROM->EepromOrEfuse		= (eeValue & BOOT_FROM_EEPROM) ? _TRUE : _FALSE;
-	pEEPROM->bautoload_fail_flag	= (eeValue & EEPROM_EN) ? _FALSE : _TRUE;
+	pEEPROM->bBootFromEEPROM	= (eeValue & BOOT_FROM_EEPROM) ? _TRUE : _FALSE;
+	pEEPROM->bAutoload			= (eeValue & EEPROM_EN) ? _SUCCESS:_FAIL;
 
 
-	DBG_8192C("Boot from %s, Autoload %s !\n", (pEEPROM->EepromOrEfuse ? "EEPROM" : "EFUSE"),
-				(pEEPROM->bautoload_fail_flag ? "Fail" : "OK") );
+	DBG_8192C("Boot from %s, Autoload %s !\n", (pEEPROM->bBootFromEEPROM ? "EEPROM" : "EFUSE"),
+				(pEEPROM->bAutoload ? "Success" : "Fail") );
 
 	//pHalData->EEType = IS_BOOT_FROM_EEPROM(Adapter) ? EEPROM_93C46 : EEPROM_BOOT_EFUSE;
 
-	if(_FALSE == pEEPROM->bautoload_fail_flag)
+	if(_SUCCESS == pEEPROM->bAutoload)
 	{
-		if (_TRUE == pEEPROM->EepromOrEfuse)
+		if (_TRUE == pEEPROM->bBootFromEEPROM)
 		{
 			// Read all Content from EEPROM or EFUSE.
 			for(i = 0; i < HWSET_MAX_SIZE; i += 2)
@@ -1288,26 +1311,11 @@ static void _ReadPROMContent(
 		else
 		{
 			// Read EFUSE real map to shadow.
-			EFUSE_ShadowMapUpdate(Adapter);
-			_memcpy((void*)PROMContent, (void*)pEEPROM->efuse_eeprom_data, HWSET_MAX_SIZE);		
-		}
-
-		//Double check 0x8192 autoload status again
-		if(RTL8192_EEPROM_ID != le16_to_cpu(*((u16 *)PROMContent)))
-		{
-			pEEPROM->bautoload_fail_flag = _TRUE;
-			DBG_8192C("Autoload OK but EEPROM ID content is incorrect!!\n");
-		}
-		
-	}
-	else //auto load fail
-	{
-		_memset(pEEPROM->efuse_eeprom_data, 0xff, HWSET_MAX_SIZE);
-		_memcpy((void*)PROMContent, (void*)pEEPROM->efuse_eeprom_data, HWSET_MAX_SIZE);		
-	}
-
+			EFUSE_ShadowMapUpdate(Adapter);						
+		}		
+	}	
 	
-	_InitAdapterVariablesByPROM(Adapter, PROMContent, pEEPROM->bautoload_fail_flag);
+	_InitAdapterVariablesByPROM(Adapter);
 	
 }
 
@@ -1345,7 +1353,7 @@ _InitOtherVariable(
 }
 
 static VOID
-_ReadRFType(
+_ReadRFChipType(
 	IN	PADAPTER	Adapter
 	)
 {
@@ -1376,7 +1384,7 @@ int ReadAdapterInfo8192C(PADAPTER	Adapter)
 #ifdef CONFIG_USB_HCI
 	//_ReadChipVersion(Adapter);
 
-	_ReadRFType(Adapter);//rf_chip -> _InitRFType()
+	_ReadRFChipType(Adapter);//rf_chip -> _InitRFType()
 	
 	_ReadPROMContent(Adapter);
 
@@ -1395,7 +1403,7 @@ u8 GetEEPROMSize8192C(PADAPTER Adapter)
 	u8	size = 0;
 	u32	curRCR;
 
-	curRCR = read16(Adapter, REG_9346CR);
+	curRCR = rtw_read16(Adapter, REG_9346CR);
 	size = (curRCR & BOOT_FROM_EEPROM) ? 6 : 4; // 6: EEPROM used is 93C46, 4: boot from E-Fuse.
 	
 	MSG_8192C("EEPROM type is %s\n", size==4 ? "E-FUSE" : "93C46");

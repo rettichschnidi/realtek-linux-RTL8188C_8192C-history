@@ -225,12 +225,12 @@ struct mic_data
 	u32     nBytesInM;      // # bytes in M
 };
 
-void secmicsetkey(struct mic_data *pmicdata, u8 * key );
-void secmicappendbyte(struct mic_data *pmicdata, u8 b );
-void secmicappend(struct mic_data *pmicdata, u8 * src, u32 nBytes );
-void secgetmic(struct mic_data *pmicdata, u8 * dst );
+void rtw_secmicsetkey(struct mic_data *pmicdata, u8 * key );
+void rtw_secmicappendbyte(struct mic_data *pmicdata, u8 b );
+void rtw_secmicappend(struct mic_data *pmicdata, u8 * src, u32 nBytes );
+void rtw_secgetmic(struct mic_data *pmicdata, u8 * dst );
 
-void seccalctkipmic(
+void rtw_seccalctkipmic(
 	u8 * key,
 	u8 *header,
 	u8 *data,
@@ -238,18 +238,18 @@ void seccalctkipmic(
 	u8 *Miccode,
 	u8   priority);
 
-u32 aes_encrypt(_adapter *padapter, u8 *pxmitframe);
-u32 tkip_encrypt(_adapter *padapter, u8 *pxmitframe);
-void wep_encrypt(_adapter *padapter, u8  *pxmitframe);
+u32 rtw_aes_encrypt(_adapter *padapter, u8 *pxmitframe);
+u32 rtw_tkip_encrypt(_adapter *padapter, u8 *pxmitframe);
+void rtw_wep_encrypt(_adapter *padapter, u8  *pxmitframe);
 
-u32 aes_decrypt(_adapter *padapter, u8  *precvframe);
-u32 tkip_decrypt(_adapter *padapter, u8  *precvframe);
-void wep_decrypt(_adapter *padapter, u8  *precvframe);
+u32 rtw_aes_decrypt(_adapter *padapter, u8  *precvframe);
+u32 rtw_tkip_decrypt(_adapter *padapter, u8  *precvframe);
+void rtw_wep_decrypt(_adapter *padapter, u8  *precvframe);
 
 
 
 #ifdef PLATFORM_WINDOWS
-void use_tkipkey_handler (
+void rtw_use_tkipkey_handler (
 	IN	PVOID					SystemSpecific1,
 	IN	PVOID					FunctionContext,
 	IN	PVOID					SystemSpecific2,
@@ -257,7 +257,7 @@ void use_tkipkey_handler (
 	);
 #endif
 #ifdef PLATFORM_LINUX
-void use_tkipkey_handler(void* FunctionContext);
+void rtw_use_tkipkey_handler(void* FunctionContext);
 #endif
 #endif	//__RTL871X_SECURITY_H_
 

@@ -242,12 +242,12 @@ union recv_frame{
 };
 
 
-int init_recvbuf(_adapter *padapter, struct recv_buf *precvbuf);
+int rtw_init_recvbuf(_adapter *padapter, struct recv_buf *precvbuf);
 int recvbuf2recvframe(_adapter *padapter, struct recv_buf *precvbuf);
 void rxcmd_event_hdl(_adapter *padapter, void *prxcmdbuf);
 
 
-void reordering_ctrl_timeout_handler(void *pcontext);
+void rtw_reordering_ctrl_timeout_handler(void *pcontext);
 
 #ifdef PLATFORM_LINUX
 #ifdef CONFIG_RECV_TASKLET

@@ -36,12 +36,12 @@
 #include <linux/udp.h>
 #endif
 
-uint remainder_len(struct pkt_file *pfile)
+uint rtw_remainder_len(struct pkt_file *pfile)
 {
 	return (pfile->buf_len - ((u32)(pfile->cur_addr) - (u32)(pfile->buf_start)));
 }
 
-void _open_pktfile (_pkt *pktptr, struct pkt_file *pfile)
+void _rtw_open_pktfile (_pkt *pktptr, struct pkt_file *pfile)
 {
 _func_enter_;
 
@@ -54,13 +54,13 @@ _func_enter_;
 _func_exit_;
 }
 
-uint _pktfile_read (struct pkt_file *pfile, u8 *rmem, uint rlen)
+uint _rtw_pktfile_read (struct pkt_file *pfile, u8 *rmem, uint rlen)
 {	
 	uint	len = 0;
 	
 _func_enter_;
 
-       len =  remainder_len(pfile);
+       len =  rtw_remainder_len(pfile);
       	len = (rlen > len)? len: rlen;
 
        if(rmem)
@@ -74,7 +74,7 @@ _func_exit_;
 	return len;	
 }
 
-sint endofpktfile(struct pkt_file *pfile)
+sint rtw_endofpktfile(struct pkt_file *pfile)
 {
 _func_enter_;
 
@@ -127,7 +127,7 @@ void set_tx_chksum_offload(_pkt *pkt, struct pkt_attrib *pattrib)
 	
 }
 
-int os_xmit_resource_alloc(_adapter *padapter, struct xmit_buf *pxmitbuf)
+int rtw_os_xmit_resource_alloc(_adapter *padapter, struct xmit_buf *pxmitbuf)
 {
 
 #ifdef CONFIG_USB_HCI
@@ -148,7 +148,7 @@ int os_xmit_resource_alloc(_adapter *padapter, struct xmit_buf *pxmitbuf)
 	return _SUCCESS;	
 }
 
-void os_xmit_resource_free(_adapter *padapter, struct xmit_buf *pxmitbuf)
+void rtw_os_xmit_resource_free(_adapter *padapter, struct xmit_buf *pxmitbuf)
 {
 
 #ifdef CONFIG_USB_HCI
@@ -166,19 +166,29 @@ void os_xmit_resource_free(_adapter *padapter, struct xmit_buf *pxmitbuf)
 
 }
 
-void os_xmit_complete(_adapter *padapter, struct xmit_frame *pxframe)
+void os_pkt_complete(_adapter *padapter, _pkt *pkt)
+{
+	if (netif_queue_stopped(padapter->pnetdev))
+		netif_wake_queue(padapter->pnetdev);
+
+	dev_kfree_skb_any(pkt);
+}
+
+void rtw_os_xmit_complete(_adapter *padapter, struct xmit_frame *pxframe)
 {
 	if(pxframe->pkt)
 	{
-		RT_TRACE(_module_xmit_osdep_c_,_drv_err_,("linux : os_xmit_complete, dev_kfree_skb()\n"));	
+		//RT_TRACE(_module_xmit_osdep_c_,_drv_err_,("linux : rtw_os_xmit_complete, dev_kfree_skb()\n"));	
 
-		dev_kfree_skb_any(pxframe->pkt);	
+		//dev_kfree_skb_any(pxframe->pkt);	
+		os_pkt_complete(padapter, pxframe->pkt);
+		
 	}	
 
 	pxframe->pkt = NULL;
 }
 
-int xmit_entry(_pkt *pkt, _nic_hdl pnetdev)
+int rtw_xmit_entry(_pkt *pkt, _nic_hdl pnetdev)
 {
 	_adapter *padapter = (_adapter *)netdev_priv(pnetdev);
 	struct xmit_priv *pxmitpriv = &padapter->xmitpriv;
@@ -190,26 +200,22 @@ _func_enter_;
 
 	RT_TRACE(_module_rtl871x_mlme_c_, _drv_info_, ("+xmit_enry\n"));
 
-	if (if_up(padapter) == _FALSE) {
-		RT_TRACE(_module_xmit_osdep_c_, _drv_err_, ("xmit_entry: if_up fail\n"));
+	if (rtw_if_up(padapter) == _FALSE) {
+		RT_TRACE(_module_xmit_osdep_c_, _drv_err_, ("rtw_xmit_entry: rtw_if_up fail\n"));
 		goto drop_packet;
 	}
 
 	res = rtw_xmit(padapter, pkt);
 	if (res < 0) goto drop_packet;
-	if (res == 0) {
-		// dump xmitframe directly or drop xframe	
-		dev_kfree_skb_any(pkt);
-	}
 
 	pxmitpriv->tx_pkts++;
-	RT_TRACE(_module_xmit_osdep_c_, _drv_info_, ("xmit_entry: tx_pkts=%d\n", (u32)pxmitpriv->tx_pkts));
+	RT_TRACE(_module_xmit_osdep_c_, _drv_info_, ("rtw_xmit_entry: tx_pkts=%d\n", (u32)pxmitpriv->tx_pkts));
 	goto exit;
 
 drop_packet:
 	pxmitpriv->tx_drop++;
 	dev_kfree_skb_any(pkt);
-	RT_TRACE(_module_xmit_osdep_c_, _drv_notice_, ("xmit_entry: drop, tx_drop=%d\\n", (u32)pxmitpriv->tx_drop));
+	RT_TRACE(_module_xmit_osdep_c_, _drv_notice_, ("rtw_xmit_entry: drop, tx_drop=%d\n", (u32)pxmitpriv->tx_drop));
 
 exit:
 

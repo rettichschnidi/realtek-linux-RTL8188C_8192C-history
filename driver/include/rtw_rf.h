@@ -89,10 +89,10 @@ typedef	enum _RT_RF_TYPE_DEFINITION
 }RT_RF_TYPE_DEF_E;
 
 struct setphyinfo_parm;
-void init_phyinfo(_adapter  *adapter, struct setphyinfo_parm* psetphyinfopara);
-u8 writephyinfo_fw(_adapter *padapter, u32 addr);
-u32 ch2freq(u32 ch);
-u32 freq2ch(u32 freq);
+static void init_phyinfo(_adapter  *adapter, struct setphyinfo_parm* psetphyinfopara);
+static u8 writephyinfo_fw(_adapter *padapter, u32 addr);
+u32 rtw_ch2freq(u32 ch);
+u32 rtw_freq2ch(u32 freq);
 
 
 #ifdef CONFIG_RTL8712

@@ -72,12 +72,12 @@
 	typedef struct work_struct _workitem;
 	
 
-static __inline _list *get_next(_list	*list)
+__inline static _list *get_next(_list	*list)
 {
 	return list->next;
 }	
 
-static __inline _list	*get_list_head(_queue	*queue)
+__inline static _list	*get_list_head(_queue	*queue)
 {
 	return (&(queue->queue));
 }
@@ -87,48 +87,48 @@ static __inline _list	*get_list_head(_queue	*queue)
         ((type *)((char *)(ptr)-(SIZE_T)(&((type *)0)->member)))	
 
         
-static void __inline _enter_critical(_lock *plock, _irqL *pirqL)
+__inline static void _enter_critical(_lock *plock, _irqL *pirqL)
 {
 	spin_lock_irqsave(plock, *pirqL);
 }
 
-static void __inline _exit_critical(_lock *plock, _irqL *pirqL)
+__inline static void _exit_critical(_lock *plock, _irqL *pirqL)
 {
 	spin_unlock_irqrestore(plock, *pirqL);
 }
 
-static void __inline _enter_critical_ex(_lock *plock, _irqL *pirqL)
+__inline static void _enter_critical_ex(_lock *plock, _irqL *pirqL)
 {
 	spin_lock_irqsave(plock, *pirqL);
 }
 
-static void __inline _exit_critical_ex(_lock *plock, _irqL *pirqL)
+__inline static void _exit_critical_ex(_lock *plock, _irqL *pirqL)
 {
 	spin_unlock_irqrestore(plock, *pirqL);
 }
 
-static void __inline _enter_critical_bh(_lock *plock, _irqL *pirqL)
+__inline static void _enter_critical_bh(_lock *plock, _irqL *pirqL)
 {
 	spin_lock_bh(plock);
 }
 
-static void __inline _exit_critical_bh(_lock *plock, _irqL *pirqL)
+__inline static void _exit_critical_bh(_lock *plock, _irqL *pirqL)
 {
 	spin_unlock_bh(plock);
 }
 
-static void __inline _enter_hwio_critical(_rwlock *prwlock, _irqL *pirqL)
+__inline static void _enter_hwio_critical(_rwlock *prwlock, _irqL *pirqL)
 {
 		down(prwlock);
 }
 
 
-static void __inline _exit_hwio_critical(_rwlock *prwlock, _irqL *pirqL)
+__inline static void _exit_hwio_critical(_rwlock *prwlock, _irqL *pirqL)
 {
 		up(prwlock);
 }
 
-static __inline void list_delete(_list *plist)
+__inline static void list_delete(_list *plist)
 {
 	
 
@@ -139,7 +139,7 @@ static __inline void list_delete(_list *plist)
 	
 }
 
-static __inline void _init_timer(_timer *ptimer,_nic_hdl padapter,void *pfunc,void* cntx)
+__inline static void _init_timer(_timer *ptimer,_nic_hdl padapter,void *pfunc,void* cntx)
 {
 	//setup_timer(ptimer, pfunc,(u32)cntx);	
 	ptimer->function = pfunc;
@@ -147,18 +147,20 @@ static __inline void _init_timer(_timer *ptimer,_nic_hdl padapter,void *pfunc,vo
 	init_timer(ptimer);
 }
 
-static __inline void _set_timer(_timer *ptimer,u32 delay_time)
+__inline static void _set_timer(_timer *ptimer,u32 delay_time)
 {	
+	if(!ptimer)
+		panic("ptimer is NULL pointer...\n");
 	mod_timer(ptimer , (jiffies+(delay_time*HZ/1000)));	
 }
 
-static __inline void _cancel_timer(_timer *ptimer,u8 *bcancelled)
+__inline static void _cancel_timer(_timer *ptimer,u8 *bcancelled)
 {
 	del_timer_sync(ptimer); 	
 	*bcancelled=  _TRUE;//TRUE ==1; FALSE==0
 }
 
-static __inline void _init_workitem(_workitem *pwork, void *pfunc, PVOID cntx)
+__inline static void _init_workitem(_workitem *pwork, void *pfunc, PVOID cntx)
 {
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,20))
 	INIT_WORK(pwork, pfunc);
@@ -167,7 +169,7 @@ static __inline void _init_workitem(_workitem *pwork, void *pfunc, PVOID cntx)
 #endif
 }
 
-static __inline void _set_workitem(_workitem *pwork)
+__inline static void _set_workitem(_workitem *pwork)
 {
 	schedule_work(pwork);
 }
@@ -221,12 +223,12 @@ static __inline void _set_workitem(_workitem *pwork)
 	#define HZ			10000000
 	#define SEMA_UPBND	(0x7FFFFFFF)   //8192
 	
-static __inline _list *get_next(_list	*list)
+__inline static _list *get_next(_list	*list)
 {
 	return list->Flink;
 }	
 
-static __inline _list	*get_list_head(_queue	*queue)
+__inline static _list	*get_list_head(_queue	*queue)
 {
 	return (&(queue->queue));
 }
@@ -235,77 +237,77 @@ static __inline _list	*get_list_head(_queue	*queue)
 #define LIST_CONTAINOR(ptr, type, member) CONTAINING_RECORD(ptr, type, member)
      
 
-static __inline _enter_critical(_lock *plock, _irqL *pirqL)
+__inline static _enter_critical(_lock *plock, _irqL *pirqL)
 {
 	NdisAcquireSpinLock(plock);	
 }
 
-static __inline _exit_critical(_lock *plock, _irqL *pirqL)
+__inline static _exit_critical(_lock *plock, _irqL *pirqL)
 {
 	NdisReleaseSpinLock(plock);	
 }
 
 
-static __inline _enter_critical_ex(_lock *plock, _irqL *pirqL)
+__inline static _enter_critical_ex(_lock *plock, _irqL *pirqL)
 {
 	NdisDprAcquireSpinLock(plock);	
 }
 
-static __inline _exit_critical_ex(_lock *plock, _irqL *pirqL)
+__inline static _exit_critical_ex(_lock *plock, _irqL *pirqL)
 {
 	NdisDprReleaseSpinLock(plock);	
 }
 
-static void __inline _enter_critical_bh(_lock *plock, _irqL *pirqL)
+__inline static void _enter_critical_bh(_lock *plock, _irqL *pirqL)
 {
 	NdisDprAcquireSpinLock(plock);
 }
 
-static void __inline _exit_critical_bh(_lock *plock, _irqL *pirqL)
+__inline static void _exit_critical_bh(_lock *plock, _irqL *pirqL)
 {
 	NdisDprReleaseSpinLock(plock);
 }
 
-static __inline _enter_hwio_critical(_rwlock *prwlock, _irqL *pirqL)
+__inline static _enter_hwio_critical(_rwlock *prwlock, _irqL *pirqL)
 {
 	KeWaitForSingleObject(prwlock, Executive, KernelMode, FALSE, NULL);
 }
 
 
-static __inline _exit_hwio_critical(_rwlock *prwlock, _irqL *pirqL)
+__inline static _exit_hwio_critical(_rwlock *prwlock, _irqL *pirqL)
 {
 	KeReleaseMutex(prwlock, FALSE);
 }
 
 
-static __inline void list_delete(_list *plist)
+__inline static void list_delete(_list *plist)
 {
 	RemoveEntryList(plist);
 	InitializeListHead(plist);	
 }
 
-static __inline void _init_timer(_timer *ptimer,_nic_hdl padapter,void *pfunc,PVOID cntx)
+__inline static void _init_timer(_timer *ptimer,_nic_hdl padapter,void *pfunc,PVOID cntx)
 {
 	NdisMInitializeTimer(ptimer, padapter, pfunc, cntx);
 }
 
-static __inline void _set_timer(_timer *ptimer,u32 delay_time)
+__inline static void _set_timer(_timer *ptimer,u32 delay_time)
 {	
  	NdisMSetTimer(ptimer,delay_time);	
 }
 
-static __inline void _cancel_timer(_timer *ptimer,u8 *bcancelled)
+__inline static void _cancel_timer(_timer *ptimer,u8 *bcancelled)
 {
 	NdisMCancelTimer(ptimer,bcancelled);
 }
 
-static __inline void _init_workitem(_workitem *pwork, void *pfunc, PVOID cntx)
+__inline static void _init_workitem(_workitem *pwork, void *pfunc, PVOID cntx)
 {
 
 	NdisInitializeWorkItem(pwork, pfunc, cntx);
 }
 
-static __inline void _set_workitem(_workitem *pwork)
+__inline static void _set_workitem(_workitem *pwork)
 {
 	NdisScheduleWorkItem(pwork);
 }
@@ -323,42 +325,42 @@ static __inline void _set_workitem(_workitem *pwork)
 	#define BIT(x)	( 1 << (x))
 #endif
 
-extern u8*	_malloc(u32 sz);
-extern void	_mfree(u8 *pbuf, u32 sz);
-extern void	_memcpy(void* dec, void* sour, u32 sz);
-extern int	_memcmp(void *dst, void *src, u32 sz);
-extern void	_memset(void *pbuf, int c, u32 sz);
+extern u8*	_rtw_malloc(u32 sz);
+extern void	_rtw_mfree(u8 *pbuf, u32 sz);
+extern void	_rtw_memcpy(void* dec, void* sour, u32 sz);
+extern int	_rtw_memcmp(void *dst, void *src, u32 sz);
+extern void	_rtw_memset(void *pbuf, int c, u32 sz);
 
-extern void	_init_listhead(_list *list);
-extern u32	is_list_empty(_list *phead);
-extern void	list_insert_tail(_list *plist, _list *phead);
+extern void	_rtw_init_listhead(_list *list);
+extern u32	rtw_is_list_empty(_list *phead);
+extern void	rtw_list_insert_tail(_list *plist, _list *phead);
 extern void	list_delete(_list *plist);
-extern void	_init_sema(_sema *sema, int init_val);
-extern void	_free_sema(_sema	*sema);
-extern void	_up_sema(_sema	*sema);
-extern u32	_down_sema(_sema *sema);
-extern void	_rwlock_init(_rwlock *prwlock);
-extern void	_spinlock_init(_lock *plock);
-extern void	_spinlock_free(_lock *plock);
-extern void	_spinlock(_lock	*plock);
-extern void	_spinunlock(_lock	*plock);
-extern void	_spinlock_ex(_lock	*plock);
-extern void	_spinunlock_ex(_lock	*plock);
-extern void	_init_queue(_queue	*pqueue);
-extern u32	_queue_empty(_queue	*pqueue);
-extern u32	end_of_queue_search(_list *queue, _list *pelement);
-extern u32	get_current_time(void);
+extern void	_rtw_init_sema(_sema *sema, int init_val);
+extern void	_rtw_free_sema(_sema	*sema);
+extern void	_rtw_up_sema(_sema	*sema);
+extern u32	_rtw_down_sema(_sema *sema);
+extern void	_rtw_rwlock_init(_rwlock *prwlock);
+extern void	_rtw_spinlock_init(_lock *plock);
+extern void	_rtw_spinlock_free(_lock *plock);
+extern void	_rtw_spinlock(_lock	*plock);
+extern void	_rtw_spinunlock(_lock	*plock);
+extern void	_rtw_spinlock_ex(_lock	*plock);
+extern void	_rtw_spinunlock_ex(_lock	*plock);
+extern void	_rtw_init_queue(_queue	*pqueue);
+extern u32	_rtw_queue_empty(_queue	*pqueue);
+extern u32	rtw_end_of_queue_search(_list *queue, _list *pelement);
+extern u32	rtw_get_current_time(void);
 
-extern void	sleep_schedulable(int ms);
+extern void	rtw_sleep_schedulable(int ms);
 
-extern void	msleep_os(int ms);
-extern void	usleep_os(int us);
-extern void	mdelay_os(int ms);
-extern void	udelay_os(int us);
+extern void	rtw_msleep_os(int ms);
+extern void	rtw_usleep_os(int us);
+extern void	rtw_mdelay_os(int ms);
+extern void	rtw_udelay_os(int us);
 
 
 
-static __inline unsigned char _cancel_timer_ex(_timer *ptimer)
+__inline static unsigned char _cancel_timer_ex(_timer *ptimer)
 {
 #ifdef PLATFORM_LINUX
 	return del_timer_sync(ptimer);
@@ -373,7 +375,7 @@ static __inline unsigned char _cancel_timer_ex(_timer *ptimer)
 #endif
 }
 
-static __inline void thread_enter(void *context)
+__inline static void thread_enter(void *context)
 {
 #ifdef PLATFORM_LINUX
 	//struct net_device *pnetdev = (struct net_device *)context;
@@ -383,7 +385,7 @@ static __inline void thread_enter(void *context)
 #endif
 }
 
-static __inline void flush_signals_thread(void) 
+__inline static void flush_signals_thread(void) 
 {
 #ifdef PLATFORM_LINUX
 	if (signal_pending (current)) 
@@ -393,7 +395,7 @@ static __inline void flush_signals_thread(void)
 #endif
 }
 
-static __inline _OS_STATUS res_to_status(sint res)
+__inline static _OS_STATUS res_to_status(sint res)
 {
 
 
@@ -412,7 +414,7 @@ static __inline _OS_STATUS res_to_status(sint res)
 	
 }
 
-static __inline u32 _RND4(u32 sz)
+__inline static u32 _RND4(u32 sz)
 {
 
 	u32	val;
@@ -423,7 +425,7 @@ static __inline u32 _RND4(u32 sz)
 
 }
 
-static __inline u32 _RND8(u32 sz)
+__inline static u32 _RND8(u32 sz)
 {
 
 	u32	val;
@@ -434,7 +436,7 @@ static __inline u32 _RND8(u32 sz)
 
 }
 
-static __inline u32 _RND128(u32 sz)
+__inline static u32 _RND128(u32 sz)
 {
 
 	u32	val;
@@ -445,7 +447,7 @@ static __inline u32 _RND128(u32 sz)
 
 }
 
-static __inline u32 _RND256(u32 sz)
+__inline static u32 _RND256(u32 sz)
 {
 
 	u32	val;
@@ -456,7 +458,7 @@ static __inline u32 _RND256(u32 sz)
 
 }
 
-static __inline u32 _RND512(u32 sz)
+__inline static u32 _RND512(u32 sz)
 {
 
 	u32	val;
@@ -467,7 +469,7 @@ static __inline u32 _RND512(u32 sz)
 
 }
 
-static __inline u32 bitshift(u32 bitmask)
+__inline static u32 bitshift(u32 bitmask)
 {
 	u32 i;
 

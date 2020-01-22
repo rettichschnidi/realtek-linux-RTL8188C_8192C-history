@@ -14,6 +14,7 @@ enum cmd_msg_element_id
 	MACID_CONFIG_EID=6,
 	MACID_PS_MODE_EID=7,
 	P2P_PS_OFFLOAD_EID=8,
+	SELECTIVE_SUSPEND_ROF_CMD=9,
 	MAX_CMDMSG_EID	 
 };
 
@@ -55,8 +56,18 @@ void set_FwPwrMode_cmd(_adapter*padapter, u8 Mode);
 void set_FwJoinBssReport_cmd(_adapter* padapter, u8 mstatus);
 #endif
 
+#ifdef CONFIG_AUTOSUSPEND
+typedef struct _H2C_SS_RFOFF_PARAM{
+	u8 	ROFOn; // 1: on, 0:off
+	u16	gpio_period; // unit: 1024 us
+}H2C_SS_RFOFF_PARAM, *PH2C_SS_RFOFF_PARAM;
+#ifdef  SUPPORT_HW_RFOFF_DETECTED
+u8 set_FWSelectSuspend_cmd(_adapter*padapter,u8 bRFon, u16 polling_period);
+#endif
+#endif
+
 #ifdef CONFIG_ANTENNA_DIVERSITY
-void antenna_select_wk_hdl(_adapter *padapter, u8 *pbuf, int sz);
+void antenna_select_wk_hdl(_adapter *padapter, u8 *pbuf, int antenna);
 u8 antenna_select_cmd(_adapter*padapter, u8 antenna, u8 enqueue);
 #endif
 
@@ -186,13 +197,13 @@ enum rtl8192c_h2c_cmd
 #define _SetRFReg_CMD_ 		_Write_RFREG_CMD_
 
 #ifdef _RTL8192C_CMD_C_
-struct _cmd_callback 	cmd_callback[] = 
+struct _cmd_callback 	rtw_cmd_callback[] = 
 {
 	{GEN_CMD_CODE(_Read_MACREG), NULL}, /*0*/
 	{GEN_CMD_CODE(_Write_MACREG), NULL}, 
-	{GEN_CMD_CODE(_Read_BBREG), &getbbrfreg_cmdrsp_callback},
+	{GEN_CMD_CODE(_Read_BBREG), &rtw_getbbrfreg_cmdrsp_callback},
 	{GEN_CMD_CODE(_Write_BBREG), NULL},
-	{GEN_CMD_CODE(_Read_RFREG), &getbbrfreg_cmdrsp_callback},
+	{GEN_CMD_CODE(_Read_RFREG), &rtw_getbbrfreg_cmdrsp_callback},
 	{GEN_CMD_CODE(_Write_RFREG), NULL}, /*5*/
 	{GEN_CMD_CODE(_Read_EEPROM), NULL},
 	{GEN_CMD_CODE(_Write_EEPROM), NULL},
@@ -203,16 +214,16 @@ struct _cmd_callback 	cmd_callback[] =
 	{GEN_CMD_CODE(_Write_CAM),	 NULL},	
 	{GEN_CMD_CODE(_setBCNITV), NULL},
  	{GEN_CMD_CODE(_setMBIDCFG), NULL},
-	{GEN_CMD_CODE(_JoinBss), &joinbss_cmd_callback},  /*14*/
-	{GEN_CMD_CODE(_DisConnect), &disassoc_cmd_callback}, /*15*/
-	{GEN_CMD_CODE(_CreateBss), &createbss_cmd_callback},
+	{GEN_CMD_CODE(_JoinBss), &rtw_joinbss_cmd_callback},  /*14*/
+	{GEN_CMD_CODE(_DisConnect), &rtw_disassoc_cmd_callback}, /*15*/
+	{GEN_CMD_CODE(_CreateBss), &rtw_createbss_cmd_callback},
 	{GEN_CMD_CODE(_SetOpMode), NULL},
-	{GEN_CMD_CODE(_SiteSurvey), &survey_cmd_callback}, /*18*/
+	{GEN_CMD_CODE(_SiteSurvey), &rtw_survey_cmd_callback}, /*18*/
 	{GEN_CMD_CODE(_SetAuth), NULL},
 	
 	{GEN_CMD_CODE(_SetKey), NULL},	/*20*/
-	{GEN_CMD_CODE(_SetStaKey), &setstaKey_cmdrsp_callback},
-	{GEN_CMD_CODE(_SetAssocSta), &setassocsta_cmdrsp_callback},
+	{GEN_CMD_CODE(_SetStaKey), &rtw_setstaKey_cmdrsp_callback},
+	{GEN_CMD_CODE(_SetAssocSta), &rtw_setassocsta_cmdrsp_callback},
 	{GEN_CMD_CODE(_DelAssocSta), NULL},	
 	{GEN_CMD_CODE(_SetStaPwrState), NULL},	
 	{GEN_CMD_CODE(_SetBasicRate), NULL}, /*25*/
@@ -270,7 +281,7 @@ struct _cmd_callback 	cmd_callback[] =
 	{_SetDIG_CMD_, NULL},	
 	{_SetRA_CMD_, NULL},		
 	{_SetPT_CMD_,NULL},
-	{GEN_CMD_CODE(_ReadTSSI), &readtssi_cmdrsp_callback},
+	{GEN_CMD_CODE(_ReadTSSI), &rtw_readtssi_cmdrsp_callback},
 	{GEN_CMD_CODE(_SetRFIntFs), NULL},
 #endif
 

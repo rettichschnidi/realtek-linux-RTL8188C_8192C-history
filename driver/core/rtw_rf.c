@@ -29,7 +29,7 @@
 #define channel2freq(starting_freq, channel) \
 	((starting_freq + (5 * channel)))
 
-u32 ch2freq(u32 ch)
+u32 rtw_ch2freq(u32 ch)
 {
 	u32 starting_freq;
 	
@@ -46,7 +46,7 @@ u32 ch2freq(u32 ch)
 		
 }
 
-u32 freq2ch(u32 freq)
+u32 rtw_freq2ch(u32 freq)
 {
 	u32 starting_freq;
 	
@@ -69,7 +69,7 @@ u32 freq2ch(u32 freq)
 }
 
 
-void set_channelset_a(_adapter  *padapter, struct regulatory_class *reg_class, u8 index, u8 channel_set)
+static void set_channelset_a(_adapter  *padapter, struct regulatory_class *reg_class, u8 index, u8 channel_set)
 {
 
 	struct eeprom_priv* peeprompriv = &padapter->eeprompriv;
@@ -84,7 +84,7 @@ void set_channelset_a(_adapter  *padapter, struct regulatory_class *reg_class, u
 }
 
 
-void set_channelset_bg(_adapter  *padapter, struct regulatory_class *reg_class, u8 index, u8 channel_set)
+static void set_channelset_bg(_adapter  *padapter, struct regulatory_class *reg_class, u8 index, u8 channel_set)
 {
 	struct eeprom_priv* peeprompriv = &padapter->eeprompriv;
 
@@ -150,7 +150,7 @@ void set_channelset_bg(_adapter  *padapter, struct regulatory_class *reg_class, 
          	- Transmit power limit (dBm):   
   		   psetphyinfopara->class_sets[class_index].txpower_limit
 */     	   	  
-void init_phyinfo(_adapter  *adapter, struct setphyinfo_parm* psetphyinfopara)
+static void init_phyinfo(_adapter  *adapter, struct setphyinfo_parm* psetphyinfopara)
 {
 
 	struct eeprom_priv* peeprompriv = &adapter->eeprompriv;
@@ -492,19 +492,19 @@ void init_phyinfo(_adapter  *adapter, struct setphyinfo_parm* psetphyinfopara)
 }
 
 
-u8 writephyinfo_fw(_adapter *padapter, u32 addr)
+static u8 writephyinfo_fw(_adapter *padapter, u32 addr)
 {
 	u32	i;
 	u32 *tmpWrite;
 	struct setphyinfo_parm*	psetphyinfopara;
 
-	psetphyinfopara = (struct setphyinfo_parm*)_malloc(sizeof(struct setphyinfo_parm)); 
+	psetphyinfopara = (struct setphyinfo_parm*)_rtw_malloc(sizeof(struct setphyinfo_parm)); 
 
 	if(psetphyinfopara==NULL){
 		return _FAIL;
 	}
 
-	_memset((unsigned char *)psetphyinfopara, 0, sizeof (struct setphyinfo_parm));
+	_rtw_memset((unsigned char *)psetphyinfopara, 0, sizeof (struct setphyinfo_parm));
 	
 	init_phyinfo(padapter, psetphyinfopara);
 
@@ -512,11 +512,11 @@ u8 writephyinfo_fw(_adapter *padapter, u32 addr)
 
 	for(i = 0; i < sizeof(struct setphyinfo_parm); i = i + sizeof(u32)) 
 	{
-		write32(padapter, addr+i, *tmpWrite);
+		rtw_write32(padapter, addr+i, *tmpWrite);
 		tmpWrite++;
 	}
 
-	_mfree((unsigned char *) psetphyinfopara, sizeof(struct	setphyinfo_parm));
+	_rtw_mfree((unsigned char *) psetphyinfopara, sizeof(struct	setphyinfo_parm));
 	
 	return _SUCCESS;
 }

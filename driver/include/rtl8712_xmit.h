@@ -264,18 +264,18 @@ int free_amsdu_xmitframe(struct xmit_priv *pxmitpriv, struct amsdu_xmit_frame *p
 struct agg_xmit_frame *alloc_txagg_xmitframe(struct xmit_priv *pxmitpriv);
 int free_txagg_xmitframe(struct xmit_priv *pxmitpriv, struct agg_xmit_frame *pxmitframe);
 
-void update_txdesc(struct xmit_frame *pxmitframe, uint *ptxdesc, int sz);
-void dump_xframe(_adapter *padapter, struct xmit_frame *pxmitframe);
+void rtw_update_txdesc(struct xmit_frame *pxmitframe, uint *ptxdesc, int sz);
+void rtw_dump_xframe(_adapter *padapter, struct xmit_frame *pxmitframe);
 
-int xmitframe_complete(_adapter *padapter, struct xmit_priv *pxmitpriv, struct xmit_buf *pxmitbuf);
+int rtw_xmitframe_complete(_adapter *padapter, struct xmit_priv *pxmitpriv, struct xmit_buf *pxmitbuf);
 
 
 struct xmit_frame *dequeue_one_xmitframe(struct xmit_priv *pxmitpriv, struct hw_xmit *phwxmit, struct tx_servq *ptxservq, _queue *pframe_queue);
 struct xmit_frame *dequeue_amsdu_xmitframe(struct xmit_priv *pxmitpriv, struct hw_xmit *phwxmit, struct tx_servq *ptxservq, _queue *pframe_queue);
-struct xmit_frame *dequeue_xframe(struct xmit_priv *pxmitpriv, struct hw_xmit *phwxmit, sint entry);
+struct xmit_frame *rtw_dequeue_xframe(struct xmit_priv *pxmitpriv, struct hw_xmit *phwxmit, sint entry);
 
-void do_queue_select(_adapter *padapter, struct pkt_attrib *pattrib);
-u32 get_ff_hwaddr(struct xmit_frame	*pxmitframe);
+void rtw_do_queue_select(_adapter *padapter, struct pkt_attrib *pattrib);
+u32 rtw_get_ff_hwaddr(struct xmit_frame	*pxmitframe);
 
 #endif
 
