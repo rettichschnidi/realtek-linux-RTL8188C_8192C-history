@@ -1,24 +1,5 @@
-/******************************************************************************
- *
- * Copyright(c) 2007 - 2010 Realtek Corporation. All rights reserved.
- *                                        
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of version 2 of the GNU General Public License as
- * published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along with
- * this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
- *
- *
- ******************************************************************************/
-#ifndef __RTL871X_EEPROM_H__
-#define __RTL871X_EEPROM_H__
+#ifndef __RTW_EEPROM_H__
+#define __RTW_EEPROM_H__
 
 #include <drv_conf.h>
 #include <osdep_service.h>
@@ -59,6 +40,14 @@
 #define	EEPROM_CID_CLEVO				0x13
 #define	EEPROM_CID_WHQL				0xFE // added by chiyoko for dtm, 20090108
 
+//
+// Customer ID, note that: 
+// This variable is initiailzed through EEPROM or registry, 
+// however, its definition may be different with that in EEPROM for 
+// EEPROM size consideration. So, we have to perform proper translation between them.
+// Besides, CustomerID of registry has precedence of that of EEPROM.
+// defined below. 060703, by rcnjko.
+//
 typedef enum _RT_CUSTOMER_ID
 {
 	RT_CID_DEFAULT = 0,
@@ -99,94 +88,27 @@ typedef enum _RT_CUSTOMER_ID
 
 struct eeprom_priv 
 {    
-	u8		bAutoload;
-	u8		bempty;
-	u8		sys_config;
+	u8		bautoload_fail_flag;
+	//u8		bempty;
+	//u8		sys_config;
 	u8		mac_addr[6];	//PermanentAddress
-	u8		config0;
+	//u8		config0;
 	u16		channel_plan;
-	u8		country_string[3];	
-	u8		tx_power_b[15];
-	u8		tx_power_g[15];
-	u8		tx_power_a[201];
+	//u8		country_string[3];	
+	//u8		tx_power_b[15];
+	//u8		tx_power_g[15];
+	//u8		tx_power_a[201];
 
-	u8		bBootFromEEPROM;
-	
+	u8		EepromOrEfuse;
+
 	u8		efuse_eeprom_data[EEPROM_MAX_SIZE];
-	u16		efuse_phy_max_size;
+
 #ifdef CONFIG_SDIO_HCI
 	u8		sdio_setting;	
 	u32		ocr;
 	u8		cis0[eeprom_cis0_sz];
 	u8		cis1[eeprom_cis1_sz];	
 #endif
-
-
-#ifdef CONFIG_RTL8192C
-	//
-	// EEPROM setting.
-	//
-	u8				EEPROMVersion;
-	u16				EEPROMVID;
-	u16				EEPROMPID;
-	u16				EEPROMSVID;
-	u16				EEPROMSDID;
-	u8				EEPROMCustomerID;
-	u8				EEPROMSubCustomerID;	
-	u8				EEPROMRegulatory;//ChannelPlan
-
-	u8	 			EEPROMUsbOption;
-	u8				EEPROMUsbEndPointNumber;
-	u8	 			EEPROMUsbPhyParam[5];
-
-	u8  				EEPROMThermalMeter;
-	u8  				EEPROMTSSI_A;
-	u8  				EEPROMTSSI_B;
-
-	u8				EEPROMBoardType;	
-
-
-	//
-	// The same as 92CE. May merge 92CU and 92CE into the other struct
-	//
-	//u8				ThermalMeter[2];	// ThermalMeter, index 0 for RFIC0, and 1 for RFIC1
-	u8				TxPwrLevelCck[RF90_PATH_MAX][CHANNEL_MAX_NUMBER];
-	u8				TxPwrLevelHT40_1S[RF90_PATH_MAX][CHANNEL_MAX_NUMBER];	// For HT 40MHZ pwr
-	u8				TxPwrLevelHT40_2S[RF90_PATH_MAX][CHANNEL_MAX_NUMBER];	// For HT 40MHZ pwr	
-	u8				TxPwrHt20Diff[RF90_PATH_MAX][CHANNEL_MAX_NUMBER];// HT 20<->40 Pwr diff
-	u8				TxPwrLegacyHtDiff[RF90_PATH_MAX][CHANNEL_MAX_NUMBER];// For HT<->legacy pwr diff
-	// For power group
-	u8				PwrGroupHT20[RF90_PATH_MAX][CHANNEL_MAX_NUMBER];
-	u8				PwrGroupHT40[RF90_PATH_MAX][CHANNEL_MAX_NUMBER];
-	
-
-	
-	//chip info from eeprom or efuse	
-	//unsigned char hw_addr[6];
-	//unsigned short chip_id;//EEPROMId	?
-	//unsigned char EEPROMUsbOption;
-	//unsigned char EEPROMUsbPhyParam[5];
-	//unsigned char EEPROMUsbEndPointNumber;
-	//unsigned char EEPROMVersion;
-	//unsigned char eeprom_ChannelPlan;
-	//unsigned char eeprom_CustomerID;
-	//unsigned char eeprom_SubCustomerID;
-	//unsigned char EEPROMBoardType;	
-	//unsigned char RfCckChnlAreaTxPwr[2][3];//RF-A&B CCK/OFDM Tx Power Level at three channel are [1-3] [4-9] [10-14]
-	//unsigned char RfOfdmChnlAreaTxPwr1T[2][3];	
-	//unsigned char RfOfdmChnlAreaTxPwr2T[2][3];	
-	//unsigned char EEPROMTxPowerDiff;
-	//unsigned char EEPROMThermalMeter;
-	//unsigned char EEPROMTSSI_A;
-	//unsigned char EEPROMTSSI_B;	
-	//unsigned char TxPwrHt20Diff[2][14];	// HT 20<->40 Pwr diff
-	//unsigned char TxPwrLegacyHtDiff[2][14];	// For HT<->legacy OFDM pwr diff
-	//unsigned char EEPROMPwrGroup[2][3];		
-	//unsigned char EEPROMRegulatory;
-	//unsigned char EEPROMOptional;
-	
-#endif //end of CONFIG_RTL8192C
-
 };
 
 

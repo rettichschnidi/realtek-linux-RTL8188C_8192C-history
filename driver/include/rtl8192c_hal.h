@@ -1,38 +1,27 @@
-/******************************************************************************
- *
- * Copyright(c) 2007 - 2010 Realtek Corporation. All rights reserved.
- *                                        
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of version 2 of the GNU General Public License as
- * published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along with
- * this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
- *
- *
- ******************************************************************************/
 #ifndef __RTL8192C_HAL_H__
 #define __RTL8192C_HAL_H__
 
+#include "rtl8192c_spec.h"
 #include "Hal8192CPhyReg.h"
 #include "Hal8192CPhyCfg.h"
+#include "rtl8192c_rf.h"
 #include "rtl8192c_dm.h"
+#include "rtl8192c_recv.h"
+#include "rtl8192c_xmit.h"
+#include "rtl8192c_cmd.h"
 
 #if (DEV_BUS_TYPE == DEV_BUS_PCI_INTERFACE)
+
+	#include "Hal8192CEHWImg.h"
 
 	#define RTL819X_DEFAULT_RF_TYPE			RF_2T2R
 	//#define RTL819X_DEFAULT_RF_TYPE			RF_1T2R
 	#define RTL819X_TOTAL_RF_PATH				2
 
 	//2TODO:  The following need to check!!
-	#define	RTL8192C_FW_IMG					"rtl8192CE\\rtl8192cfw.bin"
-	#define	RTL8188C_FW_IMG					"rtl8192CE\\rtl8192cfw.bin"
+	#define RTL8192C_FW_TSMC_IMG				"rtl8192CE\\rtl8192cfwT.bin"
+	#define RTL8192C_FW_UMC_IMG				"rtl8192CE\\rtl8192cfwU.bin"
+	#define RTL8723_FW_UMC_IMG				"rtl8192CE\\rtl8723fw.bin"
 
 	#define RTL8188C_PHY_REG					"rtl8192CE\\PHY_REG_1T.txt"
 	#define RTL8188C_PHY_RADIO_A				"rtl8192CE\\radio_a_1T.txt"
@@ -67,17 +56,20 @@
 	#define RTL819X_EFUSE_MAP					"rtl8192CE\\8192ce.map"
 
 	// The file name "_2T" is for 92CE, "_1T"  is for 88CE. Modified by tynli. 2009.11.24.
-	#define Rtl819XFwImageArray				Rtl8192CEFwImgArray
+	#define Rtl819XFwTSMCImageArray			Rtl8192CEFwTSMCImgArray
+	#define Rtl819XFwUMCImageArray				Rtl8192CEFwUMCImgArray
+	#define Rtl8723FwUMCImageArray				Rtl8192CEFwUMC8723ImgArray
 	#define Rtl819XMAC_Array					Rtl8192CEMAC_2T_Array
 	#define Rtl819XAGCTAB_2TArray				Rtl8192CEAGCTAB_2TArray
 	#define Rtl819XAGCTAB_1TArray				Rtl8192CEAGCTAB_1TArray
-	#define Rtl819XPHY_REG_2TArray			Rtl8192CEPHY_REG_2TArray
-	#define Rtl819XPHY_REG_1TArray			Rtl8192CEPHY_REG_1TArray
+	#define Rtl819XPHY_REG_2TArray				Rtl8192CEPHY_REG_2TArray
+	#define Rtl819XPHY_REG_1TArray				Rtl8192CEPHY_REG_1TArray
 	#define Rtl819XRadioA_2TArray				Rtl8192CERadioA_2TArray
 	#define Rtl819XRadioA_1TArray				Rtl8192CERadioA_1TArray
 	#define Rtl819XRadioB_2TArray				Rtl8192CERadioB_2TArray
 	#define Rtl819XRadioB_1TArray				Rtl8192CERadioB_1TArray
 	#define Rtl819XPHY_REG_Array_PG 			Rtl8192CEPHY_REG_Array_PG
+	#define Rtl819XPHY_REG_Array_MP 			Rtl8192CEPHY_REG_Array_MP
 
 #elif (DEV_BUS_TYPE == DEV_BUS_USB_INTERFACE)
 
@@ -85,22 +77,18 @@
 
 	//2TODO: We should define 8192S firmware related macro settings here!!
 	#define RTL819X_DEFAULT_RF_TYPE			RF_1T2R
-	#define RTL819X_TOTAL_RF_PATH			2
+	#define RTL819X_TOTAL_RF_PATH				2
 
 	//TODO:  The following need to check!!
 	#define	RTL8192C_FW_TSMC_IMG				"rtl8192CU\\rtl8192cfwT.bin"
 	#define	RTL8192C_FW_UMC_IMG				"rtl8192CU\\rtl8192cfwU.bin"
 	#define	RTL8723_FW_UMC_IMG				"rtl8192CU\\rtl8723fw.bin"
-	
-	//#define RTL819X_FW_BOOT_IMG   				"rtl8192CU\\boot.img"
-	//#define RTL819X_FW_MAIN_IMG				"rtl8192CU\\main.img"
-	//#define RTL819X_FW_DATA_IMG				"rtl8192CU\\data.img"
 
 	#define RTL8188C_PHY_REG					"rtl8188CU\\PHY_REG.txt"
 	#define RTL8188C_PHY_RADIO_A				"rtl8188CU\\radio_a.txt"
 	#define RTL8188C_PHY_RADIO_B				"rtl8188CU\\radio_b.txt"
-	#define RTL8188C_PHY_RADIO_A_mCard			"rtl8192CU\\radio_a_1T_mCard.txt"
-	#define RTL8188C_PHY_RADIO_B_mCard			"rtl8192CU\\radio_b_1T_mCard.txt" 
+	#define RTL8188C_PHY_RADIO_A_mCard		"rtl8192CU\\radio_a_1T_mCard.txt"
+	#define RTL8188C_PHY_RADIO_B_mCard		"rtl8192CU\\radio_b_1T_mCard.txt" 
 	#define RTL8188C_PHY_RADIO_A_HP			"rtl8192CU\\radio_a_1T_HP.txt"
 	#define RTL8188C_AGC_TAB					"rtl8188CU\\AGC_TAB.txt"
 	#define RTL8188C_PHY_MACREG				"rtl8188CU\\MACREG.txt"
@@ -111,35 +99,32 @@
 	#define RTL8192C_AGC_TAB					"rtl8192CU\\AGC_TAB.txt"
 	#define RTL8192C_PHY_MACREG				"rtl8192CU\\MACREG.txt"
 
-	#define RTL819X_PHY_REG_PG				"rtl8192CU\\PHY_REG_PG.txt"
-#if 0
 	#define RTL819X_PHY_MACPHY_REG			"rtl8192CU\\MACPHY_reg.txt"
 	#define RTL819X_PHY_MACPHY_REG_PG		"rtl8192CU\\MACPHY_reg_PG.txt"
 	#define RTL819X_PHY_MACREG				"rtl8192CU\\MAC_REG.txt"
 	#define RTL819X_PHY_REG					"rtl8192CU\\PHY_REG.txt"
 	#define RTL819X_PHY_REG_1T2R				"rtl8192CU\\PHY_REG_1T2R.txt"
-	#define RTL819X_PHY_REG_to1T1R			"rtl8192CU\\phy_to1T1R_a.txt"
-	#define RTL819X_PHY_REG_to1T2R			"rtl8192CU\\phy_to1T2R.txt"
-	#define RTL819X_PHY_REG_to2T2R			"rtl8192CU\\phy_to2T2R.txt"
-	//#define RTL819X_PHY_REG_PG				"rtl8192CU\\PHY_REG_PG.txt"
+	#define RTL819X_PHY_REG_to1T1R				"rtl8192CU\\phy_to1T1R_a.txt"
+	#define RTL819X_PHY_REG_to1T2R				"rtl8192CU\\phy_to1T2R.txt"
+	#define RTL819X_PHY_REG_to2T2R				"rtl8192CU\\phy_to2T2R.txt"
+	#define RTL819X_PHY_REG_PG					"rtl8192CU\\PHY_REG_PG.txt"
+	#define RTL819X_PHY_REG_MP 				"rtl8192CU\\PHY_REG_MP.txt" 		
+
 	#define RTL819X_AGC_TAB					"rtl8192CU\\AGC_TAB.txt"
 	#define RTL819X_PHY_RADIO_A				"rtl8192CU\\radio_a.txt"
-	#define RTL819X_PHY_RADIO_B				"rtl8192CU\\radio_b.txt"
-	#define RTL819X_PHY_RADIO_B_GM			"rtl8192CU\\radio_b_gm.txt"
+	#define RTL819X_PHY_RADIO_B				"rtl8192CU\\radio_b.txt"			
+	#define RTL819X_PHY_RADIO_B_GM			"rtl8192CU\\radio_b_gm.txt"	
 	#define RTL819X_PHY_RADIO_C				"rtl8192CU\\radio_c.txt"
 	#define RTL819X_PHY_RADIO_D				"rtl8192CU\\radio_d.txt"
 	#define RTL819X_EEPROM_MAP				"rtl8192CU\\8192cu.map"
 	#define RTL819X_EFUSE_MAP					"rtl8192CU\\8192cu.map"
 	#define RTL819X_PHY_RADIO_A_1T			"rtl8192CU\\radio_a_1t.txt"
 	#define RTL819X_PHY_RADIO_A_2T			"rtl8192CU\\radio_a_2t.txt"
-#endif
 
 	// The file name "_2T" is for 92CU, "_1T"  is for 88CU. Modified by tynli. 2009.11.24.
-	#define Rtl819XFwImageArray					Rtl8192CUFwTSMCImgArray
 	#define Rtl819XFwTSMCImageArray			Rtl8192CUFwTSMCImgArray
-	#define Rtl819XFwUMCACutImageArray			Rtl8192CUFwUMCACutImgArray
-	#define Rtl819XFwUMCBCutImageArray			Rtl8192CUFwUMCBCutImgArray
-	
+	#define Rtl819XFwUMCImageArray				Rtl8192CUFwUMCImgArray
+
 	#define Rtl819XMAC_Array					Rtl8192CUMAC_2T_Array
 	#define Rtl819XAGCTAB_2TArray				Rtl8192CUAGCTAB_2TArray
 	#define Rtl819XAGCTAB_1TArray				Rtl8192CUAGCTAB_1TArray
@@ -149,30 +134,24 @@
 	#define Rtl819XPHY_REG_1T_mCardArray		Rtl8192CUPHY_REG_1T_mCardArray 					
 	#define Rtl819XPHY_REG_2T_mCardArray		Rtl8192CUPHY_REG_2T_mCardArray	
 	#define Rtl819XPHY_REG_1T_HPArray			Rtl8192CUPHY_REG_1T_HPArray
-	#define Rtl819XRadioA_2TArray					Rtl8192CURadioA_2TArray
-	#define Rtl819XRadioA_1TArray					Rtl8192CURadioA_1TArray
-	#define Rtl819XRadioA_1T_mCardArray			Rtl8192CURadioA_1T_mCardArray			
-	#define Rtl819XRadioB_2TArray					Rtl8192CURadioB_2TArray
-	#define Rtl819XRadioB_1TArray					Rtl8192CURadioB_1TArray	
-	#define Rtl819XRadioB_1T_mCardArray			Rtl8192CURadioB_1T_mCardArray
+	#define Rtl819XRadioA_2TArray				Rtl8192CURadioA_2TArray
+	#define Rtl819XRadioA_1TArray				Rtl8192CURadioA_1TArray
+	#define Rtl819XRadioA_1T_mCardArray		Rtl8192CURadioA_1T_mCardArray			
+	#define Rtl819XRadioB_2TArray				Rtl8192CURadioB_2TArray
+	#define Rtl819XRadioB_1TArray				Rtl8192CURadioB_1TArray	
+	#define Rtl819XRadioB_1T_mCardArray		Rtl8192CURadioB_1T_mCardArray
 	#define Rtl819XRadioA_1T_HPArray			Rtl8192CURadioA_1T_HPArray	
 	#define Rtl819XPHY_REG_Array_PG 			Rtl8192CUPHY_REG_Array_PG
 	#define Rtl819XPHY_REG_Array_PG_mCard 		Rtl8192CUPHY_REG_Array_PG_mCard			
-	#define Rtl819XPHY_REG_Array_PG_HP			Rtl8192CUPHY_REG_Array_PG_HP		
-		
+	#define Rtl819XPHY_REG_Array_PG_HP			Rtl8192CUPHY_REG_Array_PG_HP
+	#define Rtl819XPHY_REG_Array_MP 			Rtl8192CUPHY_REG_Array_MP
+
 #endif
 
+#define PageNum_128(_Len)		(u32)(((_Len)>>7) + ((_Len)&0x7F ? 1:0))
 
-enum RTL871X_HCI_TYPE {
 
-	RTL8192C_SDIO,
-	RTL8192C_USB,
-	RTL8192C_PCIE
-};
-
-#define PageNum_128(_Len)		(u32)(((_Len)>>7) + ((_Len)&0x7F ? 1:0))
-
-#define FW_8192C_SIZE					16384+32//16k
+#define FW_8192C_SIZE					0x4000
 #define FW_8192C_START_ADDRESS		0x1000
 #define FW_8192C_END_ADDRESS		0x3FFF
 
@@ -228,16 +207,13 @@ typedef struct _RT_8192C_FIRMWARE_HDR {//8-byte alinment required
 #define DRIVER_EARLY_INT_TIME		0x05
 #define BCN_DMA_ATIME_INT_TIME		0x02
 
-#define USB_HIGH_SPEED_BULK_SIZE	512
-#define USB_FULL_SPEED_BULK_SIZE	64
-
-#if USB_RX_AGGREGATION_92C
+#ifdef USB_RX_AGGREGATION_92C
 
 typedef enum _USB_RX_AGG_MODE{
 	USB_RX_AGG_DISABLE,
 	USB_RX_AGG_DMA,
 	USB_RX_AGG_USB,
-	USB_RX_AGG_MIX
+	USB_RX_AGG_DMA_USB
 }USB_RX_AGG_MODE;
 
 #define MAX_RX_DMA_BUFFER_SIZE	10240		// 10K for 8192C RX DMA buffer
@@ -257,9 +233,10 @@ typedef enum _USB_RX_AGG_MODE{
 
 // For Normal Chip Setting
 // (HPQ + LPQ + NPQ + PUBQ) shall be TX_TOTAL_PAGE_NUMBER
-//#define NORMAL_PAGE_NUM_PUBQ		0x56
-//#define NORMAL_PAGE_NUM_PUBQ		0xb0
-#define NORMAL_PAGE_NUM_PUBQ		0xE7
+#define NORMAL_PAGE_NUM_PUBQ			0xE7
+#define NORMAL_PAGE_NUM_HPQ			0x0C
+#define NORMAL_PAGE_NUM_LPQ			0x02
+#define NORMAL_PAGE_NUM_NPQ			0x02
 
 
 // For Test Chip Setting
@@ -280,21 +257,21 @@ typedef enum _USB_RX_AGG_MODE{
 #define WMM_NORMAL_TX_TOTAL_PAGE_NUMBER	0xF5
 #define WMM_NORMAL_TX_PAGE_BOUNDARY	(WMM_TEST_TX_TOTAL_PAGE_NUMBER + 1) //F6
 
-#define WMM_NORMAL_PAGE_NUM_PUBQ	0xB0
+#define WMM_NORMAL_PAGE_NUM_PUBQ		0xB0
 #define WMM_NORMAL_PAGE_NUM_HPQ		0x29
-#define WMM_NORMAL_PAGE_NUM_LPQ		0x1C
+#define WMM_NORMAL_PAGE_NUM_LPQ			0x1C
 #define WMM_NORMAL_PAGE_NUM_NPQ		0x1C
 
 //-------------------------------------------------------------------------
 //	Chip specific
 //-------------------------------------------------------------------------
-#define CHIP_92C  					BIT(0)
+#define CHIP_92C						BIT(0)
 #define CHIP_92C_1T2R				BIT(1)
 #define CHIP_8723					BIT(2) // RTL8723 With BT feature
 #define CHIP_8723_DRV_REV			BIT(3) // RTL8723 Driver Revised
 #define NORMAL_CHIP  				BIT(4)
 #define CHIP_VENDOR_UMC			BIT(5)
-#define CHIP_VENDOR_UMC_B_CUT	BIT(6) // Chip version for ECO
+#define CHIP_VENDOR_UMC_B_CUT		BIT(6) // Chip version for ECO
 
 #define IS_NORMAL_CHIP(version)  	(((version) & NORMAL_CHIP) ? _TRUE : _FALSE) 
 #define IS_92C_SERIAL(version)   		(((version) & CHIP_92C) ? _TRUE : _FALSE)
@@ -302,25 +279,24 @@ typedef enum _USB_RX_AGG_MODE{
 #define IS_92C_1T2R(version)			(((version) & CHIP_92C) && ((version) & CHIP_92C_1T2R))
 #define IS_VENDOR_UMC(version)		(((version) & CHIP_VENDOR_UMC) ? _TRUE : _FALSE)
 #define IS_VENDOR_UMC_A_CUT(version)	(((version) & CHIP_VENDOR_UMC) ? (((version) & (BIT6|BIT7)) ? _FALSE : _TRUE) : _FALSE)
-
 #define IS_VENDOR_8723_A_CUT(version)	(((version) & CHIP_VENDOR_UMC) ? (((version) & (BIT6)) ? _FALSE : _TRUE) : _FALSE)
 
 // 20100707 Joseph: Add vendor information into chip version definition.
-// 20100902 Roger: Add UMC B-Cut and RTL8723 chip info definition.
 /*
-|    BIT 7   |     BIT6     |                BIT 5                | BIT 4              |       BIT 3     |  BIT 2   |  BIT 1   |   BIT 0    |
-+--------+---------+---------------------- +------------ +----------- +------ +-----------------+
-|Reserved | UMC BCut |Manufacturer(TSMC/UMC)  | TEST/NORMAL | 8723 Version | 8723?   | 1T2R?  | 88C/92C |
+|BIT 7 ~ 6 | BIT 5                              | BIT 4              | BIT 3 ~ 2  | BIT 1   | BIT 0
++--------+--------------------- +------------ +--------- +------ +---------
+|Reserved | Manufacturer(TSMC/UMC)| TEST/NORMAL | Reserved  | 1T2R?  | 88C/92C
 */
 typedef enum _VERSION_8192C{
 	VERSION_TEST_CHIP_88C = 0x00,
 	VERSION_TEST_CHIP_92C = 0x01,
+	VERSION_TEST_UMC_CHIP_8723 = 0x24,
 	VERSION_NORMAL_TSMC_CHIP_88C = 0x10,
 	VERSION_NORMAL_TSMC_CHIP_92C = 0x11,
 	VERSION_NORMAL_TSMC_CHIP_92C_1T2R = 0x13,
 	VERSION_NORMAL_UMC_CHIP_88C_A_CUT = 0x30,
 	VERSION_NORMAL_UMC_CHIP_92C_A_CUT = 0x31,
-	VERSION_NORMAL_UMC_CHIP_92C_1T2R_A_CUT = 0x33,		
+	VERSION_NORMAL_UMC_CHIP_92C_1T2R_A_CUT = 0x33,
 	VERSION_NORMA_UMC_CHIP_8723_1T1R_A_CUT = 0x34,
 	VERSION_NORMA_UMC_CHIP_8723_1T1R_B_CUT = 0x3c,
 	VERSION_NORMAL_UMC_CHIP_88C_B_CUT = 0x70,
@@ -328,8 +304,12 @@ typedef enum _VERSION_8192C{
 	VERSION_NORMAL_UMC_CHIP_92C_1T2R_B_CUT = 0x73,	
 }VERSION_8192C,*PVERSION_8192C;
 
-#define CHIP_BONDING_92C_1T2R	0x1
 #define CHIP_BONDING_IDENTIFIER(_value)	(((_value)>>22)&0x3)
+#define CHIP_BONDING_92C_1T2R	0x1
+#define CHIP_BONDING_88C_USB_MCARD	0x2
+#define CHIP_BONDING_88C_USB_HP	0x1
+
+
 //-------------------------------------------------------------------------
 //	Channel Plan
 //-------------------------------------------------------------------------
@@ -359,197 +339,411 @@ typedef struct _TxPowerInfo{
 	u8 TSSI_B;
 }TxPowerInfo, *PTxPowerInfo;
 
-struct	_hal_ops {
-	u32 (*hal_init)(PADAPTER padapter);
-	u32 (*hal_deinit)(PADAPTER padapter);
+#define		EFUSE_REAL_CONTENT_LEN		512
+#define		EFUSE_MAP_LEN					128
+#define		EFUSE_MAX_SECTION			16
+#define		EFUSE_IC_ID_OFFSET			506	//For some inferiority IC purpose. added by Roger, 2009.09.02.
+#define 		AVAILABLE_EFUSE_ADDR(addr) 	(addr < EFUSE_REAL_CONTENT_LEN)
+//
+// <Roger_Notes> To prevent out of boundary programming case, leave 1byte and program full section
+// 9bytes + 1byt + 5bytes and pre 1byte.
+// For worst case:
+// | 1byte|----8bytes----|1byte|--5bytes--| 
+// |         |            Reserved(14bytes)	      |
+//
+#define		EFUSE_OOB_PROTECT_BYTES 		15	// PG data exclude header, dummy 6 bytes frome CP test and reserved 1byte.
 
-	u32  (*inirp_init)(PADAPTER adapter);
-	u32  (*inirp_deinit)(PADAPTER adapter);
 
-	void (*intf_chip_configure)(PADAPTER Adapter);
+#define		EFUSE_MAP_LEN_8723			256
+#define		EFUSE_MAX_SECTION_8723		32
 
-	void (*read_adapter_info)(PADAPTER Adapter);
+//========================================================
+//			EFUSE for BT definition
+//========================================================
+#define		EFUSE_BT_REAL_CONTENT_LEN		1536	// 512*3
+#define		EFUSE_BT_MAP_LEN					1024	// 1k bytes
+#define		EFUSE_BT_MAX_SECTION				128		// 1024/8
 
-	void (*set_bwmode_handler)(PADAPTER padapter, HT_CHANNEL_WIDTH Bandwidth, u8 Offset);
-	void (*set_channel_handler)(PADAPTER padapter, u8 channel);
+#define		EFUSE_PROTECT_BYTES_BANK			16
 
-	void (*process_phy_info)(PADAPTER padapter, void *prframe);
-	void	(*hal_dm_watchdog)(PADAPTER Adapter);
-};
+//
+// <Roger_Notes> For RTL8723 WiFi/BT/GPS multi-function configuration. 2010.10.06.
+//
+typedef enum _RT_MULTI_FUNC{
+	RT_MULTI_FUNC_NONE = 0x00,
+	RT_MULTI_FUNC_WIFI = 0x01,
+	RT_MULTI_FUNC_BT = 0x02,
+	RT_MULTI_FUNC_GPS = 0x04,
+}RT_MULTI_FUNC,*PRT_MULTI_FUNC;
 
-struct hal_priv
+//
+// <Roger_Notes> For RTL8723 WiFi PDn/GPIO polarity control configuration. 2010.10.08.
+//
+typedef enum _RT_POLARITY_CTL{
+	RT_POLARITY_LOW_ACT = 0,
+	RT_POLARITY_HIGH_ACT = 1,	
+}RT_POLARITY_CTL,*PRT_POLARITY_CTL;
+
+#ifdef CONFIG_PCI_HCI
+struct hal_data_8192ce
 {
-	struct _hal_ops	hal_ops;
+	VERSION_8192C	VersionID;
+	RT_MULTI_FUNC	MultiFunc; // For multi-function consideration.
+	RT_POLARITY_CTL	PolarityCtl; // For Wifi PDn Polarity control.
+	u16	CustomerID;
 
-	unsigned short HardwareType;
-	unsigned short VersionID;
-	unsigned short CustomerID;
+	u16	FirmwareVersion;
+	u16	FirmwareVersionRev;
+	u16	FirmwareSubVersion;
 
-	unsigned short FirmwareVersion;
-	unsigned short FirmwareVersionRev;
-	unsigned short FirmwareSubVersion;
+	u32	IntrMask[2];
+	u32	IntrMaskToSet[2];
 
+	u32	DisabledFunctions;
+	
 	//current WIFI_PHY values
-	unsigned long ReceiveConfig;
-	unsigned char CurrentChannel;
-	WIRELESS_MODE CurrentWirelessMode;
-	HT_CHANNEL_WIDTH CurrentChannelBW;
-	unsigned char nCur40MhzPrimeSC;// Control channel sub-carrier
+	u32	ReceiveConfig;
+	u32	TransmitConfig;
+	WIRELESS_MODE		CurrentWirelessMode;
+	HT_CHANNEL_WIDTH	CurrentChannelBW;
+	u8	CurrentChannel;
+	u8	nCur40MhzPrimeSC;// Control channel sub-carrier
+
+	u16	BasicRateSet;
 
 	//rf_ctrl
-	unsigned char rf_chip;
-	unsigned char rf_type;
-	unsigned char NumTotalRFPath;
+	_lock	rf_lock;
+	u8	rf_chip;
+	u8	rf_type;
+	u8	NumTotalRFPath;
 
+	u8	InterfaceSel;
+
+	//
+	// EEPROM setting.
+	//
+	u16	EEPROMVID;
+	u16	EEPROMDID;
+	u16	EEPROMSVID;
+	u16	EEPROMSMID;
+	u16	EEPROMChannelPlan;
+	u16	EEPROMVersion;
+
+	u8	EEPROMChnlAreaTxPwrCCK[2][3];	
+	u8	EEPROMChnlAreaTxPwrHT40_1S[2][3];	
+	u8	EEPROMChnlAreaTxPwrHT40_2SDiff[2][3];
+	u8	EEPROMPwrLimitHT20[3];
+	u8	EEPROMPwrLimitHT40[3];
+
+	u8	bTXPowerDataReadFromEEPORM;
+	u8	EEPROMThermalMeter;
+	u8	EEPROMTSSI[2];
+
+	u8	EEPROMCustomerID;
+	u8	EEPROMBoardType;
+	u8	EEPROMRegulatory;
+
+	u8	bDefaultAntenna;
+	u8	bIQKInitialized;
+
+	u8	TxPwrLevelCck[RF90_PATH_MAX][CHANNEL_MAX_NUMBER];
+	u8	TxPwrLevelHT40_1S[RF90_PATH_MAX][CHANNEL_MAX_NUMBER];	// For HT 40MHZ pwr
+	u8	TxPwrLevelHT40_2S[RF90_PATH_MAX][CHANNEL_MAX_NUMBER];	// For HT 40MHZ pwr	
+	u8	TxPwrHt20Diff[RF90_PATH_MAX][CHANNEL_MAX_NUMBER];// HT 20<->40 Pwr diff
+	u8	TxPwrLegacyHtDiff[RF90_PATH_MAX][CHANNEL_MAX_NUMBER];// For HT<->legacy pwr diff
+	// For power group
+	u8	PwrGroupHT20[RF90_PATH_MAX][CHANNEL_MAX_NUMBER];
+	u8	PwrGroupHT40[RF90_PATH_MAX][CHANNEL_MAX_NUMBER];
+
+	u8	LegacyHTTxPowerDiff;// Legacy to HT rate power diff
+
+#ifdef CONFIG_BT_COEXIST
+	struct btcoexist_priv	bt_coexist;
+#endif
+
+	// Read/write are allow for following hardware information variables
+	u8	framesync;
+	u32	framesyncC34;
+	u8	framesyncMonitor;
+	u8	DefaultInitialGain[4];
+	u8	pwrGroupCnt;
+	u32	MCSTxPowerLevelOriginalOffset[7][16];
+	u32	CCKTxPowerLevelOriginalOffset;
+
+	u32	AntennaTxPath;					// Antenna path Tx
+	u32	AntennaRxPath;					// Antenna path Rx
+	u8	BluetoothCoexist;
+	u8	ExternalPA;
+
+	//u32	LedControlNum;
+	//u32	LedControlMode;
+	u8	bLedOpenDrain; // Support Open-drain arrangement for controlling the LED. Added by Roger, 2009.10.16.
+	//u32	TxPowerTrackControl;
+	u8	b1x1RecvCombine;	// for 1T1R receive combining
+
+	u8	bCurrentTurboEDCA;
+	u32	AcParam_BE; //Original parameter for BE, use for EDCA turbo.
+
+	//vivi, for tx power tracking, 20080407
+	//u16	TSSI_13dBm;
+	//u32	Pwr_Track;
+	// The current Tx Power Level
+	u8	CurrentCckTxPwrIdx;
+	u8	CurrentOfdm24GTxPwrIdx;
 
 	BB_REGISTER_DEFINITION_T	PHYRegDef[4];	//Radio A/B/C/D
 
+	BOOLEAN		bRFPathRxEnable[4];	// We support 4 RF path now.
 
-	// Read/write are allow for following hardware information variables
-	u8					framesync;
-	unsigned int			framesyncC34;
-	u8					framesyncMonitor;
-	u8					DefaultInitialGain[4];
-	u8					pwrGroupCnt;
-	u32					MCSTxPowerLevelOriginalOffset[7][16];	// 7 gropus of pwr diff by rates
-	u32					CCKTxPowerLevelOriginalOffset;
-	u8					TxPowerLevelCCK[14];			// CCK channel 1~14
-	u8					TxPowerLevelOFDM24G[14];		// OFDM 2.4G channel 1~14
-	u8					TxPowerLevelOFDM5G[14];			// OFDM 5G
-	u8					AntennaTxPwDiff[3];	// Antenna gain offset, index 0 for B, 1 for C, and 2 for D
+	u32	RfRegChnlVal[2];
 
-	//u8					ThermalMeter[2];	// ThermalMeter, index 0 for RFIC0, and 1 for RFIC1
-	u32					AntennaTxPath;					// Antenna path Tx
-	u32					AntennaRxPath;					// Antenna path Rx
-	u8					BoardType;
-	u8					BluetoothCoexist;
-	u8					ExternalPA;
+	u8	bCckHighPower;
 
-	u32					LedControlNum;
-	u32					LedControlMode;
-	//u32					TxPowerTrackControl;
-	u8					b1x1RecvCombine;	// for 1T1R receive combining
-
-	u8					bCCKinCH14;
-
-	//vivi, for tx power tracking, 20080407
-	//u2Byte					TSSI_13dBm;
-	//u4Byte					Pwr_Track;
-	// The current Tx Power Level
-	unsigned char	CurrentCckTxPwrIdx;
-	unsigned char	CurrentOfdm24GTxPwrIdx;
-
-	unsigned char	LegacyHTTxPowerDiff;// Legacy to HT rate power diff
-
-	unsigned char bCckHighPower;
-
-	unsigned int	RfRegChnlVal[2];
-
-	//
-	// The same as 92CE.
-	//
-	//u8					ThermalMeter[2];	// ThermalMeter, index 0 for RFIC0, and 1 for RFIC1
-	u8					ThermalValue;
-	u8					ThermalValue_LCK;
-	u8					ThermalValue_IQK;
-	u8					bRfPiEnable;
-
-	//for APK
-	u32					APKoutput[2][2];	//path A/B; output1_1a/output1_2a
-	u8					bAPKdone;
-	u8					bAPKThermalMeterIgnore;
-
-	//for TxPwrTracking
-	int					RegE94;
-	int 					RegE9C;
-	int					RegEB4;
-	int					RegEBC;
-
-	//for IQK
-	u32				IQKInitialized;
-
-	unsigned int		ADDA_backup[16];
-	unsigned int		IQK_MAC_backup[4];
-	u32				IQK_BB_backup[10];
 	//RDG enable
-	BOOLEAN	 	bRDGEnable;
-	u8		bDumpRxPkt;
+	BOOLEAN	 bRDGEnable;
 
 	//for host message to fw
-	u8 LastHMEBoxNum;
-	u8 PowerIndex_backup[6];
+	u8	LastHMEBoxNum;
+
+	u8	fw_ractrl;
+	u8	RegTxPause;
+	// Beacon function related global variable.
+	u32	RegBcnCtrlVal;
+	u8	RegFwHwTxQCtrl;
+	u8	RegReg542;
+
+#ifdef CONFIG_ANTENNA_DIVERSITY
+	u8	CurAntenna;	
+	u8	AntDivCfg;
+
+	//SW Antenna Switch
+	s32	RSSI_sum;
+	s32	RSSI_cnt;
+	BOOLEAN		RSSI_test;
+#endif
+
+	struct dm_priv	dmpriv;
+
+	u8	bInterruptMigration;
+	u8	bDisableTxInt;
+	u8	bGpioHwWpsPbc;
+
+	u8	FwRsvdPageStartOffset; //2010.06.23. Added by tynli. Reserve page start offset except beacon in TxQ.
+
+	u16	EfuseUsedBytes;
+};
+
+typedef struct hal_data_8192ce HAL_DATA_TYPE, *PHAL_DATA_TYPE;
+
+//
+// Function disabled.
+//
+#define DF_TX_BIT		BIT0
+#define DF_RX_BIT		BIT1
+#define DF_IO_BIT		BIT2
+#define DF_IO_D3_BIT			BIT3
+
+#define RT_DF_TYPE		u32
+#define RT_DISABLE_FUNC(__pAdapter, __FuncBits) ((__pAdapter)->DisabledFunctions |= ((RT_DF_TYPE)(__FuncBits)))
+#define RT_ENABLE_FUNC(__pAdapter, __FuncBits) ((__pAdapter)->DisabledFunctions &= (~((RT_DF_TYPE)(__FuncBits))))
+#define RT_IS_FUNC_DISABLED(__pAdapter, __FuncBits) ( (__pAdapter)->DisabledFunctions & (__FuncBits) )
+
+void InterruptRecognized8192CE(PADAPTER Adapter, PRT_ISR_CONTENT pIsrContent);
+VOID UpdateInterruptMask8192CE(PADAPTER Adapter, u32 AddMSR, u32 RemoveMSR);
+#endif
 
 #ifdef CONFIG_USB_HCI
+
+struct hal_data_8192cu
+{
+	VERSION_8192C	VersionID;
+	RT_MULTI_FUNC	MultiFunc; // For multi-function consideration.
+	RT_POLARITY_CTL	PolarityCtl; // For Wifi PDn Polarity control.
+	u16	CustomerID;
+
+	u16	FirmwareVersion;
+	u16	FirmwareVersionRev;
+	u16	FirmwareSubVersion;
+
+	//current WIFI_PHY values
+	u32	ReceiveConfig;
+	WIRELESS_MODE		CurrentWirelessMode;
+	HT_CHANNEL_WIDTH	CurrentChannelBW;
+	u8	CurrentChannel;
+	u8	nCur40MhzPrimeSC;// Control channel sub-carrier
+
+	u16	BasicRateSet;
+
+	//rf_ctrl
+	u8	rf_chip;
+	u8	rf_type;
+	u8	NumTotalRFPath;
+
+	u8	BoardType;
+	//INTERFACE_SELECT_8192CUSB	InterfaceSel;
+
+	//
+	// EEPROM setting.
+	//
+	u16	EEPROMVID;
+	u16	EEPROMPID;
+	u16	EEPROMSVID;
+	u16	EEPROMSDID;
+	u8	EEPROMCustomerID;
+	u8	EEPROMSubCustomerID;
+	u8	EEPROMVersion;
+	u8	EEPROMRegulatory;
+
+	u8	bTXPowerDataReadFromEEPORM;
+	u8	EEPROMThermalMeter;
+
+	u8	bIQKInitialized;
+
+	u8	TxPwrLevelCck[RF90_PATH_MAX][CHANNEL_MAX_NUMBER];
+	u8	TxPwrLevelHT40_1S[RF90_PATH_MAX][CHANNEL_MAX_NUMBER];	// For HT 40MHZ pwr
+	u8	TxPwrLevelHT40_2S[RF90_PATH_MAX][CHANNEL_MAX_NUMBER];	// For HT 40MHZ pwr	
+	u8	TxPwrHt20Diff[RF90_PATH_MAX][CHANNEL_MAX_NUMBER];// HT 20<->40 Pwr diff
+	u8	TxPwrLegacyHtDiff[RF90_PATH_MAX][CHANNEL_MAX_NUMBER];// For HT<->legacy pwr diff
+	// For power group
+	u8	PwrGroupHT20[RF90_PATH_MAX][CHANNEL_MAX_NUMBER];
+	u8	PwrGroupHT40[RF90_PATH_MAX][CHANNEL_MAX_NUMBER];
+
+	u8	LegacyHTTxPowerDiff;// Legacy to HT rate power diff
+
+#ifdef CONFIG_BT_COEXIST
+	struct btcoexist_priv	bt_coexist;
+#endif
+
+	// Read/write are allow for following hardware information variables
+	u8	framesync;
+	u32	framesyncC34;
+	u8	framesyncMonitor;
+	u8	DefaultInitialGain[4];
+	u8	pwrGroupCnt;
+	u32	MCSTxPowerLevelOriginalOffset[7][16];
+	u32	CCKTxPowerLevelOriginalOffset;
+
+	u32	AntennaTxPath;					// Antenna path Tx
+	u32	AntennaRxPath;					// Antenna path Rx
+	u8	BluetoothCoexist;
+	u8	ExternalPA;
+
+	u8	bLedOpenDrain; // Support Open-drain arrangement for controlling the LED. Added by Roger, 2009.10.16.
+
+	//u32	LedControlNum;
+	//u32	LedControlMode;
+	//u32	TxPowerTrackControl;
+	u8	b1x1RecvCombine;	// for 1T1R receive combining
+
+	u8	bCurrentTurboEDCA;
+	u32	AcParam_BE; //Original parameter for BE, use for EDCA turbo.
+
+	//vivi, for tx power tracking, 20080407
+	//u16	TSSI_13dBm;
+	//u32	Pwr_Track;
+	// The current Tx Power Level
+	u8	CurrentCckTxPwrIdx;
+	u8	CurrentOfdm24GTxPwrIdx;
+
+	BB_REGISTER_DEFINITION_T	PHYRegDef[4];	//Radio A/B/C/D
+
+	BOOLEAN		bRFPathRxEnable[4];	// We support 4 RF path now.
+
+	u32	RfRegChnlVal[2];
+
+	u8	bCckHighPower;
+
+	//RDG enable
+	BOOLEAN	 bRDGEnable;
+
+	//for host message to fw
+	u8	LastHMEBoxNum;
+
+	u8	fw_ractrl;
+	u8	RegTxPause;
+	// Beacon function related global variable.
+	u32	RegBcnCtrlVal;
+	u8	RegFwHwTxQCtrl;
+	u8	RegReg542;
+
+#ifdef CONFIG_ANTENNA_DIVERSITY
+	u8	CurAntenna;	
+	u8	AntDivCfg;
+
+	//SW Antenna Switch
+	s32	RSSI_sum;
+	s32	RSSI_cnt;
+	BOOLEAN		RSSI_test;
+#endif
+
+	struct dm_priv	dmpriv;
+
+	u8	FwRsvdPageStartOffset; //2010.06.23. Added by tynli. Reserve page start offset except beacon in TxQ.
+
+	// 2010/08/09 MH Add CU power down mode.
+	BOOLEAN		pwrdown;
 
 	// For 92C USB endpoint setting
 	//
 
-	unsigned int UsbBulkOutSize;
+	u32	UsbBulkOutSize;
 
-	int	RtNumInPipes;	// Number of Rx pipes in the ring, RtInPipe.
-	int	RtNumOutPipes;	// Number of Tx pipes in the ring, RtOutPipe.
+	int	RtBulkOutPipe[3];
+	int	RtBulkInPipe;
+	int	RtIntInPipe;
+	// Add for dual MAC  0--Mac0 1--Mac1
+	u32	interfaceIndex;
 
-	unsigned char	OutEpQueueSel;
-	unsigned char OutEpNumber;
+	u8	OutEpQueueSel;
+	u8	OutEpNumber;
 
-	unsigned char Queue2EPNum[8];//for out endpoint number mapping
+	u8	Queue2EPNum[8];//for out endpoint number mapping
 
-#if USB_TX_AGGREGATION_92C
-	unsigned char			UsbTxAggMode;
-	unsigned char			UsbTxAggDescNum;
+#ifdef USB_TX_AGGREGATION_92C
+	u8	UsbTxAggMode;
+	u8	UsbTxAggDescNum;
 #endif
-#if USB_RX_AGGREGATION_92C
-	u16				HwRxPageSize;				// Hardware setting
-	u32				MaxUsbRxAggBlock;
+#ifdef USB_RX_AGGREGATION_92C
+	u16	HwRxPageSize;				// Hardware setting
+	u32	MaxUsbRxAggBlock;
 
 	USB_RX_AGG_MODE	UsbRxAggMode;
-	u8				UsbRxAggBlockCount;			// USB Block count. Block size is 512-byte in hight speed and 64-byte in full speed
-	u8				UsbRxAggBlockTimeout;
-	u8				UsbRxAggPageCount;			// 8192C DMA page count
-	u8				UsbRxAggPageTimeout;
+	u8	UsbRxAggBlockCount;			// USB Block count. Block size is 512-byte in hight speed and 64-byte in full speed
+	u8	UsbRxAggBlockTimeout;
+	u8	UsbRxAggPageCount;			// 8192C DMA page count
+	u8	UsbRxAggPageTimeout;
 #endif
 
-#endif
+	// 2010/12/10 MH Add for USB aggreation mode dynamic shceme.
+	BOOLEAN		UsbRxHighSpeedMode;
 
-	u8 				fw_ractrl;
-	u8				RegTxPause;
-	u32				RegBcnCtrlVal;
-	// Beacon function related global variable.
-	u8				RegFwHwTxQCtrl;
-	u8				RegReg542;
-#ifdef CONFIG_ANTENNA_DIVERSITY
-	u8				CurAntenna;	
-	u8				AntDivCfg;
+	// 2010/11/22 MH Add for slim combo debug mode selective.
+	// This is used for fix the drawback of CU TSMC-A/UMC-A cut. HW auto suspend ability. Close BT clock.
+	BOOLEAN		SlimComboDbg;
 
-	//SW Antenna Switch
-	s32				RSSI_sum_A;
-	s32				RSSI_sum_B;
-	s32				RSSI_cnt_A;
-	s32				RSSI_cnt_B;
-	BOOLEAN			RSSI_test;
-	
-#endif
-#ifdef CONFIG_BT_COEXIST
-	struct btcoexist_priv		bt_coexist;	
-#endif
-	u8			bRxRSSIDisplay;
-
+	u16	EfuseUsedBytes;
 };
 
+typedef struct hal_data_8192cu HAL_DATA_TYPE, *PHAL_DATA_TYPE;
+#endif
 
-int FirmwareDownload92C(IN	PADAPTER Adapter);
-void NicIFReadAdapterInfo8192C(PADAPTER Adapter);
-void rtl8192c_ReadChipVersion(IN PADAPTER Adapter);
-
-
-
-typedef struct hal_priv HAL_DATA_TYPE, *PHAL_DATA_TYPE;
-typedef struct eeprom_priv EEPROM_EFUSE_PRIV, *PEEPROM_EFUSE_PRIV;
-
-#define GET_HAL_DATA(priv)	(&priv->halpriv)
+#define GET_HAL_DATA(__pAdapter)	((HAL_DATA_TYPE *)((__pAdapter)->HalData))
 #define GET_RF_TYPE(priv)	(GET_HAL_DATA(priv)->rf_type)
 
-#define GET_EEPROM_EFUSE_PRIV(priv)	(&priv->eeprompriv)
+#define INCLUDE_MULTI_FUNC_BT(_Adapter)	(GET_HAL_DATA(_Adapter)->MultiFunc & RT_MULTI_FUNC_BT)
+#define INCLUDE_MULTI_FUNC_GPS(_Adapter)	(GET_HAL_DATA(_Adapter)->MultiFunc & RT_MULTI_FUNC_GPS)
+
+VOID rtl8192c_FirmwareSelfReset(IN PADAPTER Adapter);
+int FirmwareDownload92C(IN PADAPTER Adapter);
+VOID InitializeFirmwareVars92C(PADAPTER Adapter);
+u8 GetEEPROMSize8192C(PADAPTER Adapter);
+RT_CHANNEL_DOMAIN _HalMapChannelPlan8192C(PADAPTER Adapter, u8 HalChannelPlan);
+VERSION_8192C rtl8192c_ReadChipVersion(IN PADAPTER Adapter);
+void rtl8192c_ReadBluetoothCoexistInfo(PADAPTER Adapter, u8 *PROMContent, BOOLEAN AutoloadFail);
+void rtl8192c_HalSetBrateCfg(PADAPTER Adapter, u8 *mBratesOS, u16 *pBrateCfg);
+//void rtl8192c_free_hal_data(_adapter * padapter);
+VOID rtl8192c_EfuseParseIDCode(PADAPTER pAdapter, u8 *hwinfo);
+void rtl8192c_set_hal_ops(struct hal_ops *pHalFunc);
 
 #endif
 

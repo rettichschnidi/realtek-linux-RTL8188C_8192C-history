@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Copyright(c) 2007 - 2010 Realtek Corporation. All rights reserved.
- *                                        
+ *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
  * published by the Free Software Foundation.
@@ -17,8 +17,8 @@
  *
  *
  ******************************************************************************/
-#ifndef __RTL871X_DEBUG_H__
-#define __RTL871X_DEBUG_H__
+#ifndef __RTW_DEBUG_H__
+#define __RTW_DEBUG_H__
 
 #include <drv_conf.h>
 #include <osdep_service.h>
@@ -59,13 +59,13 @@
 #define 	_module_hci_intfs_c_			BIT(20)
 #define 	_module_hci_ops_c_			BIT(21)
 #define 	_module_osdep_service_c_			BIT(22)
-#define 	_module_rtl871x_mp_ioctl_c_			BIT(23)
+#define _module_mp_			BIT(23)
 #define 	_module_hci_ops_os_c_			BIT(24)
 #define 	_module_rtl871x_ioctl_os_c			BIT(25)
 #define 	_module_rtl8712_cmd_c_ BIT(26)
-#define   _module_rtl871x_mp_c_ BIT(27)
+//#define _module_efuse_			BIT(27)
 #define	_module_rtl8192c_xmit_c_ BIT(28)
-#define   _module_rtl8712_efuse_c_ BIT(29)
+#define _module_efuse_		BIT(29)
 #define   _module_rtl8712_recv_c_ BIT(30)
 #define   _module_rtl8712_led_c_ BIT(31)
 
@@ -119,27 +119,27 @@
 	#define	_MODULE_DEFINE_	_module_hci_intfs_c_
 #elif defined _OSDEP_SERVICE_C_
 	#define	_MODULE_DEFINE_	_module_osdep_service_c_		
-#elif defined _RTL871X_MP_IOCTL_C_
-	#define	_MODULE_DEFINE_	_module_rtl871x_mp_ioctl_c_		
 #elif defined _HCI_OPS_OS_C_
 	#define	_MODULE_DEFINE_	_module_hci_ops_os_c_
 #elif defined _RTL871X_IOCTL_LINUX_C_
-	#define	_MODULE_DEFINE_	_module_rtl871x_ioctl_os_c			
-#elif defined _RTL871X_MP_C_
-	#define	_MODULE_DEFINE_	_module_rtl871x_mp_c_
+	#define	_MODULE_DEFINE_	_module_rtl871x_ioctl_os_c
 #elif defined _RTL8712_CMD_C_
-	#define	_MODULE_DEFINE_	_module_rtl8712_cmd_c_	
+	#define	_MODULE_DEFINE_	_module_rtl8712_cmd_c_
 #elif defined _RTL8192C_XMIT_C_
 	#define	_MODULE_DEFINE_	_module_rtl8192c_xmit_c_
-#elif  defined _RTL8712_EFUSE_C_	
-	#define	_MODULE_DEFINE_	_module_rtl8712_efuse_c_	
 #elif defined _RTL8712_RECV_C_
-	#define	_MODULE_DEFINE_	_module_rtl8712_recv_c_		
+	#define	_MODULE_DEFINE_	_module_rtl8712_recv_c_
 #elif defined _RTL8192CU_RECV_C_
 	#define	_MODULE_DEFINE_	_module_rtl8712_recv_c_
 #elif defined _RTL871X_MLME_EXT_C_
 	#define _MODULE_DEFINE_	_module_mlme_osdep_c_
-#endif		
+#elif defined _RTW_MP_C_
+	#define	_MODULE_DEFINE_	_module_mp_
+#elif defined _RTW_MP_IOCTL_C_
+	#define	_MODULE_DEFINE_	_module_mp_
+#elif defined _RTW_EFUSE_C_
+	#define	_MODULE_DEFINE_	_module_efuse_
+#endif
 
 #ifdef PLATFORM_OS_CE
 extern void rtl871x_cedbg(const char *fmt, ...);	
@@ -148,7 +148,7 @@ extern void rtl871x_cedbg(const char *fmt, ...);
 #define RT_TRACE(_Comp, _Level, Fmt) do{}while(0)
 #define _func_enter_ {}	
 #define _func_exit_ {}
-
+#define RT_PRINT_DATA(_Comp, _Level, _TitleString, _HexData, _HexDataLen) {}
 
 #undef	_dbgdump
 
@@ -214,14 +214,25 @@ extern void rtl871x_cedbg(const char *fmt, ...);
 			}	\
 		} while(0)
 
+		#undef RT_PRINT_DATA
+		#define RT_PRINT_DATA(_Comp, _Level, _TitleString, _HexData, _HexDataLen)			\
+			if(((_Comp) & GlobalDebugComponents) && (_Level <= GlobalDebugLevel))	\
+			{									\
+				int __i;								\
+				u8	*ptr = (u8 *)_HexData;				\
+				_dbgdump("Rtl871x: ");						\
+				_dbgdump(_TitleString);						\
+				for( __i=0; __i<(int)_HexDataLen; __i++ )				\
+				{								\
+					_dbgdump("%02X%s", ptr[__i], (((__i + 1) % 4) == 0)?"  ":" ");	\
+					if (((__i + 1) % 16) == 0)	_dbgdump("\n");			\
+				}								\
+				_dbgdump("\n");							\
+			}
 #endif
 
 
-#ifndef CONFIG_DEBUG_RTL8192C
-	#ifdef PLATFORM_LINUX
-	#define printk(x, ...) {} 
-	#endif
-#endif	//CONFIG_DEBUG_RTL8192C
+#ifdef CONFIG_DEBUG_RTL8192C
 
 	#ifdef PLATFORM_WINDOWS
 	#define _dbgdump	DbgPrint
@@ -266,10 +277,9 @@ extern void rtl871x_cedbg(const char *fmt, ...);
 	#undef ERR_8192C
 	#define ERR_8192C _dbgdump
 
-
+#endif	//CONFIG_DEBUG_RTL8192C
 
 #endif	//__RTL871X_DEBUG_H__
-
 
 #ifdef CONFIG_PROC_DEBUG
 

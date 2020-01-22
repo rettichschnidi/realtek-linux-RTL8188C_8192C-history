@@ -1,22 +1,4 @@
-/******************************************************************************
- *
- * Copyright(c) 2007 - 2010 Realtek Corporation. All rights reserved.
- *                                        
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of version 2 of the GNU General Public License as
- * published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along with
- * this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
- *
- *
- ******************************************************************************/
+
 #ifndef __WLAN_BSSDEF_H__
 #define __WLAN_BSSDEF_H__
 
@@ -317,8 +299,8 @@ typedef struct _WLAN_BSSID_EX
   NDIS_802_11_NETWORK_TYPE  NetworkTypeInUse;
   NDIS_802_11_CONFIGURATION  Configuration;
   NDIS_802_11_NETWORK_INFRASTRUCTURE  InfrastructureMode;
-  NDIS_802_11_RATES_EX  SupportedRates;  
-  WLAN_PHY_INFO	PhyInfo;  	
+  NDIS_802_11_RATES_EX  SupportedRates;
+  WLAN_PHY_INFO	PhyInfo;
   ULONG  IELength;
   UCHAR  IEs[MAX_IE_SZ];	//(timestamp, beacon interval, and capability information)
 } WLAN_BSSID_EX, *PWLAN_BSSID_EX;
@@ -347,7 +329,7 @@ struct	wlan_network {
 	int	fixed;			// set to fixed when not to be removed as site-surveying
 	unsigned long	last_scanned; //timestamp for the network
 	int	aid;			//will only be valid when a BSS is joinned.
-	int	join_res;	
+	int	join_res;
 	WLAN_BSSID_EX	network; //must be the last item
 #ifdef PLATFORM_WINDOWS	
 	unsigned char  iebuf[MAX_IE_SZ];

@@ -1,22 +1,21 @@
 /******************************************************************************
- *
- * Copyright(c) 2007 - 2010 Realtek Corporation. All rights reserved.
- *                                        
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of version 2 of the GNU General Public License as
- * published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along with
- * this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
- *
- *
- ******************************************************************************/
+* osdep_service.c                                                                                                                                 *
+*                                                                                                                                          *
+* Description :                                                                                                                       *
+*                                                                                                                                           *
+* Author :                                                                                                                       *
+*                                                                                                                                         *
+* History :                                                          
+*
+*                                        
+*                                                                                                                                       *
+* Copyright 2007, Realtek Corp.                                                                                                  *
+*                                                                                                                                        *
+* The contents of this file is the sole property of Realtek Corp.  It can not be                                     *
+* be used, copied or modified without written permission from Realtek Corp.                                         *
+*                                                                                                                                          *
+*******************************************************************************/
+
 
 #define _OSDEP_SERVICE_C_
 
@@ -28,47 +27,41 @@
 
 #define RT_TAG	'1178'
 
-u8* _rtw_zmalloc(u32 sz)
+u8* _malloc(u32 sz)
 {
-	u8 	*pbuf;
+
+	u8 	*pbuf=NULL;
+
 #ifdef PLATFORM_LINUX
-	// kzalloc(sz, GFP_KERNEL);
-	pbuf = 	kmalloc(sz, /*GFP_KERNEL*/GFP_ATOMIC);
-	if (pbuf != NULL)
-		memset(pbuf, 0, sz);
+#ifdef RTK_DMP_PLATFORM
+	if(sz > 0x4000)
+		pbuf = (u8 *)dvr_malloc(sz);
+	else
+#endif
+		pbuf = 	kmalloc(sz, /*GFP_KERNEL*/GFP_ATOMIC);
+
 #endif	
 	
 #ifdef PLATFORM_WINDOWS
+
 	NdisAllocateMemoryWithTag(&pbuf,sz, RT_TAG);
-	if (pbuf != NULL)
-		NdisFillMemory(pbuf, sz, 0);
+
 #endif
 
 	return pbuf;	
 	
 }
 
-u8* _rtw_malloc(u32 sz)
-{
-	u8 	*pbuf;
-#ifdef PLATFORM_LINUX	
-	pbuf = 	kmalloc(sz, /*GFP_KERNEL*/GFP_ATOMIC);	
-#endif	
-	
-#ifdef PLATFORM_WINDOWS
-	NdisAllocateMemoryWithTag(&pbuf,sz, RT_TAG);	
-#endif
-
-	return pbuf;	
-	
-}
-
-void	_rtw_mfree(u8 *pbuf, u32 sz)
+void	_mfree(u8 *pbuf, u32 sz)
 {
 
 #ifdef	PLATFORM_LINUX
-
-	kfree(pbuf);
+#ifdef RTK_DMP_PLATFORM
+	if(sz > 0x4000)
+		dvr_free(pbuf);
+	else
+#endif
+		kfree(pbuf);
 
 #endif	
 	
@@ -80,7 +73,7 @@ void	_rtw_mfree(u8 *pbuf, u32 sz)
 	
 	
 }
-void _rtw_memcpy(void* dst, void* src, u32 sz)
+void _memcpy(void* dst, void* src, u32 sz)
 {
 
 #ifdef PLATFORM_LINUX
@@ -97,7 +90,7 @@ void _rtw_memcpy(void* dst, void* src, u32 sz)
 
 }
 
-int	_rtw_memcmp(void *dst, void *src, u32 sz)
+int	_memcmp(void *dst, void *src, u32 sz)
 {
 
 #ifdef PLATFORM_LINUX
@@ -124,7 +117,7 @@ int	_rtw_memcmp(void *dst, void *src, u32 sz)
 	
 }
 
-void _rtw_memset(void *pbuf, int c, u32 sz)
+void _memset(void *pbuf, int c, u32 sz)
 {
 
 #ifdef PLATFORM_LINUX
@@ -144,7 +137,7 @@ void _rtw_memset(void *pbuf, int c, u32 sz)
 
 }
 
-void _rtw_init_listhead(_list *list)
+void _init_listhead(_list *list)
 {
 
 #ifdef PLATFORM_LINUX
@@ -167,7 +160,7 @@ For the following list_xxx operations,
 caller must guarantee the atomic context.
 Otherwise, there will be racing condition.
 */
-u32	rtw_is_list_empty(_list *phead)
+u32	is_list_empty(_list *phead)
 {
 
 #ifdef PLATFORM_LINUX
@@ -193,7 +186,7 @@ u32	rtw_is_list_empty(_list *phead)
 }
 
 
-void rtw_list_insert_tail(_list *plist, _list *phead)
+void list_insert_tail(_list *plist, _list *phead)
 {
 
 #ifdef PLATFORM_LINUX	
@@ -218,7 +211,7 @@ Caller must check if the list is empty before calling list_delete
 */
 
 
-void _rtw_init_sema(_sema	*sema, int init_val)
+void _init_sema(_sema	*sema, int init_val)
 {
 
 #ifdef PLATFORM_LINUX
@@ -240,7 +233,7 @@ void _rtw_init_sema(_sema	*sema, int init_val)
 
 }
 
-void _rtw_free_sema(_sema	*sema)
+void _free_sema(_sema	*sema)
 {
 
 #ifdef PLATFORM_OS_CE
@@ -249,7 +242,7 @@ void _rtw_free_sema(_sema	*sema)
 
 }
 
-void _rtw_up_sema(_sema	*sema)
+void _up_sema(_sema	*sema)
 {
 
 #ifdef PLATFORM_LINUX
@@ -269,7 +262,7 @@ void _rtw_up_sema(_sema	*sema)
 #endif
 }
 
-u32 _rtw_down_sema(_sema *sema)
+u32 _down_sema(_sema *sema)
 {
 
 #ifdef PLATFORM_LINUX
@@ -299,31 +292,27 @@ u32 _rtw_down_sema(_sema *sema)
 
 
 
-void	_rtw_mutex_init(_mutex *pmutex)
+void	_rwlock_init(_rwlock *prwlock)
 {
 #ifdef PLATFORM_LINUX
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37))
-	mutex_init(pmutex);
-#else
-	init_MUTEX(pmutex);
-#endif
-	
-#endif
+	//init_MUTEX(prwlock);
+	sema_init(prwlock, 1);
 
+#endif
 #ifdef PLATFORM_OS_XP
 
-	KeInitializeMutex(pmutex, 0);
+	KeInitializeMutex(prwlock, 0);
 
 #endif
 
 #ifdef PLATFORM_OS_CE
-	*pmutex =  CreateMutex( NULL, _FALSE, NULL);
+	*prwlock =  CreateMutex( NULL, _FALSE, NULL);
 #endif
 }
 
 
-void	_rtw_spinlock_init(_lock *plock)
+void	_spinlock_init(_lock *plock)
 {
 
 #ifdef PLATFORM_LINUX
@@ -340,7 +329,7 @@ void	_rtw_spinlock_init(_lock *plock)
 	
 }
 
-void	_rtw_spinlock_free(_lock *plock)
+void	_spinlock_free(_lock *plock)
 {
 
 	
@@ -353,7 +342,7 @@ void	_rtw_spinlock_free(_lock *plock)
 }
 
 
-void	_rtw_spinlock(_lock	*plock)
+void	_spinlock(_lock	*plock)
 {
 
 #ifdef PLATFORM_LINUX
@@ -370,7 +359,7 @@ void	_rtw_spinlock(_lock	*plock)
 	
 }
 
-void	_rtw_spinunlock(_lock *plock)
+void	_spinunlock(_lock *plock)
 {
 
 #ifdef PLATFORM_LINUX
@@ -387,7 +376,7 @@ void	_rtw_spinunlock(_lock *plock)
 }
 
 
-void	_rtw_spinlock_ex(_lock	*plock)
+void	_spinlock_ex(_lock	*plock)
 {
 
 #ifdef PLATFORM_LINUX
@@ -404,7 +393,7 @@ void	_rtw_spinlock_ex(_lock	*plock)
 	
 }
 
-void	_rtw_spinunlock_ex(_lock *plock)
+void	_spinunlock_ex(_lock *plock)
 {
 
 #ifdef PLATFORM_LINUX
@@ -422,22 +411,22 @@ void	_rtw_spinunlock_ex(_lock *plock)
 
 
 
-void	_rtw_init_queue(_queue	*pqueue)
+void	_init_queue(_queue	*pqueue)
 {
 
-	_rtw_init_listhead(&(pqueue->queue));
+	_init_listhead(&(pqueue->queue));
 
-	_rtw_spinlock_init(&(pqueue->lock));
+	_spinlock_init(&(pqueue->lock));
 
 }
 
-u32	  _rtw_queue_empty(_queue	*pqueue)
+u32	  _queue_empty(_queue	*pqueue)
 {
-	return (rtw_is_list_empty(&(pqueue->queue)));
+	return (is_list_empty(&(pqueue->queue)));
 }
 
 
-u32 rtw_end_of_queue_search(_list *head, _list *plist)
+u32 end_of_queue_search(_list *head, _list *plist)
 {
 
 	if (head == plist)
@@ -448,7 +437,7 @@ u32 rtw_end_of_queue_search(_list *head, _list *plist)
 }
 
 
-u32	rtw_get_current_time(void)
+u32	get_current_time(void)
 {
 	
 #ifdef PLATFORM_LINUX
@@ -468,7 +457,7 @@ u32	rtw_get_current_time(void)
 	
 }
 
-void rtw_sleep_schedulable(int ms)	
+void sleep_schedulable(int ms)	
 {
 
 #ifdef PLATFORM_LINUX
@@ -496,7 +485,7 @@ void rtw_sleep_schedulable(int ms)
 }
 
 
-void rtw_msleep_os(int ms)
+void msleep_os(int ms)
 {
 
 #ifdef PLATFORM_LINUX
@@ -513,7 +502,7 @@ void rtw_msleep_os(int ms)
 
 
 }
-void rtw_usleep_os(int us)
+void usleep_os(int us)
 {
 
 #ifdef PLATFORM_LINUX
@@ -535,7 +524,7 @@ void rtw_usleep_os(int us)
 
 }
 
-void rtw_mdelay_os(int ms)
+void mdelay_os(int ms)
 {
 
 #ifdef PLATFORM_LINUX
@@ -552,7 +541,7 @@ void rtw_mdelay_os(int ms)
 
 
 }
-void rtw_udelay_os(int us)
+void udelay_os(int us)
 {
 
 #ifdef PLATFORM_LINUX

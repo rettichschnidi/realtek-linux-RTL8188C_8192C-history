@@ -1,42 +1,15 @@
-/******************************************************************************
- *
- * Copyright(c) 2007 - 2010 Realtek Corporation. All rights reserved.
- *                                        
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of version 2 of the GNU General Public License as
- * published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along with
- * this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
- *
- *
- ******************************************************************************/
 #ifndef __INC_HAL8192CU_FW_IMG_H
 #define __INC_HAL8192CU_FW_IMG_H
 
-/*Created on  2010/ 5/25,  2:21*/
+#include <basic_types.h>
 
-//#define TSMCImgArrayLength 16226 //v66 2011-02-10
-#define TSMCImgArrayLength 16352 //v68.1 2011-02-24
+/*Created on  2010/12/ 8, 14:15*/
+
+#define TSMCImgArrayLength 15918
 extern u8 Rtl8192CUFwTSMCImgArray[TSMCImgArrayLength];
-
-//#define UMCImgArrayLength 16226 //V66 2011-02-10
-#define UMCACutImgArrayLength 16352 //v68.1 2011-02-24
-extern u8 Rtl8192CUFwUMCACutImgArray[UMCACutImgArrayLength];
-
-#define UMCBCutImgArrayLength 16334 //v68.1 2011-02-24
-extern u8 Rtl8192CUFwUMCBCutImgArray[UMCBCutImgArrayLength] ; 
-	
-//#define UMCBCutImgArrayLength 16206
-//extern u1Byte Rtl8192CUFwUMCBCutImgArray[UMCBCutImgArrayLength];
-
-#define UMC8723ImgArrayLength 16288
+#define UMCImgArrayLength 15918
+extern u8 Rtl8192CUFwUMCImgArray[UMCImgArrayLength];
+#define UMC8723ImgArrayLength 16092
 extern u8 Rtl8192CUFwUMC8723ImgArray[UMC8723ImgArrayLength];
 #define PHY_REG_2TArrayLength 374
 extern u32  Rtl8192CUPHY_REG_2TArray[PHY_REG_2TArrayLength];

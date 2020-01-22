@@ -1,27 +1,25 @@
 /******************************************************************************
- *
- * Copyright(c) 2007 - 2010 Realtek Corporation. All rights reserved.
- *                                        
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of version 2 of the GNU General Public License as
- * published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along with
- * this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
- *
- *
- ******************************************************************************/
-#define _RTL8192C_RECV_C_
+* rtl8192c_rxdesc.c                                                                                                                                 *
+*                                                                                                                                          *
+* Description :                                                                                                                       *
+*                                                                                                                                           *
+* Author :                                                                                                                       *
+*                                                                                                                                         *
+* History :
+*
+*
+*                                                                                                                                       *
+* Copyright 2008, Realtek Corp.                                                                                                  *
+*                                                                                                                                        *
+* The contents of this file is the sole property of Realtek Corp.  It can not be                                     *
+* be used, copied or modified without written permission from Realtek Corp.                                         *
+*                                                                                                                                          *
+*******************************************************************************/
+#define _RTL8192C_REDESC_C_
 #include <drv_conf.h>
 #include <osdep_service.h>
 #include <drv_types.h>
-    
+#include <rtl8192c_hal.h>
 
 static u8 evm_db2percentage(s8 value)
 {
@@ -49,10 +47,12 @@ static u8 evm_db2percentage(s8 value)
 	return(ret_val);
 }
 
-static s32 signal_scale_mapping(s32 cur_sig )
+
+static s32 signal_scale_mapping(_adapter *padapter, s32 cur_sig )
 {
 	s32 ret_sig;
 
+#if DEV_BUS_TYPE==DEV_BUS_USB_INTERFACE
 	if(cur_sig >= 51 && cur_sig <= 100)
 	{
 		ret_sig = 100;
@@ -85,7 +85,98 @@ static s32 signal_scale_mapping(s32 cur_sig )
 	{
 		ret_sig = cur_sig;
 	}
+#else
+	HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(padapter);
 
+	if(pHalData->CustomerID == RT_CID_819x_Lenovo)
+	{
+		// Step 1. Scale mapping.
+		// 20100611 Joseph: Re-tunning RSSI presentation for Lenovo.
+		// 20100426 Joseph: Modify Signal strength mapping.
+		// This modification makes the RSSI indication similar to Intel solution.
+		// 20100414 Joseph: Tunning RSSI for Lenovo according to RTL8191SE.
+		if(cur_sig >= 54 && cur_sig <= 100)
+		{
+			ret_sig = 100;
+		}
+		else if(cur_sig>=42 && cur_sig <= 53 )
+		{
+			ret_sig = 95;
+		}
+		else if(cur_sig>=36 && cur_sig <= 41 )
+		{
+			ret_sig = 74 + ((cur_sig - 36) *20)/6;
+		}
+		else if(cur_sig>=33 && cur_sig <= 35 )
+		{
+			ret_sig = 65 + ((cur_sig - 33) *8)/2;
+		}
+		else if(cur_sig>=18 && cur_sig <= 32 )
+		{
+			ret_sig = 62 + ((cur_sig - 18) *2)/15;
+		}
+		else if(cur_sig>=15 && cur_sig <= 17 )
+		{
+			ret_sig = 33 + ((cur_sig - 15) *28)/2;
+		}
+		else if(cur_sig>=10 && cur_sig <= 14 )
+		{
+			ret_sig = 39;
+		}
+		else if(cur_sig>=8 && cur_sig <= 9 )
+		{
+			ret_sig = 33;
+		}
+		else if(cur_sig <= 8 )
+		{
+			ret_sig = 19;
+		}
+	}
+	else
+	{
+		// Step 1. Scale mapping.
+		if(cur_sig >= 61 && cur_sig <= 100)
+		{
+			ret_sig = 90 + ((cur_sig - 60) / 4);
+		}
+		else if(cur_sig >= 41 && cur_sig <= 60)
+		{
+			ret_sig = 78 + ((cur_sig - 40) / 2);
+		}
+		else if(cur_sig >= 31 && cur_sig <= 40)
+		{
+			ret_sig = 66 + (cur_sig - 30);
+		}
+		else if(cur_sig >= 21 && cur_sig <= 30)
+		{
+			ret_sig = 54 + (cur_sig - 20);
+		}
+		else if(cur_sig >= 5 && cur_sig <= 20)
+		{
+			ret_sig = 42 + (((cur_sig - 5) * 2) / 3);
+		}
+		else if(cur_sig == 4)
+		{
+			ret_sig = 36;
+		}
+		else if(cur_sig == 3)
+		{
+			ret_sig = 27;
+		}
+		else if(cur_sig == 2)
+		{
+			ret_sig = 18;
+		}
+		else if(cur_sig == 1)
+		{
+			ret_sig = 9;
+		}
+		else
+		{
+			ret_sig = cur_sig;
+		}
+	}
+#endif
 
 	return ret_sig;
 }
@@ -103,40 +194,10 @@ static s32  translate2dbm(_adapter *padapter,u8 signal_strength_idx	)
 	return signal_power;
 }
 
-typedef struct _Phy_OFDM_Rx_Status_Report_8192cd
+void rtl8192c_query_rx_phy_status(union recv_frame *prframe, struct phy_stat *pphy_stat)
 {
-	unsigned char	trsw_gain_X[4];
-	unsigned char	pwdb_all;
-	unsigned char	cfosho_X[4];
-	unsigned char	cfotail_X[4];
-	unsigned char	rxevm_X[2];
-	unsigned char	rxsnr_X[4];
-	unsigned char	pdsnr_X[2];
-	unsigned char	csi_current_X[2];
-	unsigned char	csi_target_X[2];
-	unsigned char	sigevm;
-	unsigned char	max_ex_pwr;
-//#ifdef RTL8192SE
-#ifdef	_LITTLE_ENDIAN_
-	unsigned char ex_intf_flg:1;
-	unsigned char sgi_en:1;
-	unsigned char rxsc:2;
-	unsigned char rsvd:4;
-#else	// _BIG_ENDIAN_
-	unsigned char rsvd:4;
-	unsigned char rxsc:2;
-	unsigned char sgi_en:1;
-	unsigned char ex_intf_flg:1;
-#endif
-//#else	// RTL8190, RTL8192E
-//	unsigned char	sgi_en;
-//	unsigned char	rxsc_sgien_exflg;
-//#endif
-} PHY_STS_OFDM_8192CD_T;
-
-void rtl8192c_query_rx_phy_status(union recv_frame *prframe, struct recv_stat *prxstat)
-{
-	struct phy_cck_rx_status *pcck_buf;
+	PHY_STS_OFDM_8192CD_T	*pOfdm_buf;
+	PHY_STS_CCK_8192CD_T	*pCck_buf;
 	u8	i, max_spatial_stream, evm;
 	s8	rx_pwr[4], rx_pwr_all;
 	u8	pwdb_all;
@@ -145,11 +206,9 @@ void rtl8192c_query_rx_phy_status(union recv_frame *prframe, struct recv_stat *p
 	_adapter				*padapter = prframe->u.hdr.adapter;
 	struct rx_pkt_attrib	*pattrib = &prframe->u.hdr.attrib;
 	HAL_DATA_TYPE		*pHalData = GET_HAL_DATA(padapter);
-	struct eeprom_priv	*peeprompriv = &(padapter->eeprompriv);
-	struct phy_stat		*pphy_stat = (struct phy_stat *)(prxstat+1);
-	u8	*pphy_head=(u8 *)(prxstat+1);
-	u8 tmp_rxsnr;
-	s8 rx_snrX;
+	u8	tmp_rxsnr;
+	s8	rx_snrX;
+
 
 	// Record it for next packet processing
 	bcck_rate=(pattrib->mcs_rate<=3? 1:0);
@@ -159,7 +218,7 @@ void rtl8192c_query_rx_phy_status(union recv_frame *prframe, struct recv_stat *p
 		u8 report;
 
 		// CCK Driver info Structure is not the same as OFDM packet.
-		pcck_buf = (struct phy_cck_rx_status *)pphy_stat;
+		pCck_buf = (PHY_STS_CCK_8192CD_T *)pphy_stat;
 		//Adapter->RxStats.NumQryPhyStatusCCK++;
 
 		//
@@ -167,16 +226,14 @@ void rtl8192c_query_rx_phy_status(union recv_frame *prframe, struct recv_stat *p
 		// (2)PWDB, Average PWDB cacluated by hardware (for rate adaptive)
 		//
 
-		//if(pHalData->eRFPowerState == eRfOn)
-		//	cck_highpwr = (u1Byte)pHalData->bCckHighPower;
-		//else
-		//	cck_highpwr = FALSE;
-
-		cck_highpwr = pHalData->bCckHighPower;
+		if(padapter->pwrctrlpriv.rf_pwrstate == rf_on)
+			cck_highpwr = (u8)pHalData->bCckHighPower;
+		else
+			cck_highpwr = _FALSE;
 
 		if(!cck_highpwr)
 		{
-			report = pcck_buf->cck_agc_rpt&0xc0;
+			report = pCck_buf->cck_agc_rpt&0xc0;
 			report = report>>6;
 			switch(report)
 			{
@@ -184,42 +241,42 @@ void rtl8192c_query_rx_phy_status(union recv_frame *prframe, struct recv_stat *p
 				// Modify the RF RNA gain value to -40, -20, -2, 14 by Jenyu's suggestion
 				// Note: different RF with the different RNA gain.
 				case 0x3:
-					rx_pwr_all = (-46) - (pcck_buf->cck_agc_rpt & 0x3e);
+					rx_pwr_all = (-46) - (pCck_buf->cck_agc_rpt & 0x3e);
 					break;
 				case 0x2:
-					rx_pwr_all = (-26) - (pcck_buf->cck_agc_rpt & 0x3e);
+					rx_pwr_all = (-26) - (pCck_buf->cck_agc_rpt & 0x3e);
 					break;
 				case 0x1:
-					rx_pwr_all = (-12) - (pcck_buf->cck_agc_rpt & 0x3e);
+					rx_pwr_all = (-12) - (pCck_buf->cck_agc_rpt & 0x3e);
 					break;
 				case 0x0:
-					rx_pwr_all = (16) - (pcck_buf->cck_agc_rpt & 0x3e);
+					rx_pwr_all = (16) - (pCck_buf->cck_agc_rpt & 0x3e);
 					break;
 			}
 		}
 		else
 		{
-			report =((u8)(le32_to_cpu( pphy_stat->phydw1) >>8)) & 0x60;
+			report = pCck_buf->cck_agc_rpt & 0x60;
 			report = report>>5;
 			switch(report)
 			{
 				case 0x3:
-					rx_pwr_all = (-46) - ((pcck_buf->cck_agc_rpt & 0x1f)<<1) ;
+					rx_pwr_all = (-46) - ((pCck_buf->cck_agc_rpt & 0x1f)<<1) ;
 					break;
 				case 0x2:
-					rx_pwr_all = (-26)- ((pcck_buf->cck_agc_rpt & 0x1f)<<1);
+					rx_pwr_all = (-26)- ((pCck_buf->cck_agc_rpt & 0x1f)<<1);
 					break;
 				case 0x1:
-					rx_pwr_all = (-12) - ((pcck_buf->cck_agc_rpt & 0x1f)<<1) ;
+					rx_pwr_all = (-12) - ((pCck_buf->cck_agc_rpt & 0x1f)<<1) ;
 					break;
 				case 0x0:
-					rx_pwr_all = (16) - ((pcck_buf->cck_agc_rpt & 0x1f)<<1) ;
+					rx_pwr_all = (16) - ((pCck_buf->cck_agc_rpt & 0x1f)<<1) ;
 					break;
 			}
 		}
 
 		pwdb_all= query_rx_pwr_percentage(rx_pwr_all);
-		//if(pHalData->CustomerID == RT_CID_819x_Lenovo)
+		if(pHalData->CustomerID == RT_CID_819x_Lenovo)
 		{
 			// CCK gain is smaller than OFDM/MCS gain,
 			// so we add gain diff by experiences, the val is 6
@@ -239,6 +296,7 @@ void rtl8192c_query_rx_phy_status(union recv_frame *prframe, struct recv_stat *p
 
 		pattrib->RxPWDBAll = pwdb_all;	//for DIG/rate adaptive
 		pattrib->RecvSignalPower = rx_pwr_all;	//dBM
+
 		//
 		// (3) Get Signal Quality (EVM)
 		//
@@ -270,11 +328,11 @@ void rtl8192c_query_rx_phy_status(union recv_frame *prframe, struct recv_stat *p
 				}
 				else
 				{
-					sq = pcck_buf->sq_rpt;
+					sq = pCck_buf->SQ_rpt;
 
-					if(pcck_buf->sq_rpt > 64)
+					if(pCck_buf->SQ_rpt > 64)
 						sq = 0;
-					else if (pcck_buf->sq_rpt < 20)
+					else if (pCck_buf->SQ_rpt < 20)
 						sq= 100;
 					else
 						sq = ((64-sq) * 100) / 44;
@@ -290,25 +348,20 @@ void rtl8192c_query_rx_phy_status(union recv_frame *prframe, struct recv_stat *p
 	}
 	else //OFDM/HT
 	{
-		PHY_STS_OFDM_8192CD_T	*pOfdm_buf = (PHY_STS_OFDM_8192CD_T *)pphy_head;;
+		pOfdm_buf = (PHY_STS_OFDM_8192CD_T *)pphy_stat;
+	
 		//
 		// (1)Get RSSI per-path
 		//
 		for(i=0; i<pHalData->NumTotalRFPath; i++)
 		{
-			rf_rx_num++;
-			rx_pwr[i] = ((pphy_head[PHY_STAT_GAIN_TRSW_SHT+i]&0x3F)*2) - 110;
+			// 2008/01/30 MH we will judge RF RX path now.
+			if (pHalData->bRFPathRxEnable[i])
+				rf_rx_num++;
+			//else
+				//continue;
 
-
-			//if (priv->pshare->rf_ft_var.rssi_dump) 
-			{
-				tmp_rxsnr =	pOfdm_buf->rxsnr_X[i];
-				rx_snrX = (s8)(tmp_rxsnr);
-				rx_snrX >>= 1;
-				pattrib->RxSNRdB[i] = (int)rx_snrX;
-			}
-			
-
+			rx_pwr[i] =  ((pOfdm_buf->trsw_gain_X[i]&0x3F)*2) - 110;
 
 			/* Translate DBM to percentage. */
 			rssi=query_rx_pwr_percentage(rx_pwr[i]);
@@ -317,8 +370,10 @@ void rtl8192c_query_rx_phy_status(union recv_frame *prframe, struct recv_stat *p
 			RT_TRACE(_module_rtl871x_recv_c_, _drv_err_, ("RF-%d RXPWR=%x RSSI=%d\n", i, rx_pwr[i], rssi));
 
 			//Get Rx snr value in DB
-			//Adapter->RxStats.RxSNRdB[i] = (s4Byte)(pDrvInfo->rxsnr[i]/2);
-
+			tmp_rxsnr =	pOfdm_buf->rxsnr_X[i];
+			rx_snrX = (s8)(tmp_rxsnr);
+			rx_snrX >>= 1;
+			padapter->recvpriv.RxSNRdB[i] =  (int)rx_snrX;
 
 			/* Record Signal Strength for next packet */
 			//if(bPacketMatchBSSID)
@@ -332,42 +387,39 @@ void rtl8192c_query_rx_phy_status(union recv_frame *prframe, struct recv_stat *p
 
 					if(i == 0)
 					{
-
 						// mapping to 5 bars for vista signal strength
 						// signal quality in driver will be displayed to signal strength
 						// in vista.
 						if(rssi >= 50)
 							sq = 100;
 						else if(rssi >= 35 && rssi < 50)
-							sq  = 80;
+							sq = 80;
 						else if(rssi >= 22 && rssi < 35)
-							sq  = 60;
+							sq = 60;
 						else if(rssi >= 18 && rssi < 22)
-							sq  = 40;
+							sq = 40;
 						else
-							sq  = 20;
+							sq = 20;
 						//DbgPrint("ofdm/mcs RSSI=%d\n", RSSI);
 						//pRfd->Status.SignalQuality = SQ;
-						
 						//DbgPrint("ofdm/mcs SQ = %d\n", pRfd->Status.SignalQuality);
 					}
 				}
 			}
-
 		}
 
 
 		//
 		// (2)PWDB, Average PWDB cacluated by hardware (for rate adaptive),average
 		//
-		rx_pwr_all = (((pphy_head[PHY_STAT_PWDB_ALL_SHT]) >> 1 )& 0x7f) -110;//for OFDM Average RSSI
+		rx_pwr_all = (((pOfdm_buf->pwdb_all ) >> 1 )& 0x7f) -110;//for OFDM Average RSSI
 		pwdb_all = query_rx_pwr_percentage(rx_pwr_all);
 
 		RT_TRACE(_module_rtl871x_recv_c_, _drv_err_, ("PWDB_ALL=%d\n",	pwdb_all));
 
 		pattrib->RxPWDBAll = pwdb_all;	//for DIG/rate adaptive
 		pattrib->RecvSignalPower = rx_pwr_all;//dBM
-		
+
 		//
 		// (3)EVM of HT rate
 		//
@@ -383,10 +435,10 @@ void rtl8192c_query_rx_phy_status(union recv_frame *prframe, struct recv_stat *p
 				// Do not use shift operation like "rx_evmX >>= 1" because the compilor of free build environment
 				// fill most significant bit to "zero" when doing shifting operation which may change a negative
 				// value to positive one, then the dbm value (which is supposed to be negative)  is not correct anymore.
-				evm = evm_db2percentage( (pphy_head[PHY_STAT_RXEVM_SHT+i] /*/ 2*/));//dbm
+				evm = evm_db2percentage( (pOfdm_buf->rxevm_X[i]/*/ 2*/));//dbm
 
 				RT_TRACE(_module_rtl871x_recv_c_, _drv_err_, ("RXRATE=%x RXEVM=%x EVM=%s%d\n",
-					pattrib->mcs_rate, pphy_head[PHY_STAT_RXEVM_SHT+i], "%",evm));
+					pattrib->mcs_rate, pOfdm_buf->rxevm_X[i], "%",evm));
 
 				//if(bPacketMatchBSSID)
 				{
@@ -409,16 +461,15 @@ void rtl8192c_query_rx_phy_status(union recv_frame *prframe, struct recv_stat *p
 
 	//UI BSS List signal strength(in percentage), make it good looking, from 0~100.
 	//It is assigned to the BSS List in GetValueFromBeaconOrProbeRsp().
-
 	if(bcck_rate)
 	{
-		pattrib->signal_strength=(u8)signal_scale_mapping(pwdb_all);
+		pattrib->signal_strength=(u8)signal_scale_mapping(padapter, pwdb_all);
 	}
 	else
 	{
 		if (rf_rx_num != 0)
 		{
-			pattrib->signal_strength= (u8)(signal_scale_mapping(total_rssi/=rf_rx_num));
+			pattrib->signal_strength= (u8)(signal_scale_mapping(padapter, total_rssi/=rf_rx_num));
 		}
 	}
 	//printk("%s,rx_pwr_all(%d),RxPWDBAll(%d)\n",__FUNCTION__,rx_pwr_all,pattrib->RxPWDBAll);
@@ -430,9 +481,6 @@ static void process_rssi(_adapter *padapter,union recv_frame *prframe)
 {
 	u32	last_rssi, tmp_val;
 	struct rx_pkt_attrib *pattrib = &prframe->u.hdr.attrib;
-
-	padapter->recvpriv.RxSNRdB[0] =  pattrib->RxSNRdB[0];
-	padapter->recvpriv.RxSNRdB[1] =  pattrib->RxSNRdB[1];
 
 	//printk("process_rssi=> pattrib->rssil(%d) signal_strength(%d)\n ",pattrib->RecvSignalPower,pattrib->signal_strength);
 	//if(pRfd->Status.bPacketToSelf || pRfd->Status.bPacketBeacon)
@@ -453,7 +501,7 @@ static void process_rssi(_adapter *padapter,union recv_frame *prframe)
 
 		tmp_val = padapter->recvpriv.signal_strength_data.total_val/padapter->recvpriv.signal_strength_data.total_num;
 		padapter->recvpriv.signal_strength= tmp_val;
-		padapter->recvpriv.rssi=(s8)translate2dbm( padapter,(u8)tmp_val);		
+		padapter->recvpriv.rssi=(s8)translate2dbm( padapter,(u8)tmp_val);
 
 		RT_TRACE(_module_rtl871x_recv_c_,_drv_info_,("UI RSSI = %d, ui_rssi.TotalVal = %d, ui_rssi.TotalNum = %d\n", tmp_val, padapter->recvpriv.signal_strength_data.total_val,padapter->recvpriv.signal_strength_data.total_num));
 	}
@@ -464,20 +512,22 @@ static void process_rssi(_adapter *padapter,union recv_frame *prframe)
 static void process_PWDB(_adapter *padapter, union recv_frame *prframe)
 {
 	int	UndecoratedSmoothedPWDB;
-	struct dm_priv		*pdmpriv = &padapter->dmpriv;
+	HAL_DATA_TYPE		*pHalData = GET_HAL_DATA(padapter);
+	struct dm_priv		*pdmpriv = &pHalData->dmpriv;
 	struct rx_pkt_attrib	*pattrib= &prframe->u.hdr.attrib;
 	struct sta_info		*psta = prframe->u.hdr.psta;
 
 	if(psta)
 	{
-		//UndecoratedSmoothedPWDB = pEntry->rssi_stat.UndecoratedSmoothedPWDB;//todo:
+		//UndecoratedSmoothedPWDB = psta->UndecoratedSmoothedPWDB;//todo:
 		UndecoratedSmoothedPWDB = pdmpriv->UndecoratedSmoothedPWDB;
 	}
 	else
 	{
 		UndecoratedSmoothedPWDB = pdmpriv->UndecoratedSmoothedPWDB;
 	}
-	
+
+	//if(pRfd->Status.bPacketToSelf || pRfd->Status.bPacketBeacon)
 	{
 		if(UndecoratedSmoothedPWDB < 0) // initialize
 		{
@@ -501,7 +551,7 @@ static void process_PWDB(_adapter *padapter, union recv_frame *prframe)
 
 		if(psta)
 		{
-			//pEntry->rssi_stat.UndecoratedSmoothedPWDB = UndecoratedSmoothedPWDB;//todo:
+			//psta->UndecoratedSmoothedPWDB = UndecoratedSmoothedPWDB;//todo:
 			pdmpriv->UndecoratedSmoothedPWDB = UndecoratedSmoothedPWDB;
 		}
 		else
@@ -522,7 +572,7 @@ static void process_link_qual(_adapter *padapter,union recv_frame *prframe)
 	if(prframe == NULL || padapter==NULL){
 		return;
 	}
-	
+
 	pattrib = &prframe->u.hdr.attrib;
 
 	//printk("process_link_qual=> pattrib->signal_qual(%d)\n ",pattrib->signal_qual);
@@ -562,8 +612,15 @@ static void process_link_qual(_adapter *padapter,union recv_frame *prframe)
 void rtl8192c_process_phy_info(_adapter *padapter, void *prframe)
 {
 	union recv_frame *precvframe = (union recv_frame *)prframe;
-	
+
 #ifdef CONFIG_ANTENNA_DIVERSITY
+	// If we switch to the antenna for testing, the signal strength 
+	// of the packets in this time shall not be counted into total receiving power. 
+	// This prevents error counting Rx signal strength and affecting other dynamic mechanism.
+
+	// Select the packets to do RSSI checking for antenna switching.
+	SwAntDivRSSICheck8192C(padapter, precvframe->u.hdr.attrib.RxPWDBAll);
+
 	if(GET_HAL_DATA(padapter)->RSSI_test == _TRUE)
 		return;
 #endif
@@ -578,6 +635,6 @@ void rtl8192c_process_phy_info(_adapter *padapter, void *prframe)
 	//
 	// Check EVM
 	//
-	process_link_qual(padapter,  precvframe);	
+	process_link_qual(padapter,  precvframe);
 
 }

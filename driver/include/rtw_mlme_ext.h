@@ -1,29 +1,18 @@
-/******************************************************************************
- *
- * Copyright(c) 2007 - 2010 Realtek Corporation. All rights reserved.
- *                                        
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of version 2 of the GNU General Public License as
- * published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along with
- * this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
- *
- *
- ******************************************************************************/
-#ifndef __RTL871X_MLME_EXT_H_
-#define __RTL871X_MLME_EXT_H_
+
+#ifndef __RTW_MLME_EXT_H_
+#define __RTW_MLME_EXT_H_
 
 #include <drv_conf.h>
 #include <osdep_service.h>
 #include <drv_types.h>
 #include <wlan_bssdef.h>
+
+
+//	Commented by Albert 20101105
+//	Increase the SURVEY_TO value from 100 to 150  ( 100ms to 150ms )
+//	The Realtek 8188CE SoftAP will spend around 100ms to send the probe response after receiving the probe request.
+//	So, this driver tried to extend the dwell time for each scanning channel.
+//	This will increase the chance to receive the probe response from SoftAP.
 
 #define SURVEY_TO			(100)
 #define REAUTH_TO			(50)
@@ -101,21 +90,20 @@ typedef enum _RT_CHANNEL_DOMAIN
 	RT_CHANNEL_DOMAIN_MAX,
 }RT_CHANNEL_DOMAIN, *PRT_CHANNEL_DOMAIN;
 
+//
+// We now define the following channels as the max channels in each channel plan.
+// 2G, total 14 chnls
+// {1,2,3,4,5,6,7,8,9,10,11,12,13,14}
+// 5G, total 24 chnls
+// {36,40,44,48,52,56,60,64,100,104,108,112,116,120,124,128,132,136,140,149,153,157,161,165}
+#define	MAX_CHANNEL_NUM					38//14+24
+#define	MAX_SCAN_CHANNEL_NUM			54
+
 typedef struct _RT_CHANNEL_PLAN
 {
-	u8	Channel[32];
-	u8	Len;
+	unsigned char	Channel[MAX_CHANNEL_NUM];
+	unsigned char	Len;
 }RT_CHANNEL_PLAN, *PRT_CHANNEL_PLAN;
-
-
-// Scan type including active and passive scan.
-typedef enum _RT_SCAN_TYPE
-{
-	SCAN_PASSIVE,
-	SCAN_ACTIVE,
-	SCAN_MIX,
-}RT_SCAN_TYPE, *PRT_SCAN_TYPE;
-
 
 enum Associated_AP
 {
@@ -130,6 +118,15 @@ enum Associated_AP
 	maxAP,
 };
 
+enum SCAN_STATE
+{
+	SCAN_DISABLE = 0,
+	SCAN_START = 1,
+	SCAN_TXNULL = 2,
+	SCAN_PROCESS = 3,
+	SCAN_COMPLETE = 4,
+	SCAN_STATE_MAX,
+};
 
 struct mlme_handler {
 	unsigned int   num;
@@ -148,7 +145,7 @@ struct	ss_res
 	int							state;
 	int							bss_cnt;
 	int							channel_idx;
-	int							scan_mode;
+	int	scan_mode;
 	int							ss_ssidlen;
 	unsigned char 	ss_ssid[IW_ESSID_MAX_SIZE + 1];
 };
@@ -170,57 +167,62 @@ struct	ss_res
 #define	WIFI_FW_ASSOC_STATE			0x00002000
 #define	WIFI_FW_ASSOC_SUCCESS		0x00004000
 
-#define	WIFI_FW_LINKING_STATE		(WIFI_FW_AUTH_NULL | WIFI_FW_AUTH_STATE | WIFI_FW_ASSOC_STATE)
+#define	WIFI_FW_LINKING_STATE		(WIFI_FW_AUTH_NULL | WIFI_FW_AUTH_STATE | WIFI_FW_AUTH_SUCCESS |WIFI_FW_ASSOC_STATE)
 
 struct FW_Sta_Info
 {
 	struct sta_info	*psta;
-	unsigned char		status;
-	unsigned int		rx_pkt;
-	unsigned int		retry;
+	u32	status;
+	u32	rx_pkt;
+	u32	retry;
 	NDIS_802_11_RATES_EX  SupportedRates;
 };
 
 struct mlme_ext_info
 {
-	unsigned int		state;
-	unsigned int		reauth_count;
-	unsigned int		reassoc_count;
-	unsigned int		link_count;
-	unsigned int		auth_seq;
-	unsigned int		auth_algo;	// 802.11 auth, could be open, shared, auto
-	unsigned int 		authModeToggle;
-	unsigned int		enc_algo;//encrypt algorithm;
-	unsigned int		key_index;	// this is only valid for legendary wep, 0~3 for key id.
-	unsigned char 		key_mask;
-	unsigned int		iv;
-	unsigned char		chg_txt[128];
-	unsigned short		aid;
-	unsigned short	bcn_interval;
-	unsigned char		assoc_AP_vendor;
-	unsigned char		slotTime;
-	unsigned char		ERP_enable;
-	unsigned char		ERP_IE;
-	unsigned char		turboMode_cts2self;
-	unsigned char		turboMode_rtsen;
-	unsigned char		WMM_enable;
-	unsigned char		HT_enable;
-	unsigned char		HT_caps_enable;
-	unsigned char		HT_info_enable;
-	unsigned char		HT_protection;
-	unsigned char		agg_enable_bitmap;
-	unsigned char		ADDBA_retry_count;
-	unsigned char		candidate_tid_bitmap;
+	u32	state;
+	u32	reauth_count;
+	u32	reassoc_count;
+	u32	link_count;
+	u32	auth_seq;
+	u32	auth_algo;	// 802.11 auth, could be open, shared, auto
+	u32	authModeToggle;
+	u32	enc_algo;//encrypt algorithm;
+	u32	key_index;	// this is only valid for legendary wep, 0~3 for key id.
+	u32	iv;
+	u8	chg_txt[128];
+	u16	aid;
+	u16	bcn_interval;
+	u16	capability;
+	u8	assoc_AP_vendor;
+	u8	slotTime;
+	u8	preamble_mode;
+	u8	WMM_enable;
+	u8	ERP_enable;
+	u8	ERP_IE;
+	u8	HT_enable;
+	u8	HT_caps_enable;	
+	u8	HT_info_enable;
+	u8	HT_protection;
+	u8	turboMode_cts2self;
+	u8	turboMode_rtsen;
+	u8	SM_PS;
+	u8	agg_enable_bitmap;
+	u8	ADDBA_retry_count;
+	u8	candidate_tid_bitmap;
+	u8	dialogToken;
+	// Accept ADDBA Request
+	BOOLEAN bAcceptAddbaReq;
+	u8	bwmode_updated;
+
 	struct ADDBA_request		ADDBA_req;
 	struct WMM_para_element	WMM_param;
 	struct HT_caps_element	HT_caps;
 	struct HT_info_element	HT_info;
 	WLAN_BSSID_EX network;//join network or bss_network, if in ap mode, it is the same to cur_network.network
-	struct FW_Sta_Info FW_sta_info[NUM_STA];
-	// Accept ADDBA Request
-	BOOLEAN				bAcceptAddbaReq;	
-	unsigned char              bwmode_updated;	
+	struct FW_Sta_Info FW_sta_info[NUM_STA];	
 };
+
 // The channel information about this channel including joining, scanning, and power constraints.
 typedef struct _RT_CHANNEL_INFO
 {
@@ -234,37 +236,37 @@ typedef struct _RT_CHANNEL_INFO
 struct mlme_ext_priv
 {
 	_adapter			*padapter;
-	unsigned char		mlmeext_init;
+	u8	mlmeext_init;
 	u8				event_seq;
-	unsigned short	mgnt_seq;
+	u16	mgnt_seq;
 	
 	//struct fw_priv 	fwpriv;
 	
 	unsigned char		cur_channel;
 	unsigned char		cur_bwmode;
-	unsigned char 		cur_ch_offset;//PRIME_CHNL_OFFSET
-	unsigned char 		cur_wireless_mode;
-	//unsigned char		channel_set[NUM_CHANNELS];
-	unsigned char			max_chan_nums;
+	unsigned char 	cur_ch_offset;//PRIME_CHNL_OFFSET
+	unsigned char 	cur_wireless_mode;
+	//unsigned char	channel_set[NUM_CHANNELS];
+	unsigned char	max_chan_nums;
 	RT_CHANNEL_INFO		channel_set[NUM_CHANNELS];
-	
 	unsigned char		basicrate[NumRates];
 	unsigned char		datarate[NumRates];
 	
 	struct ss_res		sitesurvey_res;		
 	struct mlme_ext_info	mlmext_info;//for sta/adhoc mode, including current scanning/connecting/connected related info.
-                                                     //for ap mode, network includes ap's cap_info
+	                                                     //for ap mode, network includes ap's cap_info
 	_timer		survey_timer;
 	_timer		link_timer;
 	//_timer		ADDBA_timer;
-	u8			chan_scan_time;
+	u16			chan_scan_time;
 
-	unsigned int	linked_to;//linked timeout
+	u32	linked_to;//linked timeout
+	u32	retry; //retry for issue probereq
 	
 	u64 TSFValue;
 	
 #ifdef CONFIG_AP_MODE	
-	unsigned char bstart_bss;
+	unsigned char bstart_bss;	
 #endif
 
 };
@@ -296,16 +298,15 @@ void SetBWMode(_adapter *padapter, unsigned short bwmode, unsigned char channel_
 unsigned int decide_wait_for_beacon_timeout(unsigned int bcn_interval);
 
 void write_cam(_adapter *padapter, u8 entry, u16 ctrl, u8 *mac, u8 *key);
-void read_cam(_adapter *padapter ,u8 entry);
 
 void invalidate_cam_all(_adapter *padapter);
-void CAM_mark_invalid(PADAPTER Adapter, u8 ucIndex);
 void CAM_empty_entry(PADAPTER Adapter, u8 ucIndex);
 
 
 int allocate_cam_entry(_adapter *padapter);
 void flush_all_cam_entry(_adapter *padapter);
 
+BOOLEAN IsLegal5GChannel(PADAPTER Adapter, u8 channel);
 
 void site_survey(_adapter *padapter);
 u8 collect_bss_info(_adapter *padapter, union recv_frame *precv_frame, WLAN_BSSID_EX *bssid);
@@ -333,10 +334,14 @@ void VCS_update(_adapter *padapter, struct sta_info *psta);
 void update_beacon_info(_adapter *padapter, u8 *pframe, uint len, struct sta_info *psta);
 
 void update_IOT_info(_adapter *padapter);
-void update_EDCA_param(_adapter *padapter);
+void update_capinfo(PADAPTER Adapter, u16 updateCap);
+void update_wireless_mode(_adapter * padapter);
 int update_sta_support_rate(_adapter *padapter, u8* pvar_ie, uint var_ie_len, int cam_idx);
 
-void Update_RA_Entry(_adapter *padapter, unsigned int mac_id);
+unsigned int update_basic_rate(unsigned char *ptn, unsigned int ptn_sz);
+unsigned int update_supported_rate(unsigned char *ptn, unsigned int ptn_sz);
+unsigned int update_MSC_rate(struct HT_caps_element *pHT_caps);
+void Update_RA_Entry(_adapter *padapter, unsigned int cam_idx);
 void enable_rate_adaptive(_adapter *padapter);
 void set_sta_rate(_adapter *padapter);
 
@@ -360,17 +365,22 @@ void update_mgntframe_attrib(_adapter *padapter, struct pkt_attrib *pattrib);
 void dump_mgntframe(_adapter *padapter, struct xmit_frame *pmgntframe);
 
 void issue_beacon(_adapter *padapter);
-void issue_probersp(_adapter *padapter, unsigned char *da);
+void issue_probersp(_adapter *padapter, unsigned char *da, u8 is_valid_p2p_probereq);
+void issue_probersp_p2p(_adapter *padapter, unsigned char *da);
 void issue_assocreq(_adapter *padapter);
+void issue_asocrsp(_adapter *padapter, unsigned short status, struct sta_info *pstat, int pkt_type);
 void issue_auth(_adapter *padapter, struct sta_info *psta, unsigned short status);
 //	Added by Albert 2010/07/26
 //	blnbc: 1 -> broadcast probe request
 //	blnbc: 0 -> unicast probe request. The address 1 will be the BSSID.
 void issue_probereq(_adapter *padapter, u8 blnbc);
+void issue_probereq_p2p(_adapter *padapter);
 void issue_nulldata(_adapter *padapter, unsigned int power_mode);
+void issue_qos_nulldata(_adapter *padapter, unsigned char *da, u16 tid);
 void issue_deauth(_adapter *padapter, unsigned char *da, unsigned short reason);
 void issue_action_BA(_adapter *padapter, unsigned char *raddr, unsigned char action, unsigned short status);
 unsigned int send_delba(_adapter *padapter, u8 initiator, u8 *addr);
+unsigned int send_beacon(_adapter *padapter);
 
 void start_clnt_assoc(_adapter *padapter);
 void start_clnt_auth(_adapter* padapter);
@@ -400,6 +410,8 @@ unsigned int OnAction_wmm(_adapter *padapter, union recv_frame *precv_frame);
 void mlmeext_joinbss_event_callback(_adapter *padapter);
 void mlmeext_sta_del_event_callback(_adapter *padapter);
 void mlmeext_sta_add_event_callback(_adapter *padapter, struct sta_info *psta);
+void issue_p2p_invitation_response(_adapter *padapter, u8* raddr, u8 dialogToken, u8 success);
+void issue_p2p_invitation_request(_adapter *padapter, u8* raddr );
 
 void linked_status_chk(_adapter *padapter);
 
@@ -418,20 +430,219 @@ extern void process_addba_req(_adapter *padapter, u8 *paddba_req, u8 *addr);
 extern void update_TSF(struct mlme_ext_priv *pmlmeext, u8 *pframe, uint len);
 extern void correct_TSF(_adapter *padapter, struct mlme_ext_priv *pmlmeext);
 
-extern void ResumeTxBeacon(_adapter *padapter);
-extern void StopTxBeacon(_adapter *padapter);
-
 #ifdef CONFIG_AP_MODE
 void init_mlme_ap_info(_adapter *padapter);
+//void update_BCNTIM(_adapter *padapter);
+void update_beacon(_adapter *padapter, u8 ie_id, u8 *oui, u8 tx);
+void expire_timeout_chk(_adapter *padapter);
+void update_sta_info_apmode(_adapter *padapter, struct sta_info *psta);
+void start_bss_network(_adapter *padapter, u8 *pbuf);
 #ifdef CONFIG_NATIVEAP_MLME
-void	expire_timeout_chk(_adapter *padapter);
-#endif //end of CONFIG_NATIVEAP_MLME
-	
+void bss_cap_update(_adapter *padapter, struct sta_info *psta);
+void sta_info_update(_adapter *padapter, struct sta_info *psta);
+void ap_free_sta(_adapter *padapter, struct sta_info *psta);
+int rtw_sta_flush(_adapter *padapter);
+void start_ap_mode(_adapter *padapter);
+void stop_ap_mode(_adapter *padapter);
+#endif
 #endif //end of CONFIG_AP_MODE
 
+struct cmd_hdl {
+	uint	parmsize;
+	u8 (*h2cfuns)(struct _ADAPTER *padapter, u8 *pbuf);	
+};
 
-#ifdef SILENT_RESET_FOR_SPECIFIC_PLATFOM
-void silentreset_for_specific_platform(_adapter *padapter);
+
+u8 read_macreg_hdl(_adapter *padapter, u8 *pbuf);
+u8 write_macreg_hdl(_adapter *padapter, u8 *pbuf);
+u8 read_bbreg_hdl(_adapter *padapter, u8 *pbuf);
+u8 write_bbreg_hdl(_adapter *padapter, u8 *pbuf);
+u8 read_rfreg_hdl(_adapter *padapter, u8 *pbuf);
+u8 write_rfreg_hdl(_adapter *padapter, u8 *pbuf);
+
+
+u8 NULL_hdl(_adapter *padapter, u8 *pbuf);
+u8 join_cmd_hdl(_adapter *padapter, u8 *pbuf);
+u8 disconnect_hdl(_adapter *padapter, u8 *pbuf);
+u8 createbss_hdl(_adapter *padapter, u8 *pbuf);
+u8 setopmode_hdl(_adapter *padapter, u8 *pbuf);
+u8 sitesurvey_cmd_hdl(_adapter *padapter, u8 *pbuf);	
+u8 setauth_hdl(_adapter *padapter, u8 *pbuf);
+u8 setkey_hdl(_adapter *padapter, u8 *pbuf);
+u8 set_stakey_hdl(_adapter *padapter, u8 *pbuf);
+u8 set_assocsta_hdl(_adapter *padapter, u8 *pbuf);
+u8 del_assocsta_hdl(_adapter *padapter, u8 *pbuf);
+u8 add_ba_hdl(_adapter *padapter, unsigned char *pbuf);
+
+u8 mlme_evt_hdl(_adapter *padapter, unsigned char *pbuf);
+u8 h2c_msg_hdl(_adapter *padapter, unsigned char *pbuf);
+u8 tx_beacon_hdl(_adapter *padapter, unsigned char *pbuf);
+
+#define GEN_DRV_CMD_HANDLER(size, cmd)	{size, &cmd ## _hdl},
+#define GEN_MLME_EXT_HANDLER(size, cmd)	{size, cmd},
+
+#ifdef _RTW_CMD_C_
+
+struct cmd_hdl wlancmds[] = 
+{
+	GEN_DRV_CMD_HANDLER(0, NULL) /*0*/
+	GEN_DRV_CMD_HANDLER(0, NULL)
+	GEN_DRV_CMD_HANDLER(0, NULL)
+	GEN_DRV_CMD_HANDLER(0, NULL)
+	GEN_DRV_CMD_HANDLER(0, NULL)
+	GEN_DRV_CMD_HANDLER(0, NULL)
+	GEN_MLME_EXT_HANDLER(0, NULL)
+	GEN_MLME_EXT_HANDLER(0, NULL)
+	GEN_MLME_EXT_HANDLER(0, NULL)
+	GEN_MLME_EXT_HANDLER(0, NULL)
+	GEN_MLME_EXT_HANDLER(0, NULL) /*10*/
+	GEN_MLME_EXT_HANDLER(0, NULL)
+	GEN_MLME_EXT_HANDLER(0, NULL)
+	GEN_MLME_EXT_HANDLER(0, NULL)		
+	GEN_MLME_EXT_HANDLER(sizeof (struct joinbss_parm), join_cmd_hdl) /*14*/
+	GEN_MLME_EXT_HANDLER(sizeof (struct disconnect_parm), disconnect_hdl)
+	GEN_MLME_EXT_HANDLER(sizeof (struct createbss_parm), createbss_hdl)
+	GEN_MLME_EXT_HANDLER(sizeof (struct setopmode_parm), setopmode_hdl)
+	GEN_MLME_EXT_HANDLER(sizeof (struct sitesurvey_parm), sitesurvey_cmd_hdl) /*18*/
+	GEN_MLME_EXT_HANDLER(sizeof (struct setauth_parm), setauth_hdl)
+	GEN_MLME_EXT_HANDLER(sizeof (struct setkey_parm), setkey_hdl) /*20*/
+	GEN_MLME_EXT_HANDLER(sizeof (struct set_stakey_parm), set_stakey_hdl)
+	GEN_MLME_EXT_HANDLER(sizeof (struct set_assocsta_parm), NULL)
+	GEN_MLME_EXT_HANDLER(sizeof (struct del_assocsta_parm), NULL)
+	GEN_MLME_EXT_HANDLER(sizeof (struct setstapwrstate_parm), NULL)
+	GEN_MLME_EXT_HANDLER(sizeof (struct setbasicrate_parm), NULL)
+	GEN_MLME_EXT_HANDLER(sizeof (struct getbasicrate_parm), NULL)
+	GEN_MLME_EXT_HANDLER(sizeof (struct setdatarate_parm), NULL)
+	GEN_MLME_EXT_HANDLER(sizeof (struct getdatarate_parm), NULL)
+	GEN_MLME_EXT_HANDLER(sizeof (struct setphyinfo_parm), NULL)
+	GEN_MLME_EXT_HANDLER(sizeof (struct getphyinfo_parm), NULL)  /*30*/
+	GEN_MLME_EXT_HANDLER(sizeof (struct setphy_parm), NULL)
+	GEN_MLME_EXT_HANDLER(sizeof (struct getphy_parm), NULL)
+	GEN_MLME_EXT_HANDLER(0, NULL)
+	GEN_MLME_EXT_HANDLER(0, NULL)
+	GEN_MLME_EXT_HANDLER(0, NULL)
+	GEN_MLME_EXT_HANDLER(0, NULL)
+	GEN_MLME_EXT_HANDLER(0, NULL)
+	GEN_MLME_EXT_HANDLER(0, NULL)
+	GEN_MLME_EXT_HANDLER(0, NULL)
+	GEN_MLME_EXT_HANDLER(0, NULL)	/*40*/
+	GEN_MLME_EXT_HANDLER(0, NULL)
+	GEN_MLME_EXT_HANDLER(0, NULL)
+	GEN_MLME_EXT_HANDLER(0, NULL)
+	GEN_MLME_EXT_HANDLER(0, NULL)
+	GEN_MLME_EXT_HANDLER(sizeof(struct addBaReq_parm), add_ba_hdl)	
+	GEN_MLME_EXT_HANDLER(0, NULL)
+	GEN_MLME_EXT_HANDLER(0, NULL)
+	GEN_MLME_EXT_HANDLER(0, NULL)
+	GEN_MLME_EXT_HANDLER(0, NULL)
+	GEN_MLME_EXT_HANDLER(0, NULL) /*50*/
+	GEN_MLME_EXT_HANDLER(0, NULL)
+	GEN_MLME_EXT_HANDLER(0, NULL)
+	GEN_MLME_EXT_HANDLER(0, NULL)
+	GEN_MLME_EXT_HANDLER(0, NULL) 
+	GEN_MLME_EXT_HANDLER(sizeof(struct Tx_Beacon_param), tx_beacon_hdl) /*55*/
+
+	GEN_MLME_EXT_HANDLER(0, mlme_evt_hdl) /*56*/
+	GEN_MLME_EXT_HANDLER(0, drvextra_cmd_hdl) /*57*/
+
+	GEN_MLME_EXT_HANDLER(0, h2c_msg_hdl) /*58*/
+
+};
+
 #endif
+
+struct C2HEvent_Header
+{
+
+#ifdef CONFIG_LITTLE_ENDIAN
+
+	unsigned int len:16;
+	unsigned int ID:8;
+	unsigned int seq:8;
+	
+#elif defined(CONFIG_BIG_ENDIAN)
+
+	unsigned int seq:8;
+	unsigned int ID:8;
+	unsigned int len:16;
+	
+#else
+
+#  error "Must be LITTLE or BIG Endian"
+
+#endif
+
+	unsigned int rsvd;
+
+};
+
+void dummy_event_callback(_adapter *adapter , u8 *pbuf);
+void fwdbg_event_callback(_adapter *adapter , u8 *pbuf);
+
+enum rtw_c2h_event
+{
+	GEN_EVT_CODE(_Read_MACREG)=0, /*0*/
+	GEN_EVT_CODE(_Read_BBREG),
+ 	GEN_EVT_CODE(_Read_RFREG),
+ 	GEN_EVT_CODE(_Read_EEPROM),
+ 	GEN_EVT_CODE(_Read_EFUSE),
+	GEN_EVT_CODE(_Read_CAM),			/*5*/
+ 	GEN_EVT_CODE(_Get_BasicRate),  
+ 	GEN_EVT_CODE(_Get_DataRate),   
+ 	GEN_EVT_CODE(_Survey),	 /*8*/
+ 	GEN_EVT_CODE(_SurveyDone),	 /*9*/
+ 	
+ 	GEN_EVT_CODE(_JoinBss) , /*10*/
+ 	GEN_EVT_CODE(_AddSTA),
+ 	GEN_EVT_CODE(_DelSTA),
+ 	GEN_EVT_CODE(_AtimDone) ,
+ 	GEN_EVT_CODE(_TX_Report),  
+	GEN_EVT_CODE(_CCX_Report),			/*15*/
+ 	GEN_EVT_CODE(_DTM_Report),
+ 	GEN_EVT_CODE(_TX_Rate_Statistics),
+ 	GEN_EVT_CODE(_C2HLBK), 
+ 	GEN_EVT_CODE(_FWDBG),
+	GEN_EVT_CODE(_C2HFEEDBACK),               /*20*/
+	GEN_EVT_CODE(_ADDBA),
+	GEN_EVT_CODE(_C2HBCN),
+	GEN_EVT_CODE(_ReportPwrState),		//filen: only for PCIE, USB	
+	GEN_EVT_CODE(_CloseRF),				//filen: only for PCIE, work around ASPM
+ 	MAX_C2HEVT
+};
+
+
+#ifdef _RTW_MLME_EXT_C_		
+
+struct fwevent wlanevents[] = 
+{
+	{0, dummy_event_callback}, 	/*0*/
+	{0, NULL},
+	{0, NULL},
+	{0, NULL},
+	{0, NULL},
+	{0, NULL},
+	{0, NULL},
+	{0, NULL},
+	{0, &survey_event_callback},		/*8*/
+	{sizeof (struct surveydone_event), &surveydone_event_callback},	/*9*/
+		
+	{0, &joinbss_event_callback},		/*10*/
+	{sizeof(struct stassoc_event), &stassoc_event_callback},
+	{sizeof(struct stadel_event), &stadel_event_callback},	
+	{0, &atimdone_event_callback},
+	{0, dummy_event_callback},
+	{0, NULL},	/*15*/
+	{0, NULL},
+	{0, NULL},
+	{0, NULL},
+	{0, fwdbg_event_callback},
+	{0, NULL},	 /*20*/
+	{0, NULL},
+	{0, NULL},	
+	{0, &cpwm_event_callback},
+};
+
+#endif//_RTL8192C_CMD_C_
+
 #endif
 

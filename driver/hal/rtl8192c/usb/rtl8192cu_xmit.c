@@ -1,22 +1,20 @@
 /******************************************************************************
- *
- * Copyright(c) 2007 - 2010 Realtek Corporation. All rights reserved.
- *                                        
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of version 2 of the GNU General Public License as
- * published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along with
- * this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
- *
- *
- ******************************************************************************/
+* rtl8192cu_xmit.c                                                                                                                                 *
+*                                                                                                                                          *
+* Description :                                                                                                                       *
+*                                                                                                                                           *
+* Author :                                                                                                                       *
+*                                                                                                                                         *
+* History :									*
+*                                                                                                                                       *
+*										*
+*										*
+* Copyright 2010, Realtek Corp.							*
+*                                                                                                                                        *
+* The contents of this file is the sole property of Realtek Corp.  It can not be                                     *
+* be used, copied or modified without written permission from Realtek Corp.                                         *
+*                                                                                                                                          *
+*******************************************************************************/
 #define _RTL8192C_XMIT_C_
 #include <drv_conf.h>
 #include <osdep_service.h>
@@ -26,51 +24,65 @@
 #include <osdep_intf.h>
 #include <circ_buf.h>
 #include <usb_ops.h>
+#include <rtl8192c_hal.h>
 
 #if defined (PLATFORM_LINUX) && defined (PLATFORM_WINDOWS)
 #error "Shall be Linux or Windows, but not both!\n"
 #endif
 
-u32 rtw_get_ff_hwaddr(struct xmit_frame	*pxmitframe)
+
+s32	rtl8192cu_init_xmit_priv(_adapter *padapter)
+{
+	struct xmit_priv	*pxmitpriv = &padapter->xmitpriv;
+
+#ifdef PLATFORM_LINUX
+	tasklet_init(&pxmitpriv->xmit_tasklet,
+	     (void(*)(unsigned long))rtl8192cu_xmit_tasklet,
+	     (unsigned long)padapter);
+#endif
+	return _SUCCESS;
+}
+
+void	rtl8192cu_free_xmit_priv(_adapter *padapter)
+{
+}
+
+u32 get_ff_hwaddr(struct xmit_frame	*pxmitframe)
 {
 	u32 addr;
 	struct pkt_attrib *pattrib = &pxmitframe->attrib;	
 	
-	if((pxmitframe->frame_tag&0x0f) == DATA_FRAMETAG)
+	switch(pattrib->qsel)
 	{
-		switch(pattrib->qsel)
-		{
-			case 0:
-			case 3:
-				addr = BE_QUEUE_INX;
-			 	break;
-			case 1:
-			case 2:
-				addr = BK_QUEUE_INX;
-				break;				
-			case 4:
-			case 5:
-				addr = VI_QUEUE_INX;
-				break;		
-			case 6:
-			case 7:
-				addr = VO_QUEUE_INX;
-				break;
+		case 0:
+		case 3:
+			addr = BE_QUEUE_INX;
+		 	break;
+		case 1:
+		case 2:
+			addr = BK_QUEUE_INX;
+			break;				
+		case 4:
+		case 5:
+			addr = VI_QUEUE_INX;
+			break;		
+		case 6:
+		case 7:
+			addr = VO_QUEUE_INX;
+			break;
+		case 0x10:
+			addr = BCN_QUEUE_INX;
+			break;
+		case 0x11://BC/MC in PS (HIQ)
+			addr = HIGH_QUEUE_INX;
+			break;
+		case 0x12:
+			addr = MGT_QUEUE_INX;
+			break;
+		default:
+			addr = BE_QUEUE_INX;
+			break;		
 
-			default:
-				addr = BE_QUEUE_INX;
-				break;		
-				
-		}
-		
-	}	
-	else if((pxmitframe->frame_tag&0x0f) == MGNT_FRAMETAG)
-	{
-		addr = MGT_QUEUE_INX;
-	}
-	else
-	{
-		addr = BE_QUEUE_INX;
 	}
 
 	return addr;
@@ -83,18 +95,23 @@ void count_tx_stats(_adapter *padapter, struct xmit_frame *pxmitframe, int sz)
 	struct stainfo_stats *pstats = NULL;
 	struct pkt_attrib *pattrib = &pxmitframe->attrib;
 	struct xmit_priv *pxmitpriv = &padapter->xmitpriv;
+	struct mlme_priv	*pmlmepriv = &(padapter->mlmepriv);
 
 	if((pxmitframe->frame_tag&0x0f) == DATA_FRAMETAG)
 	{
 		pxmitpriv->tx_bytes += sz;
-		pxmitpriv->NumTxOkInPeriod ++;
+#ifdef USB_TX_AGGREGATION_92C
+		pmlmepriv->LinkDetectInfo.NumTxOkInPeriod += pxmitframe->agg_num;
+#else
+		pmlmepriv->LinkDetectInfo.NumTxOkInPeriod++;
+#endif
 
 		psta = pxmitframe->attrib.psta;
 
 		if(psta)
 		{
 			pstats = &psta->sta_stats;
-#if USB_TX_AGGREGATION_92C
+#ifdef USB_TX_AGGREGATION_92C
 			pstats->tx_pkts += pxmitframe->agg_num;
 #else
 			pstats->tx_pkts++;
@@ -105,14 +122,13 @@ void count_tx_stats(_adapter *padapter, struct xmit_frame *pxmitframe, int sz)
 	
 }
 
-void rtw_do_queue_select(_adapter	*padapter, struct pkt_attrib *pattrib)
+void do_queue_select(_adapter	*padapter, struct pkt_attrib *pattrib)
 {
-	unsigned int qsel;
+	u8 qsel;
 		
-	qsel = (uint)pattrib->priority;	
-	RT_TRACE(_module_rtl871x_xmit_c_,_drv_info_,("### rtw_do_queue_select priority=%d ,qsel = %d\n",pattrib->priority ,qsel));
+	qsel = pattrib->priority;
+	RT_TRACE(_module_rtl871x_xmit_c_,_drv_info_,("### do_queue_select priority=%d ,qsel = %d\n",pattrib->priority ,qsel));
 	pattrib->qsel = qsel;
-
 }
 
 int urb_zero_packet_chk(_adapter *padapter, int sz)
@@ -141,7 +157,7 @@ int urb_zero_packet_chk(_adapter *padapter, int sz)
 	
 }
 
-void cal_txdesc_chksum(struct tx_desc	*ptxdesc)
+void rtl8192cu_cal_txdesc_chksum(struct tx_desc	*ptxdesc)
 {
 		u16	*usPtr = (u16*)ptxdesc;
 		u32 count = 16;		// (32 bytes / 2 bytes per XOR) => 16 times
@@ -173,9 +189,9 @@ void fill_txdesc_for_mp(struct xmit_frame *pxmitframe, struct tx_desc *ptxdesc)
 			struct pkt_file pktfile;
 
 			ptxdesc_mp = &txdesc;
-			_rtw_open_pktfile(pxmitframe->pkt, &pktfile);
-			_rtw_pktfile_read(&pktfile, NULL, ETH_HLEN);
-			_rtw_pktfile_read(&pktfile, (u8*)ptxdesc_mp, TXDESC_SIZE);
+			_open_pktfile(pxmitframe->pkt, &pktfile);
+			_pktfile_read(&pktfile, NULL, ETH_HLEN);
+			_pktfile_read(&pktfile, (u8*)ptxdesc_mp, TXDESC_SIZE);
 
 			//offset 8
 			ptxdesc->txdw2 = cpu_to_le32(ptxdesc_mp->txdw2);
@@ -242,11 +258,6 @@ void fill_txdesc_vcs(struct pkt_attrib *pattrib, u32 *pdw)
 			break;		
 	}
 
-	if(pattrib->vcs_mode)
-	{
-		*pdw |= cpu_to_le32(BIT(13));//ENABLE HW RTS
-	}
-
 }
 
 void fill_txdesc_phy(struct pkt_attrib *pattrib, u32 *pdw)
@@ -268,7 +279,7 @@ void fill_txdesc_phy(struct pkt_attrib *pattrib, u32 *pdw)
 	}
 }
 
-#if USB_TX_AGGREGATION_92C
+#ifdef USB_TX_AGGREGATION_92C
 static void _update_txdesc(struct xmit_frame *pxmitframe, u8 *pmem, int sz)
 {
 	uint qsel;
@@ -283,7 +294,7 @@ static void _update_txdesc(struct xmit_frame *pxmitframe, u8 *pmem, int sz)
 	struct tx_desc		*ptxdesc = (struct tx_desc*)pmem;
 
 
-	_rtw_memset(ptxdesc, 0, sizeof(struct tx_desc));
+	_memset(ptxdesc, 0, sizeof(struct tx_desc));
 	
 	//4 offset 0
 	ptxdesc->txdw0 |= cpu_to_le32(sz & 0x0000ffff);
@@ -293,22 +304,23 @@ static void _update_txdesc(struct xmit_frame *pxmitframe, u8 *pmem, int sz)
 	if (bmcst) ptxdesc->txdw0 |= cpu_to_le32(BIT(24));
 
 	RT_TRACE(_module_rtl871x_xmit_c_, _drv_info_,
-		 ("rtw_update_txdesc: offset0=0x%08x\n", ptxdesc->txdw0));
+		 ("update_txdesc: offset0=0x%08x\n", ptxdesc->txdw0));
 
 	//4 offset 4
 	// pkt_offset, unit:8 bytes padding
 	if (pxmitframe->pkt_offset > 0)
 		ptxdesc->txdw1 |= cpu_to_le32((pxmitframe->pkt_offset << 26) & 0x7c000000);
 
-#if USB_TX_AGGREGATION_92C
-	if (pxmitframe->agg_num > 0)
+#ifdef USB_TX_AGGREGATION_92C
+	if (pxmitframe->agg_num > 1)
 		ptxdesc->txdw5 |= cpu_to_le32((pxmitframe->agg_num << 24) & 0xff000000);
 #endif
 
 	if (pxmitframe->frame_tag == DATA_FRAMETAG)
 	{
 		//4 offset 4
-		ptxdesc->txdw1 |= cpu_to_le32(pattrib->mac_id & 0x1f);//CAM_ID(MAC_ID)
+		//ptxdesc->txdw1 |= cpu_to_le32((pattrib->mac_id-4) & 0x1f);//CAM_ID(MAC_ID)
+		ptxdesc->txdw1 |= cpu_to_le32(pattrib->mac_id&0x1f);//CAM_ID(MAC_ID)
 
 		qsel = (uint)(pattrib->qsel & 0x0000001f);
 		ptxdesc->txdw1 |= cpu_to_le32((qsel << QSEL_SHT) & 0x00001f00);
@@ -343,7 +355,6 @@ static void _update_txdesc(struct xmit_frame *pxmitframe, u8 *pmem, int sz)
 			fill_txdesc_vcs(pattrib, &ptxdesc->txdw4);
 			fill_txdesc_phy(pattrib, &ptxdesc->txdw4);
 
-			
 			ptxdesc->txdw4 |= cpu_to_le32(0x00000008);//RTS Rate=24M
 			ptxdesc->txdw5 |= cpu_to_le32(0x0001ff00);
 			ptxdesc->txdw5 |= cpu_to_le32(0x0000000b);//DataRate - 54M
@@ -386,7 +397,8 @@ static void _update_txdesc(struct xmit_frame *pxmitframe, u8 *pmem, int sz)
 		//printk("pxmitframe->frame_tag == MGNT_FRAMETAG\n");	
 
 		//4 offset 4
-		ptxdesc->txdw1 |= cpu_to_le32(pattrib->mac_id & 0x1f);//(MAC_ID)
+		//ptxdesc->txdw1 |= cpu_to_le32((pattrib->mac_id-4) & 0x1f);//CAM_ID(MAC_ID)
+		ptxdesc->txdw1 |= cpu_to_le32(pattrib->mac_id&0x1f);//CAM_ID(MAC_ID)
 
 		qsel = (uint)(pattrib->qsel&0x0000001f);
 		ptxdesc->txdw1 |= cpu_to_le32((qsel << QSEL_SHT) & 0x00001f00);
@@ -451,11 +463,11 @@ static void _update_txdesc(struct xmit_frame *pxmitframe, u8 *pmem, int sz)
 		ptxdesc->txdw3 |= cpu_to_le32((8 <<28)); //set bit3 to 1. Suugested by TimChen. 2009.12.29.
 	}
 
-	cal_txdesc_chksum(ptxdesc);
+	rtl8192cu_cal_txdesc_chksum(ptxdesc);
 }
 #endif
 
-s32 rtw_update_txdesc(struct xmit_frame *pxmitframe, u32 *pmem, s32 sz)
+static s32 update_txdesc(struct xmit_frame *pxmitframe, u32 *pmem, s32 sz)
 {
 	int pull=0;
 	uint qsel;
@@ -474,7 +486,7 @@ s32 rtw_update_txdesc(struct xmit_frame *pxmitframe, u32 *pmem, s32 sz)
 	}
 	
 		
-	_rtw_memset(ptxdesc, 0, sizeof(struct tx_desc));
+	_memset(ptxdesc, 0, sizeof(struct tx_desc));
 	
 	//offset 0
 	ptxdesc->txdw0 |= cpu_to_le32(sz&0x0000ffff);
@@ -497,7 +509,8 @@ s32 rtw_update_txdesc(struct xmit_frame *pxmitframe, u32 *pmem, s32 sz)
 		//printk("pxmitframe->frame_tag == DATA_FRAMETAG\n");			
 
 		//offset 4
-		ptxdesc->txdw1 |= cpu_to_le32(pattrib->mac_id & 0x1f);//(MAC_ID)
+		//ptxdesc->txdw1 |= cpu_to_le32((pattrib->mac_id-4)&0x1f);//CAM_ID(MAC_ID)
+		ptxdesc->txdw1 |= cpu_to_le32(pattrib->mac_id&0x1f);//CAM_ID(MAC_ID)
 
 		qsel = (uint)(pattrib->qsel & 0x0000001f);
 		ptxdesc->txdw1 |= cpu_to_le32((qsel << QSEL_SHT) & 0x00001f00);
@@ -506,7 +519,7 @@ s32 rtw_update_txdesc(struct xmit_frame *pxmitframe, u32 *pmem, s32 sz)
 
 		fill_txdesc_sectype(pattrib, ptxdesc);
 
-	
+
 		if(pattrib->ampdu_en==_TRUE)
 			ptxdesc->txdw1 |= cpu_to_le32(BIT(5));//AGG EN
 		else
@@ -579,7 +592,8 @@ s32 rtw_update_txdesc(struct xmit_frame *pxmitframe, u32 *pmem, s32 sz)
 		//printk("pxmitframe->frame_tag == MGNT_FRAMETAG\n");	
 		
 		//offset 4		
-		ptxdesc->txdw1 |= cpu_to_le32(pattrib->mac_id & 0x1f);//(MAC_ID)
+		//ptxdesc->txdw1 |= cpu_to_le32((pattrib->mac_id-4)&0x1f);//CAM_ID(MAC_ID)
+		ptxdesc->txdw1 |= cpu_to_le32(pattrib->mac_id&0x1f);//CAM_ID(MAC_ID)
 		
 		qsel = (uint)(pattrib->qsel&0x0000001f);
 		ptxdesc->txdw1 |= cpu_to_le32((qsel<<QSEL_SHT)&0x00001f00);
@@ -597,6 +611,9 @@ s32 rtw_update_txdesc(struct xmit_frame *pxmitframe, u32 *pmem, s32 sz)
 		ptxdesc->txdw4 |= cpu_to_le32(BIT(8));//driver uses rate
 		
 		//offset 20
+		ptxdesc->txdw5 |= cpu_to_le32(BIT(17));//retry limit enable
+		ptxdesc->txdw5 |= cpu_to_le32(0x00180000);//retry limit = 6
+		
 		
 	}
 	else if((pxmitframe->frame_tag&0x0f) == TXAGG_FRAMETAG)
@@ -637,18 +654,93 @@ s32 rtw_update_txdesc(struct xmit_frame *pxmitframe, u32 *pmem, s32 sz)
 		ptxdesc->txdw3 |= cpu_to_le32((8 <<28)); //set bit3 to 1. Suugested by TimChen. 2009.12.29.
 	}
 
-	cal_txdesc_chksum(ptxdesc);
+	rtl8192cu_cal_txdesc_chksum(ptxdesc);
 		
 	return pull;
 		
 }
 
-#if USB_TX_AGGREGATION_92C
-static s32 xmitframe_need_length(struct xmit_frame *pxmitframe)
+void dump_xframe(_adapter *padapter, struct xmit_frame *pxmitframe)
+{
+	int t, sz, w_sz, pull=0;
+	u8 *mem_addr;
+	u32 ff_hwaddr;
+	struct xmit_buf *pxmitbuf = pxmitframe->pxmitbuf;
+	struct pkt_attrib *pattrib = &pxmitframe->attrib;
+	struct xmit_priv *pxmitpriv = &padapter->xmitpriv;
+	struct security_priv *psecuritypriv = &padapter->securitypriv;
+
+#ifndef CONFIG_AP_MODE
+	if ((pxmitframe->frame_tag == DATA_FRAMETAG) &&
+	    (pxmitframe->attrib.ether_type != 0x0806) &&
+	    (pxmitframe->attrib.ether_type != 0x888e) &&
+	    (pxmitframe->attrib.dhcp_pkt != 1))
+	{
+		issue_addbareq_cmd(padapter, pxmitframe);
+	}	
+#endif
+
+	mem_addr = pxmitframe->buf_addr;
+
+       RT_TRACE(_module_rtl871x_xmit_c_,_drv_info_,("dump_xframe()\n"));
+	
+	for (t = 0; t < pattrib->nr_frags; t++)
+	{
+		if (t != (pattrib->nr_frags - 1))
+		{
+			RT_TRACE(_module_rtl871x_xmit_c_,_drv_err_,("pattrib->nr_frags=%d\n", pattrib->nr_frags));
+
+			sz = pxmitpriv->frag_len;
+			sz = sz - 4 - (psecuritypriv->sw_encrypt ? 0 : pattrib->icv_len);					
+		}
+		else //no frag
+		{
+			sz = pattrib->last_txcmdsz;
+		}
+
+		pull = update_txdesc(pxmitframe, (uint*)mem_addr, sz);
+		
+		if(pull)
+		{
+			mem_addr += PACKET_OFFSET_SZ; //pull txdesc head
+			
+			//pxmitbuf ->pbuf = mem_addr;			
+			pxmitframe->buf_addr = mem_addr;
+
+			w_sz = sz + TXDESC_SIZE;
+		}
+		else
+		{
+			w_sz = sz + TXDESC_SIZE + PACKET_OFFSET_SZ;
+		}	
+
+		ff_hwaddr = get_ff_hwaddr(pxmitframe);
+		
+		write_port(padapter, ff_hwaddr, w_sz, (unsigned char*)pxmitbuf);
+
+		count_tx_stats(padapter, pxmitframe, sz);
+
+
+		RT_TRACE(_module_rtl871x_xmit_c_,_drv_info_,("write_port, w_sz=%d\n", w_sz));
+		//printk("write_port, w_sz=%d, sz=%d, txdesc_sz=%d, tid=%d\n", w_sz, sz, w_sz-sz, pattrib->priority);      
+
+		mem_addr += w_sz;
+
+		mem_addr = (u8 *)RND4(((SIZE_PTR)(mem_addr)));
+
+	}
+	
+	free_xmitframe_ex(pxmitpriv, pxmitframe);
+	
+}
+
+
+#ifdef USB_TX_AGGREGATION_92C
+static u32 xmitframe_need_length(struct xmit_frame *pxmitframe)
 {
 	struct pkt_attrib *pattrib = &pxmitframe->attrib;
 
-	int len = 0;
+	u32	len = 0;
 
 	// no consider fragement
 	len = pattrib->hdrlen + pattrib->iv_len +
@@ -663,8 +755,9 @@ static s32 xmitframe_need_length(struct xmit_frame *pxmitframe)
 }
 
 #define IDEA_CONDITION 1	// check all packets before enqueue
-s32 rtw_xmitframe_complete(_adapter *padapter, struct xmit_priv *pxmitpriv, struct xmit_buf *pxmitbuf)
+s32 rtl8192cu_xmitframe_complete(_adapter *padapter, struct xmit_priv *pxmitpriv, struct xmit_buf *pxmitbuf)
 {
+	HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(padapter);
 	struct xmit_frame *pxmitframe = NULL;
 	struct xmit_frame *pfirstframe = NULL;
 
@@ -678,10 +771,10 @@ s32 rtw_xmitframe_complete(_adapter *padapter, struct xmit_priv *pxmitpriv, stru
 
 	u32 pbuf;	// next pkt address
 	u32 pbuf_tail;	// last pkt tail
-	int len;	// packet length, except TXDESC_SIZE and PKT_OFFSET
+	u32	len;	// packet length, except TXDESC_SIZE and PKT_OFFSET
 
-	unsigned int bulkSize = padapter->halpriv.UsbBulkOutSize;
-	int descCount;
+	u32	bulkSize = pHalData->UsbBulkOutSize;
+	u8	descCount;
 	u32 bulkPtr;
 
 	// dump frame variable
@@ -691,24 +784,24 @@ s32 rtw_xmitframe_complete(_adapter *padapter, struct xmit_priv *pxmitpriv, stru
 	int res = _SUCCESS;
 #endif
 
-	RT_TRACE(_module_rtl8192c_xmit_c_, _drv_info_, ("+rtw_xmitframe_complete\n"));
+	RT_TRACE(_module_rtl8192c_xmit_c_, _drv_info_, ("+xmitframe_complete\n"));
 
 
 	// check xmitbuffer is ok
 	if (pxmitbuf == NULL) {
-		pxmitbuf = rtw_alloc_xmitbuf(pxmitpriv);
+		pxmitbuf = alloc_xmitbuf(pxmitpriv);
 		if (pxmitbuf == NULL) return _FALSE;
 	}
 
 
 	//3 1. pick up first frame
 	do {
-		rtw_free_xmitframe_ex(pxmitpriv, pxmitframe);
+		free_xmitframe_ex(pxmitpriv, pxmitframe);
 			
-		pxmitframe = rtw_dequeue_xframe(pxmitpriv, pxmitbuf->flags);
+		pxmitframe = dequeue_xframe(pxmitpriv, pxmitpriv->hwxmits, pxmitpriv->hwxmit_entry);
 		if (pxmitframe == NULL) {
 			// no more xmit frame, release xmit buffer
-			rtw_free_xmitbuf(pxmitpriv, pxmitbuf);
+			free_xmitbuf(pxmitpriv, pxmitbuf);
 			return _FALSE;
 		}
 
@@ -716,9 +809,9 @@ s32 rtw_xmitframe_complete(_adapter *padapter, struct xmit_priv *pxmitpriv, stru
 #ifndef IDEA_CONDITION
 		if (pxmitframe->frame_tag != DATA_FRAMETAG) {
 			RT_TRACE(_module_rtl8192c_xmit_c_, _drv_err_,
-				 ("rtw_xmitframe_complete: frame tag(%d) is not DATA_FRAMETAG(%d)!\n",
+				 ("xmitframe_complete: frame tag(%d) is not DATA_FRAMETAG(%d)!\n",
 				  pxmitframe->frame_tag, DATA_FRAMETAG));
-//			rtw_free_xmitframe_ex(pxmitpriv, pxmitframe);
+//			free_xmitframe_ex(pxmitpriv, pxmitframe);
 			continue;
 		}
 
@@ -726,9 +819,9 @@ s32 rtw_xmitframe_complete(_adapter *padapter, struct xmit_priv *pxmitpriv, stru
 		if ((pxmitframe->attrib.priority < 0) ||
 		    (pxmitframe->attrib.priority > 15)) {
 			RT_TRACE(_module_rtl8192c_xmit_c_, _drv_err_,
-				 ("rtw_xmitframe_complete: TID(%d) should be 0~15!\n",
+				 ("xmitframe_complete: TID(%d) should be 0~15!\n",
 				  pxmitframe->attrib.priority));
-//			rtw_free_xmitframe_ex(pxmitpriv, pxmitframe);
+//			free_xmitframe_ex(pxmitpriv, pxmitframe);
 			continue;
 		}
 #endif
@@ -737,27 +830,30 @@ s32 rtw_xmitframe_complete(_adapter *padapter, struct xmit_priv *pxmitpriv, stru
 		pxmitframe->buf_addr = pxmitbuf->pbuf;
 		pxmitbuf->priv_data = pxmitframe;
 
-		pxmitframe->agg_num = 1; // first frame of aggregation
+		//pxmitframe->agg_num = 1; // alloc xmitframe should assign to 1.
 		pxmitframe->pkt_offset = 1; // first frame of aggregation, reserve offset
 
 #ifdef IDEA_CONDITION
-		rtw_xmitframe_coalesce(padapter, pxmitframe->pkt, pxmitframe);
+		xmitframe_coalesce(padapter, pxmitframe->pkt, pxmitframe);
 #else
-		res = rtw_xmitframe_coalesce(padapter, pxmitframe->pkt, pxmitframe);
+		res = xmitframe_coalesce(padapter, pxmitframe->pkt, pxmitframe);
 		if (res == _FALSE) {
-//			rtw_free_xmitframe_ex(pxmitpriv, pxmitframe);
+//			free_xmitframe_ex(pxmitpriv, pxmitframe);
 			continue;
 		}
 #endif
 
-		// always return ndis_packet after rtw_xmitframe_coalesce
-		rtw_os_xmit_complete(padapter, pxmitframe);
+		// always return ndis_packet after xmitframe_coalesce
+		os_xmit_complete(padapter, pxmitframe);
 
+#ifndef CONFIG_AP_MODE
 		if ((pxmitframe->attrib.ether_type != 0x0806) &&
 		    (pxmitframe->attrib.ether_type != 0x888e) &&
 		    (pxmitframe->attrib.dhcp_pkt != 1))
-			rtw_issue_addbareq_cmd(padapter, pxmitframe);
-
+		{
+			issue_addbareq_cmd(padapter, pxmitframe);
+		}	
+#endif
 		break;
 	} while (1);
 
@@ -810,7 +906,7 @@ s32 rtw_xmitframe_complete(_adapter *padapter, struct xmit_priv *pxmitpriv, stru
 
 	xmitframe_phead = get_list_head(&ptxservq->sta_pending);
 	xmitframe_plist = get_next(xmitframe_phead);
-	while (rtw_end_of_queue_search(xmitframe_phead, xmitframe_plist) == _FALSE)
+	while (end_of_queue_search(xmitframe_phead, xmitframe_plist) == _FALSE)
 	{
 		pxmitframe = LIST_CONTAINOR(xmitframe_plist, struct xmit_frame, list);
 		xmitframe_plist = get_next(xmitframe_plist);
@@ -820,16 +916,14 @@ s32 rtw_xmitframe_complete(_adapter *padapter, struct xmit_priv *pxmitpriv, stru
 
 		list_delete(&pxmitframe->list);
 		ptxservq->qcnt--;
-//		phwxmit->accnt--;	// ?
-//		phwxmit->txcmdcnt++;	// ?
 
 #ifndef IDEA_CONDITION
 		// suppose only data frames would be in queue
 		if (pxmitframe->frame_tag != DATA_FRAMETAG) {
 			RT_TRACE(_module_rtl8192c_xmit_c_, _drv_err_,
-				 ("rtw_xmitframe_complete: frame tag(%d) is not DATA_FRAMETAG(%d)!\n",
+				 ("xmitframe_complete: frame tag(%d) is not DATA_FRAMETAG(%d)!\n",
 				  pxmitframe->frame_tag, DATA_FRAMETAG));
-			rtw_free_xmitframe_ex(pxmitpriv, pxmitframe);
+			free_xmitframe_ex(pxmitpriv, pxmitframe);
 			continue;
 		}
 
@@ -837,9 +931,9 @@ s32 rtw_xmitframe_complete(_adapter *padapter, struct xmit_priv *pxmitpriv, stru
 		if ((pxmitframe->attrib.priority < 0) ||
 		    (pxmitframe->attrib.priority > 15)) {
 			RT_TRACE(_module_rtl8192c_xmit_c_, _drv_err_,
-				 ("rtw_xmitframe_complete: TID(%d) should be 0~15!\n",
+				 ("xmitframe_complete: TID(%d) should be 0~15!\n",
 				  pxmitframe->attrib.priority));
-			rtw_free_xmitframe_ex(pxmitpriv, pxmitframe);
+			free_xmitframe_ex(pxmitpriv, pxmitframe);
 			continue;
 		}
 #endif
@@ -851,28 +945,34 @@ s32 rtw_xmitframe_complete(_adapter *padapter, struct xmit_priv *pxmitpriv, stru
 		pxmitframe->pkt_offset = 0; // not first frame of aggregation, no need to reserve offset
 
 #ifdef IDEA_CONDITION
-		rtw_xmitframe_coalesce(padapter, pxmitframe->pkt, pxmitframe);
+		xmitframe_coalesce(padapter, pxmitframe->pkt, pxmitframe);
 #else
-		res = rtw_xmitframe_coalesce(padapter, pxmitframe->pkt, pxmitframe);
+		res = xmitframe_coalesce(padapter, pxmitframe->pkt, pxmitframe);
 		if (res == _FALSE) {
-			rtw_free_xmitframe_ex(pxmitpriv, pxmitframe);
+			free_xmitframe_ex(pxmitpriv, pxmitframe);
 			continue;
 		}
 #endif
 
-		// always return ndis_packet after rtw_xmitframe_coalesce
-		rtw_os_xmit_complete(padapter, pxmitframe);
+		// always return ndis_packet after xmitframe_coalesce
+		os_xmit_complete(padapter, pxmitframe);
 
 		if ((pxmitframe->attrib.ether_type != 0x0806) &&
 		    (pxmitframe->attrib.ether_type != 0x888e) &&
 		    (pxmitframe->attrib.dhcp_pkt != 1))
-			rtw_issue_addbareq_cmd(padapter, pxmitframe);
+		{
+#ifdef CONFIG_AP_MODE
+			struct mlme_priv *pmlmepriv = &padapter->mlmepriv;
+			if(pmlmepriv->LinkDetectInfo.bBusyTraffic == _TRUE)
+#endif				
+				issue_addbareq_cmd(padapter, pxmitframe);
+		}	
 
 		// (len - TXDESC_SIZE) == pxmitframe->attrib.last_txcmdsz
 		_update_txdesc(pxmitframe, pxmitframe->buf_addr, pxmitframe->attrib.last_txcmdsz);
 
 		// don't need xmitframe any more
-		rtw_free_xmitframe_ex(pxmitpriv, pxmitframe);
+		free_xmitframe_ex(pxmitpriv, pxmitframe);
 
 		// handle pointer and stop condition
 		pbuf_tail = pbuf + len;
@@ -884,15 +984,14 @@ s32 rtw_xmitframe_complete(_adapter *padapter, struct xmit_priv *pxmitpriv, stru
 
 		if (pbuf < bulkPtr) {
 			descCount++;
-			if (descCount == padapter->halpriv.UsbTxAggDescNum)
+			if (descCount == pHalData->UsbTxAggDescNum)
 				break;
 		} else {
 			descCount = 0;
 			bulkPtr = ((pbuf / bulkSize) + 1) * bulkSize;
 		}
 	}
-	
-	if (_rtw_queue_empty(&ptxservq->sta_pending) == _TRUE)
+	if (_queue_empty(&ptxservq->sta_pending) == _TRUE)
 		list_delete(&ptxservq->tx_pending);
 
 	_exit_critical_bh(&pxmitpriv->lock, &irqL);
@@ -907,10 +1006,10 @@ s32 rtw_xmitframe_complete(_adapter *padapter, struct xmit_priv *pxmitpriv, stru
 	_update_txdesc(pfirstframe, pfirstframe->buf_addr, pfirstframe->attrib.last_txcmdsz);
 
 	//3 4. write xmit buffer to USB FIFO
-	ff_hwaddr = rtw_get_ff_hwaddr(pfirstframe);
+	ff_hwaddr = get_ff_hwaddr(pfirstframe);
 
 	// xmit address == ((xmit_frame*)pxmitbuf->priv_data)->buf_addr
-	rtw_write_port(padapter, ff_hwaddr, pbuf_tail, (u8*)pxmitbuf);
+	write_port(padapter, ff_hwaddr, pbuf_tail, (u8*)pxmitbuf);
 
 
 	//3 5. update statisitc
@@ -919,24 +1018,29 @@ s32 rtw_xmitframe_complete(_adapter *padapter, struct xmit_priv *pxmitpriv, stru
 	
 	count_tx_stats(padapter, pfirstframe, pbuf_tail);
 
-	rtw_free_xmitframe_ex(pxmitpriv, pfirstframe);
+	free_xmitframe_ex(pxmitpriv, pfirstframe);
 
 	return _TRUE;
 }
 
 #else
 
-s32 rtw_xmitframe_complete(_adapter *padapter, struct xmit_priv *pxmitpriv, struct xmit_buf *pxmitbuf)
-{
+s32 rtl8192cu_xmitframe_complete(_adapter *padapter, struct xmit_priv *pxmitpriv, struct xmit_buf *pxmitbuf)
+{		
+
+	struct hw_xmit *phwxmits;
+	sint hwentry;
 	struct xmit_frame *pxmitframe=NULL;	
 	int res=_SUCCESS, xcnt = 0;
 
+	phwxmits = pxmitpriv->hwxmits;
+	hwentry = pxmitpriv->hwxmit_entry;
 
-	RT_TRACE(_module_rtl871x_xmit_c_,_drv_info_,("rtw_xmitframe_complete()\n"));
+	RT_TRACE(_module_rtl871x_xmit_c_,_drv_info_,("xmitframe_complete()\n"));
 
 	if(pxmitbuf==NULL)
 	{
-		pxmitbuf = rtw_alloc_xmitbuf(pxmitpriv);		
+		pxmitbuf = alloc_xmitbuf(pxmitpriv);		
 		if(!pxmitbuf)
 		{
 			return _FALSE;
@@ -946,7 +1050,7 @@ s32 rtw_xmitframe_complete(_adapter *padapter, struct xmit_priv *pxmitpriv, stru
 
 	do
 	{		
-		pxmitframe =  rtw_dequeue_xframe(pxmitpriv, pxmitbuf->flags);
+		pxmitframe =  dequeue_xframe(pxmitpriv, phwxmits, hwentry);
 		
 		if(pxmitframe)
 		{
@@ -960,24 +1064,24 @@ s32 rtw_xmitframe_complete(_adapter *padapter, struct xmit_priv *pxmitpriv, stru
 			{	
 				if(pxmitframe->attrib.priority<=15)//TID0~15
 				{
-					res = rtw_xmitframe_coalesce(padapter, pxmitframe->pkt, pxmitframe);
+					res = xmitframe_coalesce(padapter, pxmitframe->pkt, pxmitframe);
 				}	
 							
-				rtw_os_xmit_complete(padapter, pxmitframe);//always return ndis_packet after rtw_xmitframe_coalesce 			
+				os_xmit_complete(padapter, pxmitframe);//always return ndis_packet after xmitframe_coalesce 			
 			}	
 
 				
-			RT_TRACE(_module_rtl871x_xmit_c_,_drv_info_,("rtw_xmitframe_complete(): rtw_dump_xframe\n"));
+			RT_TRACE(_module_rtl871x_xmit_c_,_drv_info_,("xmitframe_complete(): dump_xframe\n"));
 
 			
 			if(res == _SUCCESS)
 			{
-				rtw_dump_xframe(padapter, pxmitframe);		 
+				dump_xframe(padapter, pxmitframe);		 
 			}
 			else
 			{
-				rtw_free_xmitbuf(pxmitpriv, pxmitbuf);
-				rtw_free_xmitframe_ex(pxmitpriv, pxmitframe);	
+				free_xmitbuf(pxmitpriv, pxmitbuf);
+				free_xmitframe_ex(pxmitpriv, pxmitframe);	
 			}
 	 			 		
 			xcnt++;
@@ -985,7 +1089,7 @@ s32 rtw_xmitframe_complete(_adapter *padapter, struct xmit_priv *pxmitpriv, stru
 		}
 		else
 		{			
-			rtw_free_xmitbuf(pxmitpriv, pxmitbuf);
+			free_xmitbuf(pxmitpriv, pxmitbuf);
 			return _FALSE;
 		}
 
@@ -998,86 +1102,18 @@ s32 rtw_xmitframe_complete(_adapter *padapter, struct xmit_priv *pxmitpriv, stru
 }
 #endif
 
-void rtw_dump_xframe(_adapter *padapter, struct xmit_frame *pxmitframe)
-{
-	int t, sz, w_sz, pull=0;
-	u8 *mem_addr;
-	u32 ff_hwaddr;
-	struct xmit_buf *pxmitbuf = pxmitframe->pxmitbuf;
-	struct pkt_attrib *pattrib = &pxmitframe->attrib;
-	struct xmit_priv *pxmitpriv = &padapter->xmitpriv;
-	struct security_priv *psecuritypriv = &padapter->securitypriv;
-
-	if ((pxmitframe->frame_tag == DATA_FRAMETAG) &&
-	    (pxmitframe->attrib.ether_type != 0x0806) &&
-	    (pxmitframe->attrib.ether_type != 0x888e) &&
-	    (pxmitframe->attrib.dhcp_pkt != 1))
-		rtw_issue_addbareq_cmd(padapter, pxmitframe);
-
-	mem_addr = pxmitframe->buf_addr;
-
-       RT_TRACE(_module_rtl871x_xmit_c_,_drv_info_,("rtw_dump_xframe()\n"));
-	
-	for (t = 0; t < pattrib->nr_frags; t++)
-	{
-		if (t != (pattrib->nr_frags - 1))
-		{
-			RT_TRACE(_module_rtl871x_xmit_c_,_drv_err_,("pattrib->nr_frags=%d\n", pattrib->nr_frags));
-
-			sz = pxmitpriv->frag_len;
-			sz = sz - 4 - (psecuritypriv->sw_encrypt ? 0 : pattrib->icv_len);					
-		}
-		else //no frag
-		{
-			sz = pattrib->last_txcmdsz;
-		}
-
-		pull = rtw_update_txdesc(pxmitframe, (uint*)mem_addr, sz);
-		
-		if(pull)
-		{
-			mem_addr += PACKET_OFFSET_SZ; //pull txdesc head
-			
-			//pxmitbuf ->pbuf = mem_addr;			
-			pxmitframe->buf_addr = mem_addr;
-
-			w_sz = sz + TXDESC_SIZE;
-		}
-		else
-		{
-			w_sz = sz + TXDESC_SIZE + PACKET_OFFSET_SZ;
-		}	
-
-		ff_hwaddr = rtw_get_ff_hwaddr(pxmitframe);
-		
-		rtw_write_port(padapter, ff_hwaddr, w_sz, (unsigned char*)pxmitbuf);
-
-		count_tx_stats(padapter, pxmitframe, sz);
 
 
-		RT_TRACE(_module_rtl871x_xmit_c_,_drv_info_,("rtw_write_port, w_sz=%d\n", w_sz));
-		//printk("rtw_write_port, w_sz=%d, sz=%d, txdesc_sz=%d, tid=%d\n", w_sz, sz, w_sz-sz, pattrib->priority);      
-
-		mem_addr += w_sz;
-
-		mem_addr = (u8 *)RND4(((SIZE_PTR)(mem_addr)));
-
-	}
-	
-	rtw_free_xmitframe_ex(pxmitpriv, pxmitframe);
-	
-}
-
-s32 xmitframe_direct(_adapter *padapter, struct xmit_frame *pxmitframe)
+static s32 xmitframe_direct(_adapter *padapter, struct xmit_frame *pxmitframe)
 {
 	s32 res = _SUCCESS;
 
 
-	res = rtw_xmitframe_coalesce(padapter, pxmitframe->pkt, pxmitframe);
+	res = xmitframe_coalesce(padapter, pxmitframe->pkt, pxmitframe);
 	if (res == _SUCCESS) {
-		rtw_dump_xframe(padapter, pxmitframe);
+		dump_xframe(padapter, pxmitframe);
 	}
-	
+
 	return res;
 }
 
@@ -1086,49 +1122,70 @@ s32 xmitframe_direct(_adapter *padapter, struct xmit_frame *pxmitframe)
  *	_TRUE	dump packet directly
  *	_FALSE	enqueue packet
  */
-s32 pre_xmitframe(_adapter *padapter, struct xmit_frame *pxmitframe)
+static s32 pre_xmitframe(_adapter *padapter, struct xmit_frame *pxmitframe)
 {
-	_irqL irqL;
+        _irqL irqL;
 	s32 res;
 	struct xmit_buf *pxmitbuf = NULL;
 	struct xmit_priv *pxmitpriv = &padapter->xmitpriv;
 	struct pkt_attrib *pattrib = &pxmitframe->attrib;
-	struct mlme_priv *pmlmepriv = &padapter->mlmepriv;	
+	struct mlme_priv *pmlmepriv = &padapter->mlmepriv;
 
 
-
-
-	rtw_do_queue_select(padapter, pattrib);
+	do_queue_select(padapter, pattrib);
 	
 	_enter_critical_bh(&pxmitpriv->lock, &irqL);
+
+#ifdef CONFIG_AP_MODE
+	if(xmitframe_enqueue_for_sleeping_sta(padapter, pxmitframe) == _TRUE)
+	{
+		struct sta_info *psta;
+		struct sta_priv *pstapriv = &padapter->stapriv;
+
 	
-	if (rtw_txframes_sta_ac_pending(padapter, pattrib) > 0)
+		_exit_critical_bh(&pxmitpriv->lock, &irqL);
+
+		if(pattrib->psta)
+		{
+			psta = pattrib->psta;
+		}
+		else
+		{
+			psta=get_stainfo(pstapriv, pattrib->ra);
+		}
+
+		if(psta)
+		{
+			if(psta->sleepq_len > (NR_XMITFRAME>>3))
+			{
+				wakeup_sta_to_xmit(padapter, psta);
+			}	
+		}	
+
+		return _FALSE;
+	}
+#endif
+	
+	if (txframes_sta_ac_pending(padapter, pattrib) > 0)
 		goto enqueue;
 
 	if (check_fwstate(pmlmepriv, _FW_UNDER_SURVEY) == _TRUE)
 		goto enqueue;
 
-#ifdef CONFIG_AP_MODE
-	if(xmitframe_enqueue_for_sleeping_sta(padapter, pxmitframe) == _TRUE)
-	{
-		_exit_critical_bh(&pxmitpriv->lock, &irqL);
-		return _FALSE;
-	}
-#endif
 
-	pxmitbuf = rtw_alloc_xmitbuf(pxmitpriv);	
+	pxmitbuf = alloc_xmitbuf(pxmitpriv);
 	if (pxmitbuf == NULL)
 		goto enqueue;
-	
-        _exit_critical_bh(&pxmitpriv->lock, &irqL);
+
+	_exit_critical_bh(&pxmitpriv->lock, &irqL);
 
 	pxmitframe->pxmitbuf = pxmitbuf;
 	pxmitframe->buf_addr = pxmitbuf->pbuf;
 	pxmitbuf->priv_data = pxmitframe;
 
 	if (xmitframe_direct(padapter, pxmitframe) != _SUCCESS) {
-		rtw_free_xmitbuf(pxmitpriv, pxmitbuf);
-		rtw_free_xmitframe_ex(pxmitpriv, pxmitframe);
+		free_xmitbuf(pxmitpriv, pxmitbuf);
+		free_xmitframe_ex(pxmitpriv, pxmitframe);
 	}
 
 	return _TRUE;
@@ -1139,7 +1196,7 @@ enqueue:
 
 	if (res != _SUCCESS) {
 		RT_TRACE(_module_xmit_osdep_c_, _drv_err_, ("pre_xmitframe: enqueue xmitframe fail\n"));
-		rtw_free_xmitframe_ex(pxmitpriv, pxmitframe);
+		free_xmitframe_ex(pxmitpriv, pxmitframe);
 
 		// Trick, make the statistics correct
 		pxmitpriv->tx_pkts--;
@@ -1150,13 +1207,154 @@ enqueue:
 	return _FALSE;
 }
 
+void rtl8192cu_mgnt_xmit(_adapter *padapter, struct xmit_frame *pmgntframe)
+{
+	dump_xframe(padapter, pmgntframe);
+}
+
 /*
  * Return
  *	_TRUE	dump packet directly ok
  *	_FALSE	temporary can't transmit packets to hardware
  */
-s32 hal_xmit(_adapter *padapter, struct xmit_frame *pxmitframe)
+s32 rtl8192cu_hal_xmit(_adapter *padapter, struct xmit_frame *pxmitframe)
 {
 	return pre_xmitframe(padapter, pxmitframe);
 }
+
+#ifdef  CONFIG_HOSTAPD_MLME
+
+static void rtl8192cu_hostap_mgnt_xmit_cb(struct urb *urb)
+{	
+#ifdef PLATFORM_LINUX
+	struct sk_buff *skb = (struct sk_buff *)urb->context;
+
+	//printk("%s\n", __FUNCTION__);
+
+	dev_kfree_skb_any(skb);
+#endif	
+}
+
+s32 rtl8192cu_hostap_mgnt_xmit_entry(_adapter *padapter, _pkt *pkt)
+{
+#ifdef PLATFORM_LINUX
+	u16 fc;
+	int rc, len, pipe;	
+	unsigned int bmcst, tid, qsel;
+	struct sk_buff *skb, *pxmit_skb;
+	struct urb *urb;
+	unsigned char *pxmitbuf;
+	struct tx_desc *ptxdesc;
+	struct ieee80211_hdr *tx_hdr;
+	struct hostapd_priv *phostapdpriv = padapter->phostapdpriv;	
+	struct net_device *pnetdev = padapter->pnetdev;
+	HAL_DATA_TYPE *pHalData = GET_HAL_DATA(padapter);
+	struct dvobj_priv *pdvobj = &padapter->dvobjpriv;	
+
+	
+	//printk("%s\n", __FUNCTION__);
+
+	skb = pkt;
+	
+	len = skb->len;
+	tx_hdr = (struct ieee80211_hdr *)(skb->data);
+	fc = le16_to_cpu(tx_hdr->frame_ctl);
+	bmcst = IS_MCAST(tx_hdr->addr1);
+
+	if ((fc & IEEE80211_FCTL_FTYPE) != IEEE80211_FTYPE_MGMT)
+		goto _exit;
+
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,18)) // http://www.mail-archive.com/netdev@vger.kernel.org/msg17214.html
+	pxmit_skb = dev_alloc_skb(len + TXDESC_SIZE);			
+#else			
+	pxmit_skb = netdev_alloc_skb(pnetdev, len + TXDESC_SIZE);
+#endif		
+
+	if(!pxmit_skb)
+		goto _exit;
+
+	pxmitbuf = pxmit_skb->data;
+
+	urb = usb_alloc_urb(0, GFP_ATOMIC);
+	if (!urb) {
+		goto _exit;
+	}
+
+	// ----- fill tx desc -----	
+	ptxdesc = (struct tx_desc *)pxmitbuf;	
+	_memset(ptxdesc, 0, sizeof(*ptxdesc));
+		
+	//offset 0	
+	ptxdesc->txdw0 |= cpu_to_le32(len&0x0000ffff); 
+	ptxdesc->txdw0 |= cpu_to_le32(((TXDESC_SIZE+OFFSET_SZ)<<OFFSET_SHT)&0x00ff0000);//default = 32 bytes for TX Desc
+	ptxdesc->txdw0 |= cpu_to_le32(OWN | FSG | LSG);
+
+	if(bmcst)	
+	{
+		ptxdesc->txdw0 |= cpu_to_le32(BIT(24));
+	}	
+
+	//offset 4	
+	ptxdesc->txdw1 |= cpu_to_le32(0x00);//MAC_ID
+
+	ptxdesc->txdw1 |= cpu_to_le32((0x12<<QSEL_SHT)&0x00001f00);
+
+	ptxdesc->txdw1 |= cpu_to_le32((0x06<< 16) & 0x000f0000);//b mode
+
+	//offset 8			
+
+	//offset 12		
+	ptxdesc->txdw3 |= cpu_to_le32((le16_to_cpu(tx_hdr->seq_ctl)<<16)&0xffff0000);
+
+	//offset 16		
+	ptxdesc->txdw4 |= cpu_to_le32(BIT(8));//driver uses rate
+		
+	//offset 20
+
+
+	//HW append seq
+	ptxdesc->txdw4 |= cpu_to_le32(BIT(7)); // Hw set sequence number
+	ptxdesc->txdw3 |= cpu_to_le32((8 <<28)); //set bit3 to 1. Suugested by TimChen. 2009.12.29.
+	
+
+	rtl8192cu_cal_txdesc_chksum(ptxdesc);
+	// ----- end of fill tx desc -----
+
+	//
+	skb_put(pxmit_skb, len + TXDESC_SIZE);
+	pxmitbuf = pxmitbuf + TXDESC_SIZE;
+	_memcpy(pxmitbuf, skb->data, len);
+
+	//printk("mgnt_xmit, len=%x\n", pxmit_skb->len);
+
+
+	// ----- prepare urb for submit -----
+	
+	//translate DMA FIFO addr to pipehandle
+	//pipe = ffaddr2pipehdl(pdvobj, MGT_QUEUE_INX);
+	pipe = usb_sndbulkpipe(pdvobj->pusbdev, pHalData->Queue2EPNum[(u8)MGT_QUEUE_INX]&0x0f);
+	
+	usb_fill_bulk_urb(urb, pdvobj->pusbdev, pipe,
+			  pxmit_skb->data, pxmit_skb->len, rtl8192cu_hostap_mgnt_xmit_cb, pxmit_skb);
+	
+	urb->transfer_flags |= URB_ZERO_PACKET;
+	usb_anchor_urb(urb, &phostapdpriv->anchored);
+	rc = usb_submit_urb(urb, GFP_ATOMIC);
+	if (rc < 0) {
+		usb_unanchor_urb(urb);
+		kfree_skb(skb);
+	}
+	usb_free_urb(urb);
+
+	
+_exit:	
+	
+	dev_kfree_skb_any(skb);
+
+#endif
+
+	return 0;
+
+}
+#endif
 

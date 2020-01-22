@@ -21,7 +21,7 @@ typedef NDIS_STATUS _OS_STATUS;
 
 typedef NDIS_SPIN_LOCK	_lock;
 
-typedef HANDLE 		_mutex; //Mutex
+typedef HANDLE 		_rwlock; //Mutex
 
 typedef u32	_irqL;
 
@@ -87,15 +87,15 @@ __inline static _exit_critical_ex(_lock *plock, _irqL *pirqL)
 }
 
 
-__inline static void _enter_critical_mutex(_mutex *pmutex, _irqL *pirqL)
+__inline static void _enter_hwio_critical(_rwlock *prwlock, _irqL *pirqL)
 {
-	WaitForSingleObject(*pmutex, INFINITE );
+	WaitForSingleObject(*prwlock, INFINITE );
 
 }
 
-__inline static void _exit_critical_mutex(_mutex *pmutex, _irqL *pirqL)
+__inline static void _exit_hwio_critical(_rwlock *prwlock, _irqL *pirqL)
 {
-	ReleaseMutex(*pmutex);
+	ReleaseMutex(*prwlock);
 }
 
 __inline static void list_delete(_list *plist)
@@ -128,6 +128,26 @@ __inline static void _init_workitem(_workitem *pwork, void *pfunc, PVOID cntx)
 __inline static void _set_workitem(_workitem *pwork)
 {
 	NdisScheduleWorkItem(pwork);
+}
+
+#define ATOMIC_INIT(i)  { (i) }
+
+//
+// Global Mutex: can only be used at PASSIVE level.
+//
+
+#define ACQUIRE_GLOBAL_MUTEX(_MutexCounter)                              \
+{                                                               \
+    while (NdisInterlockedIncrement((PULONG)&(_MutexCounter)) != 1)\
+    {                                                           \
+        NdisInterlockedDecrement((PULONG)&(_MutexCounter));        \
+        NdisMSleep(10000);                          \
+    }                                                           \
+}
+
+#define RELEASE_GLOBAL_MUTEX(_MutexCounter)                              \
+{                                                               \
+    NdisInterlockedDecrement((PULONG)&(_MutexCounter));              \
 }
 #endif
 

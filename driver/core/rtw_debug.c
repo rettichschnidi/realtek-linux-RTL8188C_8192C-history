@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Copyright(c) 2007 - 2010 Realtek Corporation. All rights reserved.
- *                                        
+ *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
  * published by the Free Software Foundation.
@@ -17,8 +17,7 @@
  *
  *
  ******************************************************************************/
-
-#define _RTL871X_DEBUG_C_
+#define _RTW_DEBUG_C_
 
 
 #include <rtw_debug.h>
@@ -50,15 +49,14 @@
 			_module_rtl871x_pwrctrl_c_|
 			_module_hci_intfs_c_|
 			_module_hci_ops_c_|
-			_module_rtl871x_mp_ioctl_c_|
 			_module_hci_ops_os_c_|
 			_module_rtl871x_ioctl_os_c|
-			_module_rtl871x_mp_c_ |
 			_module_rtl8712_cmd_c_|
 			_module_rtl8192c_xmit_c_|
-			_module_rtl8712_efuse_c_|
-			_module_rtl8712_recv_c_;
-
+			_module_rtl8712_recv_c_ |
+			_module_mp_ |
+			_module_efuse_;
+	
 #endif
 
 #ifdef CONFIG_PROC_DEBUG
@@ -97,13 +95,13 @@ int proc_set_write_reg(struct file *file, const char *buffer,
 		switch(len)
 		{
 			case 1:
-				rtw_write8(padapter, addr, (u8)val);				
+				write8(padapter, addr, (u8)val);				
 				break;
 			case 2:
-				rtw_write16(padapter, addr, (u16)val);				
+				write16(padapter, addr, (u16)val);				
 				break;
 			case 4:
-				rtw_write32(padapter, addr, val);				
+				write32(padapter, addr, val);				
 				break;
 			default:
 				printk("error write length=%d", len);
@@ -137,13 +135,13 @@ int proc_get_read_reg(char *page, char **start,
 	switch(proc_get_read_len)
 	{
 		case 1:			
-			len += snprintf(page + len, count - len, "read8(0x%x)=0x%x\n", proc_get_read_addr, rtw_read8(padapter, proc_get_read_addr));
+			len += snprintf(page + len, count - len, "read8(0x%x)=0x%x\n", proc_get_read_addr, read8(padapter, proc_get_read_addr));
 			break;
 		case 2:
-			len += snprintf(page + len, count - len, "read16(0x%x)=0x%x\n", proc_get_read_addr, rtw_read16(padapter, proc_get_read_addr));
+			len += snprintf(page + len, count - len, "read16(0x%x)=0x%x\n", proc_get_read_addr, read16(padapter, proc_get_read_addr));
 			break;
 		case 4:
-			len += snprintf(page + len, count - len, "read32(0x%x)=0x%x\n", proc_get_read_addr, rtw_read32(padapter, proc_get_read_addr));
+			len += snprintf(page + len, count - len, "read32(0x%x)=0x%x\n", proc_get_read_addr, read32(padapter, proc_get_read_addr));
 			break;
 		default:
 			len += snprintf(page + len, count - len, "error read length=%d\n", proc_get_read_len);
@@ -301,7 +299,7 @@ int proc_get_ap_info(char *page, char **start,
 	struct sta_priv *pstapriv = &padapter->stapriv;
 	int len = 0;
 
-	psta = rtw_get_stainfo(pstapriv, cur_network->network.MacAddress);
+	psta = get_stainfo(pstapriv, cur_network->network.MacAddress);
 	if(psta)
 	{
 		int i;
@@ -363,9 +361,9 @@ int proc_get_trx_info(char *page, char **start,
 	
 	len += snprintf(page + len, count - len, "free_xmitbuf_cnt=%d, free_xmitframe_cnt=%d\n", 
 				pxmitpriv->free_xmitbuf_cnt, pxmitpriv->free_xmitframe_cnt);
-						
+#ifdef CONFIG_USB_HCI
 	len += snprintf(page + len, count - len, "rx_urb_pending_cn=%d\n", precvpriv->rx_pending_cnt);
-
+#endif
 
 	*eof = 1;
 	return len;
@@ -442,5 +440,4 @@ int proc_get_all_sta_info(char *page, char **start,
 
 	
 #endif
-
 

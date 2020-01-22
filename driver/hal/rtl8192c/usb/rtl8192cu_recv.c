@@ -1,22 +1,20 @@
 /******************************************************************************
- *
- * Copyright(c) 2007 - 2010 Realtek Corporation. All rights reserved.
- *                                        
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of version 2 of the GNU General Public License as
- * published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along with
- * this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
- *
- *
- ******************************************************************************/
+* rtl8192cu_recv.c                                                                                                                                 *
+*                                                                                                                                          *
+* Description :                                                                                                                       *
+*                                                                                                                                           *
+* Author :                                                                                                                       *
+*                                                                                                                                         *
+* History :
+*
+*
+*                                                                                                                                       *
+* Copyright 2008, Realtek Corp.                                                                                                  *
+*                                                                                                                                        *
+* The contents of this file is the sole property of Realtek Corp.  It can not be                                     *
+* be used, copied or modified without written permission from Realtek Corp.                                         *
+*                                                                                                                                          *
+*******************************************************************************/
 #define _RTL8192CU_RECV_C_
 #include <drv_conf.h>
 #include <osdep_service.h>
@@ -27,9 +25,7 @@
 #include <if_ether.h>
 #include <ethernet.h>
 
-#ifdef CONFIG_USB_HCI
 #include <usb_ops.h>
-#endif
 
 #if defined (PLATFORM_LINUX) && defined (PLATFORM_WINDOWS)
 
@@ -40,43 +36,81 @@
 #include <wifi.h>
 #include <circ_buf.h>
 
+#include <rtl8192c_hal.h>
 
-int	rtw_init_recv_priv(struct recv_priv *precvpriv, _adapter *padapter)
+
+void rtl8192cu_init_recvbuf(_adapter *padapter, struct recv_buf *precvbuf)
 {
-	int i;
+
+	precvbuf->transfer_len = 0;
+
+	precvbuf->len = 0;
+
+	precvbuf->ref_cnt = 0;
+
+	if(precvbuf->pbuf)
+	{
+		precvbuf->pdata = precvbuf->phead = precvbuf->ptail = precvbuf->pbuf;
+		precvbuf->pend = precvbuf->pdata + MAX_RECVBUF_SZ;
+	}
+
+}
+
+int	rtl8192cu_init_recv_priv(_adapter *padapter)
+{
+	struct recv_priv	*precvpriv = &padapter->recvpriv;
+	int	i, res = _SUCCESS;
 	struct recv_buf *precvbuf;
-	//struct recv_reorder_ctrl *preorder_ctrl;
-	int	res=_SUCCESS;
 
+#ifdef CONFIG_RECV_THREAD_MODE	
+	_init_sema(&precvpriv->recv_sema, 0);//will be removed
+	_init_sema(&precvpriv->terminate_recvthread_sema, 0);//will be removed
+#endif
 
-	_rtw_init_sema(&precvpriv->recv_sema, 0);//will be removed
-	_rtw_init_sema(&precvpriv->terminate_recvthread_sema, 0);//will be removed
+#ifdef PLATFORM_LINUX
+	tasklet_init(&precvpriv->recv_tasklet,
+	     (void(*)(unsigned long))rtl8192cu_recv_tasklet,
+	     (unsigned long)padapter);
+#endif
+
+#ifdef CONFIG_USB_INTERRUPT_IN_PIPE
+#ifdef PLATFORM_LINUX
+	precvpriv->int_in_urb = usb_alloc_urb(0, GFP_KERNEL);
+	if(precvpriv->int_in_urb == NULL){
+		DBG_8192C("alloc_urb for interrupt in endpoint fail !!!!\n");
+	}
+#endif
+	precvpriv->int_in_buf = _malloc(sizeof(INTERRUPT_MSG_FORMAT_EX));
+	if(precvpriv->int_in_buf == NULL){
+		DBG_8192C("alloc_mem for interrupt in endpoint fail !!!!\n");
+	}
+#endif
 
 	//init recv_buf
-	_rtw_init_queue(&precvpriv->free_recv_buf_queue);
+	_init_queue(&precvpriv->free_recv_buf_queue);
 
-
-	precvpriv->pallocated_recv_buf = _rtw_zmalloc(NR_RECVBUFF *sizeof(struct recv_buf) + 4);
+	precvpriv->pallocated_recv_buf = _malloc(NR_RECVBUFF *sizeof(struct recv_buf) + 4);
 	if(precvpriv->pallocated_recv_buf==NULL){
 		res= _FAIL;
 		RT_TRACE(_module_rtl871x_recv_c_,_drv_err_,("alloc recv_buf fail!\n"));
 		goto exit;
 	}
-//	_rtw_memset(precvpriv->pallocated_recv_buf, 0, NR_RECVBUFF *sizeof(struct recv_buf) + 4);
+	_memset(precvpriv->pallocated_recv_buf, 0, NR_RECVBUFF *sizeof(struct recv_buf) + 4);
 
-	precvpriv->precv_buf = precvpriv->pallocated_recv_buf + 4 -
-							((SIZE_PTR) (precvpriv->pallocated_recv_buf) &(4-1));
+	precvpriv->precv_buf = (u8 *)N_BYTE_ALIGMENT((SIZE_PTR)(precvpriv->pallocated_recv_buf), 4);
+	//precvpriv->precv_buf = precvpriv->pallocated_recv_buf + 4 -
+	//						((uint) (precvpriv->pallocated_recv_buf) &(4-1));
 
 
 	precvbuf = (struct recv_buf*)precvpriv->precv_buf;
 
 	for(i=0; i < NR_RECVBUFF ; i++)
 	{
-		_rtw_init_listhead(&precvbuf->list);
+		_init_listhead(&precvbuf->list);
 
-		_rtw_spinlock_init(&precvbuf->recvbuf_lock);
+		_spinlock_init(&precvbuf->recvbuf_lock);
 
-		res = rtw_os_recvbuf_resource_alloc(padapter, precvbuf);
+		res = os_recvbuf_resource_alloc(padapter, precvbuf);
 		if(res==_FAIL)
 			break;
 
@@ -84,45 +118,15 @@ int	rtw_init_recv_priv(struct recv_priv *precvpriv, _adapter *padapter)
 		precvbuf->adapter =padapter;
 
 
-		rtw_list_insert_tail(&precvbuf->list, &(precvpriv->free_recv_buf_queue.queue));
+		list_insert_tail(&precvbuf->list, &(precvpriv->free_recv_buf_queue.queue));
 
 		precvbuf++;
 
 	}
-#ifdef CONFIG_SDIO_HCI
-
-	precvpriv->recvbuf_drop= (struct recv_buf*)_rtw_zmalloc(sizeof(struct recv_buf));
-#ifdef PLATFORM_LINUX
-	((struct recv_buf *)precvpriv->recvbuf_drop)->pallocated_buf = _rtw_zmalloc(MAX_RECVBUF_SZ+4);
-	if(((struct recv_buf *)precvpriv->recvbuf_drop)->pallocated_buf == NULL){
-		res = _FAIL;
-	}
-
-	((struct recv_buf *)precvpriv->recvbuf_drop)->pbuf=((struct recv_buf *)precvpriv->recvbuf_drop)->pallocated_buf + 4 -  ((uint) (((struct recv_buf *)precvpriv->recvbuf_drop)->pallocated_buf) &(4-1));
-
-
-	((struct recv_buf *)precvpriv->recvbuf_drop)->pdata = ((struct recv_buf *)precvpriv->recvbuf_drop)->phead = ((struct recv_buf *)precvpriv->recvbuf_drop)->ptail =((struct recv_buf *)precvpriv->recvbuf_drop)->pbuf;
-
-	((struct recv_buf *)precvpriv->recvbuf_drop)->pend = ((struct recv_buf *)precvpriv->recvbuf_drop)->pdata + MAX_RECVBUF_SZ;
-
-
-
-	((struct recv_buf *)precvpriv->recvbuf_drop)->len = 0;
-
-#else
-	rtw_os_recvbuf_resource_alloc(padapter, precvpriv->recvbuf_drop);
-#endif
-#endif
 
 	precvpriv->free_recv_buf_queue_cnt = NR_RECVBUFF;
 
-
 #ifdef PLATFORM_LINUX
-
-	tasklet_init(&precvpriv->recv_tasklet,
-	     (void(*)(unsigned long))rtl8192cu_recv_tasklet,
-	     (unsigned long)padapter);
-
 
 	skb_queue_head_init(&precvpriv->rx_skb_queue);
 
@@ -158,7 +162,6 @@ int	rtw_init_recv_priv(struct recv_priv *precvpriv, _adapter *padapter)
 			pskb=NULL;
 
 		}
-
 	}
 #endif
 
@@ -170,23 +173,33 @@ exit:
 
 }
 
-void rtw_free_recv_priv (struct recv_priv *precvpriv)
+void rtl8192cu_free_recv_priv (_adapter *padapter)
 {
-	int i;
-	struct recv_buf *precvbuf;
-	_adapter *padapter = precvpriv->adapter;
+	int	i;
+	struct recv_buf	*precvbuf;
+	struct recv_priv	*precvpriv = &padapter->recvpriv;
 
 	precvbuf = (struct recv_buf *)precvpriv->precv_buf;
 
 	for(i=0; i < NR_RECVBUFF ; i++)
 	{
-		rtw_os_recvbuf_resource_free(padapter, precvbuf);
+		os_recvbuf_resource_free(padapter, precvbuf);
 		precvbuf++;
 	}
 
 	if(precvpriv->pallocated_recv_buf)
-		_rtw_mfree(precvpriv->pallocated_recv_buf, NR_RECVBUFF *sizeof(struct recv_buf) + 4);
+		_mfree(precvpriv->pallocated_recv_buf, NR_RECVBUFF *sizeof(struct recv_buf) + 4);
 
+#ifdef CONFIG_USB_INTERRUPT_IN_PIPE
+#ifdef PLATFORM_LINUX
+	if(precvpriv->int_in_urb)
+	{
+		usb_free_urb(precvpriv->int_in_urb);
+	}
+#endif
+	if(precvpriv->int_in_buf)
+		_mfree(precvpriv->int_in_buf, sizeof(INTERRUPT_MSG_FORMAT_EX));
+#endif
 
 #ifdef PLATFORM_LINUX
 
@@ -210,40 +223,18 @@ void rtw_free_recv_priv (struct recv_priv *precvpriv)
 
 }
 
-int rtw_init_recvbuf(_adapter *padapter, struct recv_buf *precvbuf)
-{
-	int res=_SUCCESS;
-#ifdef CONFIG_USB_HCI
-	precvbuf->transfer_len = 0;
-
-	precvbuf->len = 0;
-
-	precvbuf->ref_cnt = 0;
-
-#endif //#ifdef CONFIG_USB_HCI
-	if(precvbuf->pbuf)
-	{
-		precvbuf->pdata = precvbuf->phead = precvbuf->ptail = precvbuf->pbuf;
-		precvbuf->pend = precvbuf->pdata + MAX_RECVBUF_SZ;
-	}
-
-	return res;
-
-}
-
 void rtl8192cu_update_recvframe_attrib_from_recvstat(union recv_frame *precvframe, struct recv_stat *prxstat)
 {
-	u8 physt, qos, shift, icverr, htc,crcerr;
-	u32 *pphy_info;
+	u8	physt, qos, shift, icverr, htc, crcerr;
 	u16 drvinfo_sz=0;
-	struct rx_pkt_attrib *pattrib = &precvframe->u.hdr.attrib;	
-	_adapter *padapter = precvframe->u.hdr.adapter;
+	struct phy_stat		*pphy_info;
+	struct rx_pkt_attrib *pattrib = &precvframe->u.hdr.attrib;
+	_adapter				*padapter = precvframe->u.hdr.adapter;
+	u8	bPacketMatchBSSID =_FALSE;
+	u8	bPacketToSelf = _FALSE;
+	u8	bPacketBeacon = _FALSE;
 
-	HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(padapter);
-	
-	u8 bPacketMatchBSSID=_FALSE;
-	u8 bPacketToSelf = _FALSE;
-	u8 bPacketBeacon = _FALSE;
+
 	//Offset 0
 	drvinfo_sz = (le32_to_cpu(prxstat->rxdw0)&0x000f0000)>>16;
 	drvinfo_sz = drvinfo_sz<<3;
@@ -251,7 +242,6 @@ void rtl8192cu_update_recvframe_attrib_from_recvstat(union recv_frame *precvfram
 	pattrib->bdecrypted = ((le32_to_cpu(prxstat->rxdw0) & BIT(27)) >> 27)? 0:1;
 
 	physt = ((le32_to_cpu(prxstat->rxdw0) & BIT(26)) >> 26)? 1:0;
-	pattrib->physt = physt;
 
 	shift = (le32_to_cpu(prxstat->rxdw0)&0x03000000)>>24;
 
@@ -259,7 +249,7 @@ void rtl8192cu_update_recvframe_attrib_from_recvstat(union recv_frame *precvfram
 
 	icverr = ((le32_to_cpu(prxstat->rxdw0) & BIT(15)) >> 15)? 1:0;
 
-	crcerr =  ((le32_to_cpu(prxstat->rxdw0) & BIT(14)) >> 14 )?1:0;
+	pattrib->crc_err = crcerr = ((le32_to_cpu(prxstat->rxdw0) & BIT(14)) >> 14 )? 1:0;
 
 
 	//Offset 4
@@ -297,9 +287,6 @@ void rtl8192cu_update_recvframe_attrib_from_recvstat(union recv_frame *precvfram
 
 
 #if 0 //dump rxdesc for debug
-	if(pHalData->bDumpRxPkt){
-		printk("### rxdw0=0x%08x #### \n", le32_to_cpu(prxstat->rxdw0));	
-		printk("pkt_len=0x%04x\n",(le32_to_cpu(prxstat->rxdw0)&0x3FFF));
 	printk("drvinfo_sz=%d\n", drvinfo_sz);
 	printk("physt=%d\n", physt);
 	printk("shift=%d\n", shift);
@@ -309,23 +296,21 @@ void rtl8192cu_update_recvframe_attrib_from_recvstat(union recv_frame *precvfram
 	printk("bdecrypted=%d\n", pattrib->bdecrypted);
 	printk("mcs_rate=%d\n", pattrib->mcs_rate);
 	printk("rxht=%d\n", pattrib->rxht);
-	}
 #endif
 
 	//phy_info
 	if(drvinfo_sz && physt)
 	{
-		bPacketMatchBSSID = ((!IsFrameTypeCtrl(precvframe->u.hdr.rx_data)) && 
-							!icverr && !crcerr && _rtw_memcmp(get_hdr_bssid(precvframe->u.hdr.rx_data), 
-							get_my_bssid(&padapter->mlmeextpriv.mlmext_info.network), ETH_ALEN));
+		bPacketMatchBSSID = ((!IsFrameTypeCtrl(precvframe->u.hdr.rx_data)) && !icverr && !crcerr &&
+			_memcmp(get_hdr_bssid(precvframe->u.hdr.rx_data), get_my_bssid(&padapter->mlmeextpriv.mlmext_info.network), ETH_ALEN));
 
-			
 
-		bPacketToSelf = bPacketMatchBSSID &&  (_rtw_memcmp(get_da(precvframe->u.hdr.rx_data), myid(&padapter->eeprompriv), ETH_ALEN));
+		bPacketToSelf = bPacketMatchBSSID &&  (_memcmp(get_da(precvframe->u.hdr.rx_data), myid(&padapter->eeprompriv), ETH_ALEN));
 
 		bPacketBeacon =bPacketMatchBSSID && (GetFrameSubType(precvframe->u.hdr.rx_data) ==  WIFI_BEACON);
+	
 
-		pphy_info=(u32 *)prxstat+1;
+		pphy_info = (struct phy_stat *)(prxstat+1);
 
 		//printk("pphy_info, of0=0x%08x\n", *pphy_info);
 		//printk("pphy_info, of1=0x%08x\n", *(pphy_info+1));
@@ -335,24 +320,11 @@ void rtl8192cu_update_recvframe_attrib_from_recvstat(union recv_frame *precvfram
 		//printk("pphy_info, of5=0x%08x\n", *(pphy_info+5));
 		//printk("pphy_info, of6=0x%08x\n", *(pphy_info+6));
 		//printk("pphy_info, of7=0x%08x\n", *(pphy_info+7));
-		
-		
-		rtl8192c_query_rx_phy_status(precvframe, prxstat);
 
-#ifdef CONFIG_ANTENNA_DIVERSITY
-		// If we switch to the antenna for testing, the signal strength 
-		// of the packets in this time shall not be counted into total receiving power. 
-		// This prevents error counting Rx signal strength and affecting other dynamic mechanism.
+		rtl8192c_query_rx_phy_status(precvframe, pphy_info);
 
-		// Select the packets to do RSSI checking for antenna switching.
-		if(bPacketToSelf || bPacketBeacon)
-		{	
-			SwAntDivRSSICheck(padapter, precvframe->u.hdr.attrib.RxPWDBAll);	
-		}
-		
-#endif
 		if(bPacketToSelf || bPacketBeacon)	
-			rtl8192c_process_phy_info(padapter,precvframe);		
+			rtl8192c_process_phy_info(padapter,precvframe);
 
 #if 0 //dump phy_status for debug
 

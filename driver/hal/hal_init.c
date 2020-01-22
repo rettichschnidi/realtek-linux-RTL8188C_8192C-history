@@ -1,22 +1,20 @@
 /******************************************************************************
- *
- * Copyright(c) 2007 - 2010 Realtek Corporation. All rights reserved.
- *                                        
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of version 2 of the GNU General Public License as
- * published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along with
- * this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
- *
- *
- ******************************************************************************/
+* hal_init.c                                                                                                                                 *
+*                                                                                                                                          *
+* Description :                                                                                                                       *
+*                                                                                                                                           *
+* Author :                                                                                                                       *
+*                                                                                                                                         *
+* History :                                                          
+*
+*                                        
+*                                                                                                                                       *
+* Copyright 2007, Realtek Corp.                                                                                                  *
+*                                                                                                                                        *
+* The contents of this file is the sole property of Realtek Corp.  It can not be                                     *
+* be used, copied or modified without written permission from Realtek Corp.                                         *
+*                                                                                                                                          *
+*******************************************************************************/
 
 #define _HAL_INIT_C_
 #include <drv_conf.h>
@@ -28,22 +26,42 @@
 
 #ifdef CONFIG_SDIO_HCI
 	#include <sdio_hal.h>
-#ifdef PLATFORM_LINUX
-	#include <linux/mmc/sdio_func.h>
-#endif
 #elif defined(CONFIG_USB_HCI)
 	#include <usb_hal.h>
-#endif	
+#endif
 
+void intf_chip_configure(_adapter *padapter)
+{
+	if(padapter->HalFunc.intf_chip_configure)
+		padapter->HalFunc.intf_chip_configure(padapter);
+}
+
+void intf_read_chip_info(_adapter *padapter)
+{
+	if(padapter->HalFunc.read_adapter_info)
+		padapter->HalFunc.read_adapter_info(padapter);
+}
+
+void	rtw_dm_init(_adapter *padapter)
+{
+	if(padapter->HalFunc.dm_init)
+		padapter->HalFunc.dm_init(padapter);
+}
+
+void	rtw_led_init(_adapter *padapter)
+{
+	if(padapter->HalFunc.InitSwLeds)
+		padapter->HalFunc.InitSwLeds(padapter);
+}
 
 uint	 rtw_hal_init(_adapter *padapter) 
 {
 	uint	status = _SUCCESS;
-	HAL_DATA_TYPE *pHalData = GET_HAL_DATA(padapter);
 	
-	padapter->hw_init_completed=_FALSE;	
-	
-	status = pHalData->hal_ops.hal_init(padapter);
+	padapter->hw_init_completed=_FALSE;
+
+	padapter->bfirst_init = _TRUE;
+	status = padapter->HalFunc.hal_init(padapter);
 
 	if(status == _SUCCESS){
 		padapter->hw_init_completed = _TRUE;
@@ -52,6 +70,7 @@ uint	 rtw_hal_init(_adapter *padapter)
 	 	padapter->hw_init_completed = _FALSE;
 		RT_TRACE(_module_hal_init_c_,_drv_err_,("rtw_hal_init: hal__init fail\n"));
 	}
+	padapter->bfirst_init = _FALSE;
 
 	RT_TRACE(_module_hal_init_c_,_drv_err_,("-rtl871x_hal_init:status=0x%x\n",status));
 
@@ -62,11 +81,10 @@ uint	 rtw_hal_init(_adapter *padapter)
 uint	 rtw_hal_deinit(_adapter *padapter)
 {
 	uint	status = _SUCCESS;
-	HAL_DATA_TYPE *pHalData = GET_HAL_DATA(padapter);
 	
 _func_enter_;
 
-	status = pHalData->hal_ops.hal_deinit(padapter);
+	status = padapter->HalFunc.hal_deinit(padapter);
 
 	if(status == _SUCCESS){
 		padapter->hw_init_completed = _FALSE;

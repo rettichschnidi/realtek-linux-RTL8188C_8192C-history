@@ -1,22 +1,20 @@
 /******************************************************************************
- *
- * Copyright(c) 2007 - 2010 Realtek Corporation. All rights reserved.
- *                                        
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of version 2 of the GNU General Public License as
- * published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along with
- * this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
- *
- *
- ******************************************************************************/
+* xmit_linux.c                                                                                                                                 *
+*                                                                                                                                          *
+* Description :                                                                                                                       *
+*                                                                                                                                           *
+* Author :                                                                                                                       *
+*                                                                                                                                         *
+* History :									*
+*                                                                                                                                       *
+*										*
+*										*
+* Copyright 2010, Realtek Corp.							*
+*                                                                                                                                        *
+* The contents of this file is the sole property of Realtek Corp.  It can not be                                     *
+* be used, copied or modified without written permission from Realtek Corp.                                         *
+*                                                                                                                                          *
+*******************************************************************************/
 #define _XMIT_OSDEP_C_
 
 #include <drv_conf.h>
@@ -32,18 +30,13 @@
 #include <osdep_intf.h>
 #include <circ_buf.h>
 
-#ifdef CONFIG_RTL8712_TCP_CSUM_OFFLOAD_TX
-#include <linux/in.h>
-#include <linux/ip.h>
-#include <linux/udp.h>
-#endif
 
-uint rtw_remainder_len(struct pkt_file *pfile)
+uint remainder_len(struct pkt_file *pfile)
 {
 	return (pfile->buf_len - ((SIZE_PTR)(pfile->cur_addr) - (SIZE_PTR)(pfile->buf_start)));
 }
 
-void _rtw_open_pktfile (_pkt *pktptr, struct pkt_file *pfile)
+void _open_pktfile (_pkt *pktptr, struct pkt_file *pfile)
 {
 _func_enter_;
 
@@ -56,13 +49,13 @@ _func_enter_;
 _func_exit_;
 }
 
-uint _rtw_pktfile_read (struct pkt_file *pfile, u8 *rmem, uint rlen)
+uint _pktfile_read (struct pkt_file *pfile, u8 *rmem, uint rlen)
 {	
 	uint	len = 0;
 	
 _func_enter_;
 
-       len =  rtw_remainder_len(pfile);
+       len =  remainder_len(pfile);
       	len = (rlen > len)? len: rlen;
 
        if(rmem)
@@ -76,7 +69,7 @@ _func_exit_;
 	return len;	
 }
 
-sint rtw_endofpktfile(struct pkt_file *pfile)
+sint endofpktfile(struct pkt_file *pfile)
 {
 _func_enter_;
 
@@ -129,7 +122,7 @@ void set_tx_chksum_offload(_pkt *pkt, struct pkt_attrib *pattrib)
 	
 }
 
-int rtw_os_xmit_resource_alloc(_adapter *padapter, struct xmit_buf *pxmitbuf)
+int os_xmit_resource_alloc(_adapter *padapter, struct xmit_buf *pxmitbuf)
 {
 
 #ifdef CONFIG_USB_HCI
@@ -137,7 +130,7 @@ int rtw_os_xmit_resource_alloc(_adapter *padapter, struct xmit_buf *pxmitbuf)
 	
        for(i=0; i<8; i++)
       	{
-      		pxmitbuf->pxmit_urb[i] = usb_alloc_urb(0, GFP_KERNEL);
+      		pxmitbuf->pxmit_urb[i] = usb_alloc_urb(0, GFP_ATOMIC);//usb_alloc_urb(0, GFP_KERNEL);
              	if(pxmitbuf->pxmit_urb[i] == NULL) 
              	{
              		printk("pxmitbuf->pxmit_urb[i]==NULL");
@@ -150,7 +143,7 @@ int rtw_os_xmit_resource_alloc(_adapter *padapter, struct xmit_buf *pxmitbuf)
 	return _SUCCESS;	
 }
 
-void rtw_os_xmit_resource_free(_adapter *padapter, struct xmit_buf *pxmitbuf)
+void os_xmit_resource_free(_adapter *padapter, struct xmit_buf *pxmitbuf)
 {
 
 #ifdef CONFIG_USB_HCI
@@ -176,11 +169,11 @@ void os_pkt_complete(_adapter *padapter, _pkt *pkt)
 	dev_kfree_skb_any(pkt);
 }
 
-void rtw_os_xmit_complete(_adapter *padapter, struct xmit_frame *pxframe)
+void os_xmit_complete(_adapter *padapter, struct xmit_frame *pxframe)
 {
 	if(pxframe->pkt)
 	{
-		//RT_TRACE(_module_xmit_osdep_c_,_drv_err_,("linux : rtw_os_xmit_complete, dev_kfree_skb()\n"));	
+		//RT_TRACE(_module_xmit_osdep_c_,_drv_err_,("linux : os_xmit_complete, dev_kfree_skb()\n"));	
 
 		//dev_kfree_skb_any(pxframe->pkt);	
 		os_pkt_complete(padapter, pxframe->pkt);
@@ -190,7 +183,7 @@ void rtw_os_xmit_complete(_adapter *padapter, struct xmit_frame *pxframe)
 	pxframe->pkt = NULL;
 }
 
-int rtw_xmit_entry(_pkt *pkt, _nic_hdl pnetdev)
+int xmit_entry(_pkt *pkt, _nic_hdl pnetdev)
 {
 	_adapter *padapter = (_adapter *)netdev_priv(pnetdev);
 	struct xmit_priv *pxmitpriv = &padapter->xmitpriv;
@@ -202,8 +195,8 @@ _func_enter_;
 
 	RT_TRACE(_module_rtl871x_mlme_c_, _drv_info_, ("+xmit_enry\n"));
 
-	if (rtw_if_up(padapter) == _FALSE) {
-		RT_TRACE(_module_xmit_osdep_c_, _drv_err_, ("rtw_xmit_entry: rtw_if_up fail\n"));
+	if (if_up(padapter) == _FALSE) {
+		RT_TRACE(_module_xmit_osdep_c_, _drv_err_, ("xmit_entry: if_up fail\n"));
 		goto drop_packet;
 	}
 
@@ -211,13 +204,13 @@ _func_enter_;
 	if (res < 0) goto drop_packet;
 
 	pxmitpriv->tx_pkts++;
-	RT_TRACE(_module_xmit_osdep_c_, _drv_info_, ("rtw_xmit_entry: tx_pkts=%d\n", (u32)pxmitpriv->tx_pkts));
+	RT_TRACE(_module_xmit_osdep_c_, _drv_info_, ("xmit_entry: tx_pkts=%d\n", (u32)pxmitpriv->tx_pkts));
 	goto exit;
 
 drop_packet:
 	pxmitpriv->tx_drop++;
 	dev_kfree_skb_any(pkt);
-	RT_TRACE(_module_xmit_osdep_c_, _drv_notice_, ("rtw_xmit_entry: drop, tx_drop=%d\n", (u32)pxmitpriv->tx_drop));
+	RT_TRACE(_module_xmit_osdep_c_, _drv_notice_, ("xmit_entry: drop, tx_drop=%d\n", (u32)pxmitpriv->tx_drop));
 
 exit:
 
