@@ -28,7 +28,7 @@
 		2.14 RTL8192D_operation_mode.pdf
 
 	3. driver/ 
-		3.1 rtl8188C_8192C_8192D_usb_linux_v3.3.0_2971.20111128.tar.gz
+		3.1 rtl8188C_8192C_8192D_usb_linux_v3.3.1_3083.20111213.tar.gz
 			Naming rule: rtlCHIPS_linux_vM.N.P_ssss.yyyymmdd.tar.gz
 			where:
 				CHIPS: supported chips

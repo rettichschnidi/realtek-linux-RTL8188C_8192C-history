@@ -701,7 +701,7 @@ int rtw_hw_suspend(_adapter *padapter )
 
 		}
 		//s2-3.
-		rtw_free_assoc_resources(padapter);
+		rtw_free_assoc_resources(padapter, 1);
 
 		//s2-4.
 		rtw_free_network_queue(padapter,_TRUE);
@@ -848,7 +848,7 @@ static int rtw_suspend(struct usb_interface *pusb_intf, pm_message_t message)
 		//s2-2.  indicate disconnect to os
 		rtw_indicate_disconnect(padapter);
 		//s2-3.
-		rtw_free_assoc_resources(padapter);
+		rtw_free_assoc_resources(padapter, 1);
 #ifdef CONFIG_AUTOSUSPEND
 		if(!pwrpriv->bInternalAutoSuspend )
 #endif
