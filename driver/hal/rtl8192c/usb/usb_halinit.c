@@ -1869,6 +1869,10 @@ _func_enter_;
 	_InitSecuritySetting(padapter);
 	_RfPowerSave(padapter);
 
+	// HW SEQ CTRL
+	//set 0x0 to 0xFF by tynli. Default enable HW SEQ NUM.
+	write8(padapter,REG_HWSEQ_CTRL, 0xFF); 
+
 	//
 	// f. Start to BulkIn transfer.
 	//

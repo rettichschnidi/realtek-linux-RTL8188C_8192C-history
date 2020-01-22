@@ -1043,21 +1043,25 @@ void FillH2CCmd(_adapter* padapter, u8 ElementID, u32 CmdLen, u8* pCmdBuffer)
 			break;
 		}		
 				
-		if(CmdLen<=3){
-			h2c_cmd |=   *((u32 *)pCmdBuffer) << 8;			
+		if(CmdLen<=3)
+		{
+			_memcpy((u8*)(&h2c_cmd)+1, pCmdBuffer, CmdLen );
 		}
 		else{
 			_memcpy((u8*)(&h2c_cmd_ex), pCmdBuffer, EX_MESSAGE_BOX_SIZE);
 			_memcpy((u8*)(&h2c_cmd)+1, pCmdBuffer+2,( CmdLen-EX_MESSAGE_BOX_SIZE));
-			h2c_cmd |= BIT(7);								
+			*(u8*)(&h2c_cmd) |= BIT(7);
 		}
-		h2c_cmd |= ElementID;
+
+		*(u8*)(&h2c_cmd) |= ElementID;
 		
 		if(h2c_cmd & BIT(7)){
 			msgbox_ex_addr = REG_HMEBOX_EXT_0 + (h2c_box_num *EX_MESSAGE_BOX_SIZE);
+			h2c_cmd_ex = cpu_to_le16( h2c_cmd_ex );
 			write16(padapter, msgbox_ex_addr, h2c_cmd_ex);
 		}
 		msgbox_addr =REG_HMEBOX_0 + (h2c_box_num *MESSAGE_BOX_SIZE);
+		h2c_cmd = cpu_to_le32( h2c_cmd );
 		write32(padapter,msgbox_addr, h2c_cmd);
 		
 		if(!isnchip){//for Test chip
@@ -1914,22 +1918,57 @@ _func_enter_;
 		// We should set AID, correct TSF, HW seq enable before set JoinBssReport to Fw in 88/92C.
 		// Suggested by filen. Added by tynli.
 		write16(padapter, REG_BCN_PSR_RPT, (0xC000|pmlmeinfo->aid));
-		correct_TSF(padapter, pmlmeext);
-		write16(padapter, REG_NQOS_SEQ, ((pmlmeext->mgnt_seq+100)&0xFFF));
-		write8(padapter, REG_HWSEQ_CTRL, 0xFF);
+		// Do not set TSF again here or vWiFi beacon DMA INT will not work.
+		//correct_TSF(padapter, pmlmeext);
+		// Hw sequende enable by dedault. 2010.06.23. by tynli.
+		//write16(padapter, REG_NQOS_SEQ, ((pmlmeext->mgnt_seq+100)&0xFFF));
+		//write8(padapter, REG_HWSEQ_CTRL, 0xFF);
 
 		if(IS_NORMAL_CHIP(pHalData->VersionID))
 		{
-			//u8	U1bTmp;
+			BOOLEAN bRecover = _FALSE;
 
 			//set REG_CR bit 8
 			//U1bTmp = read8(padapter, REG_CR+1);
 			write8(padapter,  REG_CR+1, 0x03);
-			
+
+			// Disable Hw protection for a time which revserd for Hw sending beacon.
+			// Fix download reserved page packet fail that access collision with the protection time.
+			// 2010.05.11. Added by tynli.
+			//SetBcnCtrlReg(padapter, 0, BIT3);
+			//SetBcnCtrlReg(padapter, BIT4, 0);
+			write8(padapter, REG_BCN_CTRL, read8(padapter, REG_BCN_CTRL)&(~BIT(3)));
+			write8(padapter, REG_BCN_CTRL, read8(padapter, REG_BCN_CTRL)|BIT(4));
+
+			// Set FWHW_TXQ_CTRL 0x422[6]=0 to tell Hw the packet is not a real beacon frame.
+			if(pHalData->RegFwHwTxQCtrl&BIT6)
+				bRecover = _TRUE;
+
 			// To tell Hw the packet is not a real beacon frame.
 			//U1bTmp = read8(padapter, REG_FWHW_TXQ_CTRL+2);
 			write8(padapter, REG_FWHW_TXQ_CTRL+2, (pHalData->RegFwHwTxQCtrl&(~BIT6)));
+			pHalData->RegFwHwTxQCtrl &= (~BIT6);
 			SetFwRsvdPagePkt(padapter, 0);
+
+			// 2010.05.11. Added by tynli.
+			//SetBcnCtrlReg(padapter, BIT3, 0);
+			//SetBcnCtrlReg(padapter, 0, BIT4);
+			write8(padapter, REG_BCN_CTRL, read8(padapter, REG_BCN_CTRL)|BIT(3));
+			write8(padapter, REG_BCN_CTRL, read8(padapter, REG_BCN_CTRL)&(~BIT(4)));
+
+			// To make sure that if there exists an adapter which would like to send beacon.
+			// If exists, the origianl value of 0x422[6] will be 1, we should check this to
+			// prevent from setting 0x422[6] to 0 after download reserved page, or it will cause 
+			// the beacon cannot be sent by HW.
+			// 2010.06.23. Added by tynli.
+			if(bRecover)
+			{
+				write8(padapter, REG_FWHW_TXQ_CTRL+2, (pHalData->RegFwHwTxQCtrl|BIT6));
+				pHalData->RegFwHwTxQCtrl |= BIT6;
+			}
+
+			// Clear CR[8] or beacon packet will not be send to TxBuf anymore.
+			write8(padapter, REG_CR+1, 0x02);
 		}
 	}
 

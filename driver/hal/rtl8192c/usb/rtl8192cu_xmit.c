@@ -583,17 +583,19 @@ static void _update_txdesc(struct xmit_frame *pxmitframe, u8 *pmem, int sz)
 		//4 offset 20
 	}
 
-#ifdef CONFIG_LPS
 	// 2009.11.05. tynli_test. Suggested by SD4 Filen for FW LPS.
-	// The sequence number of each non-Qos frame / broadcast / multicast /
+	// (1) The sequence number of each non-Qos frame / broadcast / multicast /
 	// mgnt frame should be controled by Hw because Fw will also send null data
 	// which we cannot control when Fw LPS enable.
-	if((!pattrib->qos_en) && (padapter->pwrctrlpriv.bLeisurePs))
+	// --> default enable non-Qos data sequense number. 2010.06.23. by tynli.
+	// (2) Enable HW SEQ control for beacon packet, because we use Hw beacon.
+	// (3) Use HW Qos SEQ to control the seq num of Ext port non-Qos packets.
+	// 2010.06.23. Added by tynli.
+	if(!pattrib->qos_en)
 	{		
 		ptxdesc->txdw4 |= cpu_to_le32(BIT(7)); // Hw set sequence number
 		ptxdesc->txdw3 |= cpu_to_le32((8 <<28)); //set bit3 to 1. Suugested by TimChen. 2009.12.29.
 	}
-#endif
 
 	cal_txdesc_chksum(ptxdesc);
 }
@@ -774,17 +776,19 @@ s32 update_txdesc(struct xmit_frame *pxmitframe, u32 *pmem, s32 sz)
 		//offset 20
 	}
 
-#ifdef CONFIG_LPS
 	// 2009.11.05. tynli_test. Suggested by SD4 Filen for FW LPS.
-	// The sequence number of each non-Qos frame / broadcast / multicast /
+	// (1) The sequence number of each non-Qos frame / broadcast / multicast /
 	// mgnt frame should be controled by Hw because Fw will also send null data
 	// which we cannot control when Fw LPS enable.
-	if((!pattrib->qos_en) && (padapter->pwrctrlpriv.bLeisurePs))
+	// --> default enable non-Qos data sequense number. 2010.06.23. by tynli.
+	// (2) Enable HW SEQ control for beacon packet, because we use Hw beacon.
+	// (3) Use HW Qos SEQ to control the seq num of Ext port non-Qos packets.
+	// 2010.06.23. Added by tynli.
+	if(!pattrib->qos_en)
 	{		
 		ptxdesc->txdw4 |= cpu_to_le32(BIT(7)); // Hw set sequence number
 		ptxdesc->txdw3 |= cpu_to_le32((8 <<28)); //set bit3 to 1. Suugested by TimChen. 2009.12.29.
 	}
-#endif
 
 	cal_txdesc_chksum(ptxdesc);
 		
