@@ -1042,6 +1042,25 @@ struct ADDBA_request
 #define	P2P_WILDCARD_SSID_LEN				7
 #define	P2P_FINDPHASE_EX_CNT					3
 
+#define	P2P_PROVISION_TIMEOUT				3000	//	3 seconds timeout for sending the provision discovery request
+#define	P2P_GO_NEGO_TIMEOUT					2000	//	2 seconds timeout for receiving the group negotation response
+
+#define	P2P_MAX_INTENT						15
+
+//	WPS Configuration Method
+#define	WPS_CM_NONE							0x0000
+#define	WPS_CM_LABEL							0x0004
+#define	WPS_CM_DISPLYA						0x0008
+#define	WPS_CM_EXTERNAL_NFC_TOKEN			0x0010
+#define	WPS_CM_INTEGRATED_NFC_TOKEN		0x0020
+#define	WPS_CM_NFC_INTERFACE					0x0040
+#define	WPS_CM_PUSH_BUTTON					0x0080
+#define	WPS_CM_KEYPAD						0x0100
+#define	WPS_CM_SW_PUHS_BUTTON				0x0280
+#define	WPS_CM_HW_PUHS_BUTTON				0x0480
+#define	WPS_CM_SW_DISPLAY_PIN				0x2008
+#define	WPS_CM_LCD_DISPLAY_PIN				0x4008
+
 enum P2P_ROLE {
 	P2P_ROLE_DISABLE = 0,
 	P2P_ROLE_DEVICE = 1,
@@ -1056,18 +1075,15 @@ enum P2P_STATE {
 	P2P_STATE_SCAN = 3,					//	In scan phase
 	P2P_STATE_FIND_PHASE_LISTEN = 4,		//	In the listen state of find phase
 	P2P_STATE_FIND_PHASE_SEARCH = 5,		//	In the search state of find phase
-	P2P_STATE_PROVISION_DIS = 6,			//	In P2P provisioning discovery
-											//	todo: should separate four states here
-											//	first: sending provisioning request
-											//	second: receiving the provisioning response
-											//	third: receiving the provisioning request
-											//	fourth: sending the provisioning response
-	P2P_STATE_GONEGO_ING = 7,				//	Doing the group owner negoitation handshake
-	P2P_STATE_GONEGO_OK = 8,				//	finish the group negoitation handshake with success
-	P2P_STATE_GONEGO_FAIL = 9,			//	finish the group negoitation handshake with failure
-	P2P_STATE_RECV_INVITE_REQ = 10,		//	receiving the P2P Inviation request
-	P2P_STATE_PROVISIONING_ING = 11,		//	Doing the P2P WPS
-	P2P_STATE_PROVISIONING_DONE = 12,	//	Finish the P2P WPS
+	P2P_STATE_TX_PROVISION_DIS_REQ = 6,	//	In P2P provisioning discovery
+	P2P_STATE_RX_PROVISION_DIS_RSP = 7,
+	P2P_STATE_RX_PROVISION_DIS_REQ = 8,	
+	P2P_STATE_GONEGO_ING = 9,				//	Doing the group owner negoitation handshake
+	P2P_STATE_GONEGO_OK = 10,				//	finish the group negoitation handshake with success
+	P2P_STATE_GONEGO_FAIL = 11,			//	finish the group negoitation handshake with failure
+	P2P_STATE_RECV_INVITE_REQ = 12,		//	receiving the P2P Inviation request
+	P2P_STATE_PROVISIONING_ING = 13,		//	Doing the P2P WPS
+	P2P_STATE_PROVISIONING_DONE = 14,	//	Finish the P2P WPS
 };
 #endif // _WIFI_H_
 

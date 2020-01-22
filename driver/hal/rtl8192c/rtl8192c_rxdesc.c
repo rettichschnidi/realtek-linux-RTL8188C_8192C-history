@@ -512,23 +512,30 @@ static void process_rssi(_adapter *padapter,union recv_frame *prframe)
 static void process_PWDB(_adapter *padapter, union recv_frame *prframe)
 {
 	int	UndecoratedSmoothedPWDB;
+	int	UndecoratedSmoothedCCK;
 	HAL_DATA_TYPE		*pHalData = GET_HAL_DATA(padapter);
 	struct dm_priv		*pdmpriv = &pHalData->dmpriv;
 	struct rx_pkt_attrib	*pattrib= &prframe->u.hdr.attrib;
 	struct sta_info		*psta = prframe->u.hdr.psta;
+	u8 isCCKrate=(pattrib->mcs_rate<=3? 1:0);
+
 
 	if(psta)
 	{
-		//UndecoratedSmoothedPWDB = psta->UndecoratedSmoothedPWDB;//todo:
-		UndecoratedSmoothedPWDB = pdmpriv->UndecoratedSmoothedPWDB;
+		UndecoratedSmoothedPWDB = psta->rssi_stat.UndecoratedSmoothedPWDB;
+		UndecoratedSmoothedCCK = psta->rssi_stat.UndecoratedSmoothedCCK;
 	}
 	else
 	{
-		UndecoratedSmoothedPWDB = pdmpriv->UndecoratedSmoothedPWDB;
+		UndecoratedSmoothedPWDB = pdmpriv->UndecoratedSmoothedPWDB;		
+		UndecoratedSmoothedCCK = pdmpriv->UndecoratedSmoothedCCK;
 	}
 
 	//if(pRfd->Status.bPacketToSelf || pRfd->Status.bPacketBeacon)
+	
+	if(!isCCKrate)
 	{
+		// Process OFDM RSSI
 		if(UndecoratedSmoothedPWDB < 0) // initialize
 		{
 			UndecoratedSmoothedPWDB = pattrib->RxPWDBAll;
@@ -548,19 +555,64 @@ static void process_PWDB(_adapter *padapter, union recv_frame *prframe)
 					( ((UndecoratedSmoothedPWDB)*(Rx_Smooth_Factor-1)) +
 					(pattrib->RxPWDBAll)) /(Rx_Smooth_Factor);
 		}
+		
+	}
+	else
+	{
+		// Process CCK RSSI
+		if(UndecoratedSmoothedCCK < 0) // initialize
+		{
+			UndecoratedSmoothedCCK = pattrib->RxPWDBAll;
+		}
+
+		if(pattrib->RxPWDBAll > (u32)UndecoratedSmoothedCCK)
+		{
+			UndecoratedSmoothedCCK =
+					( ((UndecoratedSmoothedCCK)*(Rx_Smooth_Factor-1)) +
+					(pattrib->RxPWDBAll)) /(Rx_Smooth_Factor);
+
+			UndecoratedSmoothedCCK = UndecoratedSmoothedCCK + 1;
+		}
+		else
+		{
+			UndecoratedSmoothedCCK =
+					( ((UndecoratedSmoothedCCK)*(Rx_Smooth_Factor-1)) +
+					(pattrib->RxPWDBAll)) /(Rx_Smooth_Factor);
+		}
+
+
+	}
+		
+
 
 		if(psta)
 		{
 			//psta->UndecoratedSmoothedPWDB = UndecoratedSmoothedPWDB;//todo:
 			pdmpriv->UndecoratedSmoothedPWDB = UndecoratedSmoothedPWDB;
+
+
+			if(pdmpriv->RSSI_Select == RSSI_OFDM)
+				psta->rssi_stat.UndecoratedSmoothedPWDB = UndecoratedSmoothedPWDB;
+			else if(pdmpriv->RSSI_Select == RSSI_CCK)
+				psta->rssi_stat.UndecoratedSmoothedPWDB = UndecoratedSmoothedCCK;
+			
+			psta->rssi_stat.UndecoratedSmoothedCCK = UndecoratedSmoothedCCK;
+			
 		}
 		else
 		{
-			pdmpriv->UndecoratedSmoothedPWDB = UndecoratedSmoothedPWDB;
+			//pdmpriv->UndecoratedSmoothedPWDB = UndecoratedSmoothedPWDB;
+
+			if(pdmpriv->RSSI_Select == RSSI_OFDM)
+				pdmpriv->UndecoratedSmoothedPWDB = UndecoratedSmoothedPWDB;
+			else if(pdmpriv->RSSI_Select == RSSI_CCK)
+				pdmpriv->UndecoratedSmoothedPWDB = UndecoratedSmoothedCCK;
+			
+			pdmpriv->UndecoratedSmoothedCCK = UndecoratedSmoothedCCK;
 		}
 
-		//UpdateRxSignalStatistics8192C(padapter, prframe);
-	}
+		//UpdateRxSignalStatistics8192C(padapter, prframe);	
+
 }
 
 

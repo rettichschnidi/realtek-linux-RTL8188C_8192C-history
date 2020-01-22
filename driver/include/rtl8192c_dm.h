@@ -8,6 +8,9 @@
 //
 //============================================================
 
+#define	RSSI_CCK	0
+#define	RSSI_OFDM	1
+
 #define	OFDM_TABLE_SIZE 	37
 #define	CCK_TABLE_SIZE		33
 
@@ -438,6 +441,7 @@ struct 	dm_priv
 
 	//* Upper and Lower Signal threshold for Rate Adaptive*/
 	int	UndecoratedSmoothedPWDB;
+	int	UndecoratedSmoothedCCK;
 	int	EntryMinUndecoratedSmoothedPWDB;
 	int	EntryMaxUndecoratedSmoothedPWDB;
 

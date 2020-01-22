@@ -118,7 +118,7 @@ _func_enter_;
 	Please also apply  free_txobj to link_up all the xmit_frames...
 	*/
 
-	pxmitpriv->pallocated_frame_buf = _malloc(NR_XMITFRAME * sizeof(struct xmit_frame) + 4);
+	pxmitpriv->pallocated_frame_buf = _zmalloc(NR_XMITFRAME * sizeof(struct xmit_frame) + 4);
 	
 	if (pxmitpriv->pallocated_frame_buf  == NULL){
 		pxmitpriv->pxmit_frame_buf =NULL;
@@ -158,7 +158,7 @@ _func_enter_;
 	_init_queue(&pxmitpriv->free_xmitbuf_queue);
 	_init_queue(&pxmitpriv->pending_xmitbuf_queue);
 
-	pxmitpriv->pallocated_xmitbuf = _malloc(NR_XMITBUFF * sizeof(struct xmit_buf) + 4);	
+	pxmitpriv->pallocated_xmitbuf = _zmalloc(NR_XMITBUFF * sizeof(struct xmit_buf) + 4);	
 	if (pxmitpriv->pallocated_xmitbuf  == NULL){
 		RT_TRACE(_module_rtl871x_xmit_c_,_drv_err_,("alloc xmit_buf fail!\n"));
 		res= _FAIL;
@@ -178,7 +178,7 @@ _func_enter_;
 		pxmitbuf->priv_data = NULL;
 		pxmitbuf->padapter = padapter;
 
-		pxmitbuf->pallocated_buf = _malloc(MAX_XMITBUF_SZ + XMITBUF_ALIGN_SZ);
+		pxmitbuf->pallocated_buf = _zmalloc(MAX_XMITBUF_SZ + XMITBUF_ALIGN_SZ);
 		if (pxmitbuf->pallocated_buf == NULL)
 		{
 			res = _FAIL;
@@ -535,30 +535,15 @@ static s32 update_attrib(_adapter *padapter, _pkt *pkt, struct pkt_attrib *pattr
 	
 	// get sta_info
 	if (bmcast) {
-		psta = get_bcmc_stainfo(padapter);
-		pattrib->mac_id = 4;		
+		psta = get_bcmc_stainfo(padapter);		
 	} else {
-		psta = get_stainfo(pstapriv, pattrib->ra);
-		if (psta == NULL)	{ // if we cannot get psta => drrp the pkt
-			RT_TRACE(_module_rtl871x_xmit_c_, _drv_alert_, ("\nupdate_attrib => get sta_info fail \n"));
-			RT_TRACE(_module_rtl871x_xmit_c_, _drv_alert_, ("\nra:%x:%x:%x:%x:%x:%x\n", 
-			pattrib->ra[0], pattrib->ra[1],
-			pattrib->ra[2], pattrib->ra[3],
-			pattrib->ra[4], pattrib->ra[5]));
-			res =_FAIL;
-			goto exit;
-		}
-
-		if (check_fwstate(pmlmepriv, WIFI_STATION_STATE)) {
-			//pattrib->mac_id = 5;
-			pattrib->mac_id = 0;
-		} else {
-			pattrib->mac_id = psta->mac_id;
-		}
+		psta = get_stainfo(pstapriv, pattrib->ra);		
 	}
 
 	if (psta) {
-
+            
+		pattrib->mac_id = psta->mac_id;
+                
 		pattrib->psta = psta;
 
 	} else {
@@ -576,16 +561,21 @@ static s32 update_attrib(_adapter *padapter, _pkt *pkt, struct pkt_attrib *pattr
 	// get ether_hdr_len
 	pattrib->pkt_hdrlen = ETH_HLEN;//(pattrib->ether_type == 0x8100) ? (14 + 4 ): 14; //vlan tag
 
-	if (pqospriv->qos_option) {
-		if (check_fwstate(pmlmepriv, WIFI_AP_STATE) && psta->qos_option) 
-			set_qos(&pktfile, pattrib);
-		else
-			set_qos(&pktfile, pattrib);
-	} else {
-		pattrib->hdrlen = WLAN_HDR_A3_LEN;
-		pattrib->subtype = WIFI_DATA_TYPE;	
-		pattrib->priority = 0;
+	pattrib->hdrlen = WLAN_HDR_A3_LEN;
+	pattrib->subtype = WIFI_DATA_TYPE;	
+	pattrib->priority = 0;
+	
+	if (check_fwstate(pmlmepriv, WIFI_AP_STATE|WIFI_ADHOC_STATE|WIFI_ADHOC_MASTER_STATE))
+	{
+		if(psta->qos_option)
+			set_qos(&pktfile, pattrib);	
 	}
+	else
+	{
+		if(pqospriv->qos_option)
+			set_qos(&pktfile, pattrib);
+	}
+
 	//pattrib->priority = 5; //force to used VI queue, for testing
 
 	if (psta->ieee8021x_blocked == _TRUE)
@@ -792,12 +782,12 @@ _func_enter_;
 				payload=payload+pattrib->hdrlen+pattrib->iv_len;
 				RT_TRACE(_module_rtl871x_xmit_c_,_drv_err_,("curfragnum=%d pattrib->hdrlen=%d pattrib->iv_len=%d",curfragnum,pattrib->hdrlen,pattrib->iv_len));
 				if((curfragnum+1)==pattrib->nr_frags){
-					length=pattrib->last_txcmdsz-pattrib->hdrlen-pattrib->iv_len-( (psecuritypriv->sw_encrypt) ? pattrib->icv_len : 0);
+					length=pattrib->last_txcmdsz-pattrib->hdrlen-pattrib->iv_len-( (pattrib->bswenc) ? pattrib->icv_len : 0);
 					secmicappend(&micdata, payload,length);
 					payload=payload+length;
 				}
 				else{
-					length=pxmitpriv->frag_len-pattrib->hdrlen-pattrib->iv_len-( (psecuritypriv->sw_encrypt) ? pattrib->icv_len : 0);
+					length=pxmitpriv->frag_len-pattrib->hdrlen-pattrib->iv_len-( (pattrib->bswenc) ? pattrib->icv_len : 0);
 					secmicappend(&micdata, payload, length);
 					payload=payload+length+pattrib->icv_len;
 					RT_TRACE(_module_rtl871x_xmit_c_,_drv_err_,("curfragnum=%d length=%d pattrib->icv_len=%d",curfragnum,length,pattrib->icv_len));
@@ -1686,16 +1676,20 @@ static struct xmit_frame *dequeue_one_xmitframe(struct xmit_priv *pxmitpriv, str
 #endif*/
 		list_delete(&pxmitframe->list);
 
+		ptxservq->qcnt--;
+
 #ifdef CONFIG_AP_MODE
 		if(xmitframe_enqueue_for_sleeping_sta(padapter, pxmitframe)==_FALSE)
 #endif
 		{
 			//list_insert_tail(&pxmitframe->list, &phwxmit->pending);
 
-			ptxservq->qcnt--;
+			//ptxservq->qcnt--;
 
 			break;
 		}
+
+		pxmitframe = NULL;
 
 	}
 
@@ -1973,7 +1967,7 @@ void alloc_hwxmits(_adapter *padapter)
 
 	pxmitpriv->hwxmit_entry = HWXMIT_ENTRY;
 
-	pxmitpriv->hwxmits = (struct hw_xmit *)_malloc(sizeof (struct hw_xmit) * pxmitpriv->hwxmit_entry);	
+	pxmitpriv->hwxmits = (struct hw_xmit *)_zmalloc(sizeof (struct hw_xmit) * pxmitpriv->hwxmit_entry);	
 	
 	hwxmits = pxmitpriv->hwxmits;
 
@@ -2117,7 +2111,7 @@ sint xmitframe_enqueue_for_sleeping_sta(_adapter *padapter, struct xmit_frame *p
 	{
 		//DBG_871X("directly xmit pspoll_triggered packet\n");
 
-		pattrib->triggered=0;
+		//pattrib->triggered=0;
 
 		if(bmcst)
 			pattrib->qsel = 0x11;//HIQ
@@ -2132,6 +2126,8 @@ sint xmitframe_enqueue_for_sleeping_sta(_adapter *padapter, struct xmit_frame *p
 		if(pstapriv->sta_dz_bitmap)//if anyone sta is in ps mode
 		{
 			//pattrib->qsel = 0x11;//HIQ
+
+			list_delete(&pxmitframe->list);
 			
 			_enter_critical_bh(&psta->sleep_q.lock, &irqL);	
 			
@@ -2161,7 +2157,9 @@ sint xmitframe_enqueue_for_sleeping_sta(_adapter *padapter, struct xmit_frame *p
 		u8 wmmps_ac=0;
 	
 		if(pstapriv->sta_dz_bitmap&BIT(psta->aid))	
-		{			
+		{		
+			list_delete(&pxmitframe->list);
+		
 			_enter_critical_bh(&psta->sleep_q.lock, &irqL);	
 			
 			list_insert_tail(&pxmitframe->list, get_list_head(&psta->sleep_q));
@@ -2330,6 +2328,8 @@ void wakeup_sta_to_xmit(_adapter *padapter, struct sta_info *psta)
 			list_delete(&pxmitframe->list);
 
 			psta_bmc->sleepq_len--;
+
+			pxmitframe->attrib.triggered = 1;
 
 			if(padapter->HalFunc.hal_xmit(padapter, pxmitframe) == _TRUE)
 			{		

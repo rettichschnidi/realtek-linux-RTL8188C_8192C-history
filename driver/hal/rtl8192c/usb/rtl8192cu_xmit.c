@@ -911,6 +911,18 @@ s32 rtl8192cu_xmitframe_complete(_adapter *padapter, struct xmit_priv *pxmitpriv
 		pxmitframe = LIST_CONTAINOR(xmitframe_plist, struct xmit_frame, list);
 		xmitframe_plist = get_next(xmitframe_plist);
 
+		//
+#ifdef CONFIG_AP_MODE
+		if(xmitframe_enqueue_for_sleeping_sta(padapter, pxmitframe)==_TRUE)
+		{
+			//list_delete(&pxmitframe->list);
+			
+			ptxservq->qcnt--;
+			
+			continue;
+		}
+#endif
+
 		len = xmitframe_need_length(pxmitframe) + TXDESC_SIZE; // no offset
 		if (pbuf + len > MAX_XMITBUF_SZ) break;
 
@@ -963,7 +975,7 @@ s32 rtl8192cu_xmitframe_complete(_adapter *padapter, struct xmit_priv *pxmitpriv
 		{
 #ifdef CONFIG_AP_MODE
 			struct mlme_priv *pmlmepriv = &padapter->mlmepriv;
-			if(pmlmepriv->LinkDetectInfo.bBusyTraffic == _TRUE)
+			if(pmlmepriv->LinkDetectInfo.bHigherBusyTraffic == _TRUE)
 #endif				
 				issue_addbareq_cmd(padapter, pxmitframe);
 		}	
@@ -1164,8 +1176,8 @@ static s32 pre_xmitframe(_adapter *padapter, struct xmit_frame *pxmitframe)
 
 		return _FALSE;
 	}
-#endif
-	
+#endif	
+
 	if (txframes_sta_ac_pending(padapter, pattrib) > 0)
 		goto enqueue;
 

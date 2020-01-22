@@ -1082,8 +1082,11 @@ int get_wps_ie_p2p(u8 *in_ie, uint in_len, u8 *wps_ie, uint *wps_ielen)
 		
 		if((eid==_WPA_IE_ID_)&&(_memcmp(&in_ie[cnt+2], wps_oui, 4)==_TRUE))
 		{
-			_memcpy(wps_ie, &in_ie[cnt], in_ie[cnt+1]+2);
-			
+			if ( wps_ie != NULL )
+			{
+				_memcpy(wps_ie, &in_ie[cnt], in_ie[cnt+1]+2);
+			}
+		
 			*wps_ielen = in_ie[cnt+1]+2;
 			
 			cnt+=in_ie[cnt+1]+2;

@@ -190,7 +190,7 @@ static char *translate_scan(_adapter *padapter,
 	u32 ht_ielen = 0;
 	char custom[MAX_CUSTOM_LEN];
 	char *p;
-	u16 max_rate, rate, ht_cap=_FALSE;
+	u16 max_rate=0, rate, ht_cap=_FALSE;
 	u32 i = 0;	
 	char	*current_val;
 	long rssi;
@@ -753,7 +753,7 @@ static int rtw_set_wpa_ie(_adapter *padapter, char *pie, unsigned short ielen)
 
 	if(ielen)
 	{		
-		buf = _malloc(ielen);
+		buf = _zmalloc(ielen);
 		if (buf == NULL){
 			ret =  -ENOMEM;
 			goto exit;
@@ -1582,8 +1582,7 @@ static int rtw_wx_set_scan(struct net_device *dev, struct iw_request_info *a,
 	} 
 
 	if (check_fwstate(pmlmepriv, _FW_UNDER_SURVEY|_FW_UNDER_LINKING) == _TRUE)
-	{
-		ret = -1;
+	{		
 		goto exit;
 	} 
 
@@ -3407,6 +3406,28 @@ exit:
 		
 }
 
+void enter_listen_state_workitem_process(struct work_struct *work)
+{
+	struct wifidirect_info  *pwdinfo = container_of(work, struct wifidirect_info, enter_listen_state_workitem);
+	_adapter *padapter = pwdinfo->padapter;
+	struct mlme_priv		*pmlmepriv = &padapter->mlmepriv;
+
+_func_enter_;
+
+	pwdinfo->p2p_state = P2P_STATE_LISTEN;
+	set_channel_bwmode( padapter, pwdinfo->listen_channel, HAL_PRIME_CHNL_OFFSET_DONT_CARE, HT_CHANNEL_WIDTH_20);
+
+_func_exit_;
+}
+
+void enter_listen_state_timer_process (void *FunctionContext)
+{
+	_adapter *adapter = (_adapter *)FunctionContext;
+	struct	wifidirect_info		*pwdinfo = &adapter->wdinfo;
+
+	_set_workitem( &pwdinfo->enter_listen_state_workitem );
+}
+
 void find_phase_workitem_process(struct work_struct *work)
 {
 	struct wifidirect_info  *pwdinfo = container_of(work, struct wifidirect_info, find_phase_workitem);
@@ -3441,7 +3462,7 @@ void find_phase_timer_process (void *FunctionContext)
 	_set_workitem( &adapter->wdinfo.find_phase_workitem );
 }
 
-static void init_wifidirect_info( _adapter*	padapter)
+static void init_wifidirect_info( _adapter*	padapter, u8* pinitValue)
 {
 	struct wifidirect_info	*pwdinfo;
 
@@ -3460,7 +3481,19 @@ static void init_wifidirect_info( _adapter*	padapter)
 	
 	//	Use the channel 11 as the listen channel
 	pwdinfo->listen_channel = 11;
-	pwdinfo->role = P2P_ROLE_DEVICE;
+	
+	if ( *pinitValue == 1 )
+	{
+		pwdinfo->role = P2P_ROLE_DEVICE;
+		pwdinfo->p2p_state = P2P_STATE_LISTEN;
+		pwdinfo->intent = 1;
+	}
+	else if ( *pinitValue == 2 )
+	{
+		pwdinfo->role = P2P_ROLE_GO;
+		pwdinfo->p2p_state = P2P_STATE_GONEGO_OK;
+		pwdinfo->intent = 15;
+	}
 	
 //	Use the OFDM rate in the P2P probe response frame. ( 6(B), 9(B), 12(B), 24(B), 36, 48, 54 )	
 	pwdinfo->support_rate[0] = 0x8c;
@@ -3471,15 +3504,12 @@ static void init_wifidirect_info( _adapter*	padapter)
 	pwdinfo->support_rate[5] = 0x60;
 	pwdinfo->support_rate[6] = 0x6c;
 
-	pwdinfo->intent = 1;
 
 	_memcpy( ( void* ) pwdinfo->p2p_wildcard_ssid, "DIRECT-", 7 );
 
 	_memset( pwdinfo->device_name, 0x00, WPS_MAX_DEVICE_NAME_LEN );
 	_memcpy( pwdinfo->device_name, "Realtek DMP Device", 18 );
 	pwdinfo->device_name_len = 18;
-
-	pwdinfo->p2p_state = P2P_STATE_LISTEN;
 
 	_memset( &pwdinfo->invitereq_info, 0x00, sizeof( struct tx_invite_req_info ) );
 	pwdinfo->invitereq_info.token = 3;	//	Token used for P2P invitation request frame.
@@ -3499,6 +3529,16 @@ static void init_wifidirect_info( _adapter*	padapter)
 	pwdinfo->listen_dwell = ( u8 ) (( get_current_time() % 3 ) + 1);
 	printk( "[%s] listen_dwell time is %d00ms\n", __FUNCTION__, pwdinfo->listen_dwell );
 
+	pwdinfo->wps_config_method_request = WPS_CM_NONE;
+
+	_init_workitem( &pwdinfo->enter_listen_state_workitem, enter_listen_state_workitem_process, padapter );
+	_init_timer( &pwdinfo->enter_listen_state_timer, padapter->pnetdev, enter_listen_state_timer_process, padapter );
+
+	pwdinfo->device_password_id_for_nego = WPS_DPID_PBC;
+	pwdinfo->negotiation_dialog_token = 1;
+
+	_memset( pwdinfo->nego_ssid, 0x00, WLAN_SSID_MAXLEN );
+	pwdinfo->nego_ssidlen = 0;
 }
 
 static int rtw_p2p_enable(struct net_device *dev,
@@ -3511,16 +3551,35 @@ static int rtw_p2p_enable(struct net_device *dev,
 	struct mlme_priv *pmlmepriv = &(padapter->mlmepriv);	
 	struct iw_point *pdata = &wrqu->data;
 	struct wifidirect_info *pwdinfo= &(padapter->wdinfo);
+	struct mlme_ext_priv	*pmlmeext = &padapter->mlmeextpriv;
+	
+	if ( ( *extra == 1 ) || ( *extra == 2 ) )
+	{
+		u8 channel, ch_offset;
+		u16 bwmode;
+		
+		//	Enable P2P function
+		init_wifidirect_info(padapter,  extra );
 
-	if ( *extra == 1 )
-	{	//	Enable P2P Listen State
-		//if ( ( pwdinfo->p2p_state == P2P_STATE_NONE) || ( pwdinfo->p2p_state == P2P_STATE_IDLE ) )
+
+		if(pwdinfo->p2p_state == P2P_STATE_LISTEN)
 		{
-			init_wifidirect_info(padapter);
-			pwdinfo->p2p_state = P2P_STATE_LISTEN;
-			//	Stay at the listen state and wait for discovery.			
-			set_channel_bwmode(padapter, pwdinfo->listen_channel, HAL_PRIME_CHNL_OFFSET_DONT_CARE, HT_CHANNEL_WIDTH_20);
+			//	Stay at the listen state and wait for discovery.
+			channel = pwdinfo->listen_channel;
+			ch_offset = HAL_PRIME_CHNL_OFFSET_DONT_CARE;
+			bwmode = HT_CHANNEL_WIDTH_20;			
 		}
+		else
+		{
+			pwdinfo->operating_channel = pmlmeext->cur_channel;
+		
+			channel = pwdinfo->operating_channel;
+			ch_offset = pmlmeext->cur_ch_offset;
+			bwmode = pmlmeext->cur_bwmode;						
+		}
+
+		set_channel_bwmode(padapter, channel, ch_offset, bwmode);
+		
 	}
 	else if ( *extra == 0 )
 	{	//	Disable P2P Listen State
@@ -4163,13 +4222,13 @@ static u8 set_pairwise_key(_adapter *padapter, struct sta_info *psta)
 	struct cmd_priv 			*pcmdpriv=&padapter->cmdpriv;	
 	u8	res=_SUCCESS;
 
-	ph2c = (struct cmd_obj*)_malloc(sizeof(struct cmd_obj));
+	ph2c = (struct cmd_obj*)_zmalloc(sizeof(struct cmd_obj));
 	if ( ph2c == NULL){
 		res= _FAIL;
 		goto exit;
 	}
 
-	psetstakey_para = (struct set_stakey_parm*)_malloc(sizeof(struct set_stakey_parm));
+	psetstakey_para = (struct set_stakey_parm*)_zmalloc(sizeof(struct set_stakey_parm));
 	if(psetstakey_para==NULL){
 		_mfree((u8 *) ph2c, sizeof(struct cmd_obj));
 		res=_FAIL;
@@ -4204,12 +4263,12 @@ static int set_group_key(_adapter *padapter, u8 *key, u8 alg, int keyid)
 
 	printk("%s\n", __FUNCTION__);
 	
-	pcmd = (struct cmd_obj*)_malloc(sizeof(struct	cmd_obj));
+	pcmd = (struct cmd_obj*)_zmalloc(sizeof(struct	cmd_obj));
 	if(pcmd==NULL){
 		res= _FAIL;
 		goto exit;
 	}
-	psetkeyparm=(struct setkey_parm*)_malloc(sizeof(struct setkey_parm));
+	psetkeyparm=(struct setkey_parm*)_zmalloc(sizeof(struct setkey_parm));
 	if(psetkeyparm==NULL){
 		_mfree((unsigned char *)pcmd, sizeof(struct cmd_obj));
 		res= _FAIL;
@@ -4506,7 +4565,7 @@ static void update_bmc_sta(_adapter *padapter)
 		psta->mac_id = psta->aid+4;		
 
 		psta->qos_option = 0;		
-		psta->htpriv.ht_option = 0;
+		psta->htpriv.ht_option = _FALSE;
 
 		psta->ieee8021x_blocked = 0;
 
@@ -5461,7 +5520,7 @@ static int rtw_set_beacon(struct net_device *dev, struct ieee_param *param, int 
 		}		
 	}
 
-	pmlmepriv->htpriv.ht_option = 0;
+	pmlmepriv->htpriv.ht_option = _FALSE;
 #ifdef CONFIG_80211N_HT
 	if( (psecuritypriv->wpa2_pairwise_cipher&WPA_CIPHER_TKIP) ||
 		      (psecuritypriv->wpa_pairwise_cipher&WPA_CIPHER_TKIP))
@@ -5473,7 +5532,7 @@ static int rtw_set_beacon(struct net_device *dev, struct ieee_param *param, int 
 	//ht_cap	
 	if(pregistrypriv->ht_enable && ht_cap==_TRUE)
 	{		
-		pmlmepriv->htpriv.ht_option = 1;
+		pmlmepriv->htpriv.ht_option = _TRUE;
 		pmlmepriv->qospriv.qos_option = 1;
 
 		if(pregistrypriv->ampdu_enable==1)
@@ -5623,17 +5682,17 @@ static int rtw_add_sta(struct net_device *dev, struct ieee_param *param)
 		//chec 802.11n ht cap.
 		if(WLAN_STA_HT&flags)
 		{
-			psta->htpriv.ht_option = 1;
+			psta->htpriv.ht_option = _TRUE;
 			psta->qos_option = 1;
 			_memcpy((void*)&psta->htpriv.ht_cap, (void*)&param->u.add_sta.ht_cap, sizeof(struct ieee80211_ht_cap));
 		}
 		else		
 		{
-			psta->htpriv.ht_option = 0;
+			psta->htpriv.ht_option = _FALSE;
 		}
 		
-		if(pmlmepriv->htpriv.ht_option == 0)	
-			psta->htpriv.ht_option = 0;
+		if(pmlmepriv->htpriv.ht_option == _FALSE)	
+			psta->htpriv.ht_option = _FALSE;
 #endif		
 
 

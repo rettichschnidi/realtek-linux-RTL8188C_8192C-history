@@ -487,12 +487,13 @@ void invalidate_cam_all(_adapter *padapter)
 
 void write_cam(_adapter *padapter, u8 entry, u16 ctrl, u8 *mac, u8 *key)
 {
-	unsigned int	i, j, val, addr, cmd;
+	unsigned int	i, val, addr, cmd;
+	int j;
 	u32	cam_val[2];
 
 	addr = entry << 3;
 
-	for (j = 0; j < 6; j++)
+	for (j = 5; j >= 0; j--)
 	{	
 		switch (j)
 		{
@@ -512,7 +513,7 @@ void write_cam(_adapter *padapter, u8 entry, u16 ctrl, u8 *mac, u8 *key)
 		}
 
 		cam_val[0] = val;
-		cam_val[1] = addr + j;
+		cam_val[1] = addr + (unsigned int)j;
 
 		padapter->HalFunc.SetHwRegHandler(padapter, HW_VAR_CAM_WRITE, (u8 *)cam_val);
 		
@@ -756,7 +757,7 @@ void HT_caps_handler(_adapter *padapter, PNDIS_802_11_VARIABLE_IEs pIE)
 	struct mlme_priv 		*pmlmepriv = &padapter->mlmepriv;	
 	struct ht_priv			*phtpriv = &pmlmepriv->htpriv;
 
-	if(phtpriv->ht_option == 0)	return;
+	if(phtpriv->ht_option == _FALSE)	return;
 
 	pmlmeinfo->HT_caps_enable = 1;
 	
@@ -812,6 +813,11 @@ void HT_caps_handler(_adapter *padapter, PNDIS_802_11_VARIABLE_IEs pIE)
 		{
 			pmlmeinfo->HT_caps.HT_cap_element.MCS_rate[i] &= MCS_rate_2R[i];
 		}
+	        #ifdef RTL8192C_RECONFIG_TO_1T1R
+		{
+			pmlmeinfo->HT_caps.HT_cap_element.MCS_rate[i] &= MCS_rate_1R[i];
+		}
+		#endif
 	}
 	
 	return;
@@ -824,7 +830,7 @@ void HT_info_handler(_adapter *padapter, PNDIS_802_11_VARIABLE_IEs pIE)
 	struct mlme_priv 		*pmlmepriv = &padapter->mlmepriv;	
 	struct ht_priv			*phtpriv = &pmlmepriv->htpriv;
 
-	if(phtpriv->ht_option == 0)	return;
+	if(phtpriv->ht_option == _FALSE)	return;
 
 
 	if(pIE->Length > sizeof(struct HT_info_element))
@@ -1468,7 +1474,7 @@ void fire_write_MAC_cmd(_adapter *padapter, unsigned int addr, unsigned int valu
 	struct reg_rw_parm			*pwriteMacPara;
 	struct cmd_priv					*pcmdpriv = &(padapter->cmdpriv);
 
-	if ((ph2c = (struct cmd_obj*)_malloc(sizeof(struct cmd_obj))) == NULL)
+	if ((ph2c = (struct cmd_obj*)_zmalloc(sizeof(struct cmd_obj))) == NULL)
 	{
 		return;
 	}	

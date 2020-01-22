@@ -302,7 +302,7 @@ void rtl8192cu_update_recvframe_attrib_from_recvstat(union recv_frame *precvfram
 	if(drvinfo_sz && physt)
 	{
 		bPacketMatchBSSID = ((!IsFrameTypeCtrl(precvframe->u.hdr.rx_data)) && !icverr && !crcerr &&
-			_memcmp(get_hdr_bssid(precvframe->u.hdr.rx_data), get_my_bssid(&padapter->mlmeextpriv.mlmext_info.network), ETH_ALEN));
+			_memcmp(get_hdr_bssid(precvframe->u.hdr.rx_data), get_bssid(&padapter->mlmepriv), ETH_ALEN));
 
 
 		bPacketToSelf = bPacketMatchBSSID &&  (_memcmp(get_da(precvframe->u.hdr.rx_data), myid(&padapter->eeprompriv), ETH_ALEN));
@@ -323,8 +323,41 @@ void rtl8192cu_update_recvframe_attrib_from_recvstat(union recv_frame *precvfram
 
 		rtl8192c_query_rx_phy_status(precvframe, pphy_info);
 
-		if(bPacketToSelf || bPacketBeacon)	
-			rtl8192c_process_phy_info(padapter,precvframe);
+		precvframe->u.hdr.psta = NULL;
+		if(bPacketMatchBSSID && check_fwstate(&padapter->mlmepriv, WIFI_AP_STATE) == _TRUE)
+		{
+			u8 *sa;
+			struct sta_info *psta=NULL;
+			struct sta_priv *pstapriv = &padapter->stapriv;
+			
+			sa = get_sa(precvframe->u.hdr.rx_data);
+
+			psta = get_stainfo(pstapriv, sa);
+			if(psta)
+			{
+				precvframe->u.hdr.psta = psta;
+				rtl8192c_process_phy_info(padapter, precvframe);
+			}
+		}
+		else if(bPacketToSelf || bPacketBeacon)
+		{
+			if(check_fwstate(&padapter->mlmepriv, WIFI_ADHOC_STATE|WIFI_ADHOC_MASTER_STATE) == _TRUE)
+			{
+				u8 *sa;
+				struct sta_info *psta=NULL;
+				struct sta_priv *pstapriv = &padapter->stapriv;
+			
+				sa = get_sa(precvframe->u.hdr.rx_data);
+	
+				psta = get_stainfo(pstapriv, sa);
+				if(psta)
+				{
+					precvframe->u.hdr.psta = psta;					
+				}				
+			}
+					
+			rtl8192c_process_phy_info(padapter, precvframe);			
+		}	
 
 #if 0 //dump phy_status for debug
 

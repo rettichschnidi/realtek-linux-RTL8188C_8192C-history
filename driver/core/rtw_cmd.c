@@ -47,7 +47,7 @@ _func_enter_;
 	
 	pcmdpriv->cmd_seq = 1;
 	
-	pcmdpriv->cmd_allocated_buf = _malloc(MAX_CMDSZ + CMDBUFF_ALIGN_SZ);
+	pcmdpriv->cmd_allocated_buf = _zmalloc(MAX_CMDSZ + CMDBUFF_ALIGN_SZ);
 	
 	if (pcmdpriv->cmd_allocated_buf == NULL){
 		res= _FAIL;
@@ -56,7 +56,7 @@ _func_enter_;
 	
 	pcmdpriv->cmd_buf = pcmdpriv->cmd_allocated_buf  +  CMDBUFF_ALIGN_SZ - ( (SIZE_PTR)(pcmdpriv->cmd_allocated_buf) & (CMDBUFF_ALIGN_SZ-1));
 		
-	pcmdpriv->rsp_allocated_buf = _malloc(MAX_RSPSZ + 4);
+	pcmdpriv->rsp_allocated_buf = _zmalloc(MAX_RSPSZ + 4);
 	
 	if (pcmdpriv->rsp_allocated_buf == NULL){
 		res= _FAIL;
@@ -98,7 +98,7 @@ _func_enter_;
 	_init_sema(&(pevtpriv->evt_notify), 0);
 	_init_sema(&(pevtpriv->terminate_evtthread_sema), 0);
 
-	pevtpriv->evt_allocated_buf = _malloc(MAX_EVTSZ + 4);	
+	pevtpriv->evt_allocated_buf = _zmalloc(MAX_EVTSZ + 4);	
 	if (pevtpriv->evt_allocated_buf == NULL){
 		res= _FAIL;
 		goto exit;
@@ -107,7 +107,7 @@ _func_enter_;
 	
 		
 #ifdef CONFIG_SDIO_HCI
-	pevtpriv->allocated_c2h_mem = _malloc(C2H_MEM_SZ +4); 
+	pevtpriv->allocated_c2h_mem = _zmalloc(C2H_MEM_SZ +4); 
 	
 	if (pevtpriv->allocated_c2h_mem == NULL){
 		res= _FAIL;
@@ -610,13 +610,13 @@ u8 setstandby_cmd(_adapter *padapter, uint action)
 	
 _func_enter_;	
 
-	ph2c = (struct cmd_obj*)_malloc(sizeof(struct cmd_obj));
+	ph2c = (struct cmd_obj*)_zmalloc(sizeof(struct cmd_obj));
 	if (ph2c == NULL) {
 		ret = _FAIL;
 		goto exit;
 		}
 	
-	psetusbsuspend = (struct usb_suspend_parm*)_malloc(sizeof(struct usb_suspend_parm)); 
+	psetusbsuspend = (struct usb_suspend_parm*)_zmalloc(sizeof(struct usb_suspend_parm)); 
 	if (psetusbsuspend == NULL) {
 		_mfree((u8 *) ph2c, sizeof(struct	cmd_obj));
 		ret = _FAIL;
@@ -656,11 +656,11 @@ _func_enter_;
 	}
 #endif
 
-	ph2c = (struct cmd_obj*)_malloc(sizeof(struct cmd_obj));
+	ph2c = (struct cmd_obj*)_zmalloc(sizeof(struct cmd_obj));
 	if (ph2c == NULL)
 		return _FAIL;
 
-	psurveyPara = (struct sitesurvey_parm*)_malloc(sizeof(struct sitesurvey_parm)); 
+	psurveyPara = (struct sitesurvey_parm*)_zmalloc(sizeof(struct sitesurvey_parm)); 
 	if (psurveyPara == NULL) {
 		_mfree((unsigned char*) ph2c, sizeof(struct cmd_obj));
 		return _FAIL;
@@ -704,13 +704,13 @@ u8 setdatarate_cmd(_adapter *padapter, u8 *rateset)
 
 _func_enter_;	
 
-	ph2c = (struct cmd_obj*)_malloc(sizeof(struct cmd_obj));
+	ph2c = (struct cmd_obj*)_zmalloc(sizeof(struct cmd_obj));
 	if (ph2c == NULL) {
 		res = _FAIL;
 		goto exit;
 	}
 
-	pbsetdataratepara = (struct setdatarate_parm*)_malloc(sizeof(struct setdatarate_parm)); 
+	pbsetdataratepara = (struct setdatarate_parm*)_zmalloc(sizeof(struct setdatarate_parm)); 
 	if (pbsetdataratepara == NULL) {
 		_mfree((u8 *) ph2c, sizeof(struct cmd_obj));
 		res = _FAIL;
@@ -742,12 +742,12 @@ u8 setbasicrate_cmd(_adapter *padapter, u8 *rateset)
 
 _func_enter_;
 
-	ph2c = (struct cmd_obj*)_malloc(sizeof(struct cmd_obj));
+	ph2c = (struct cmd_obj*)_zmalloc(sizeof(struct cmd_obj));
 	if (ph2c == NULL) {
 		res= _FAIL;
 		goto exit;
 	}
-	pssetbasicratepara = (struct setbasicrate_parm*)_malloc(sizeof(struct setbasicrate_parm)); 
+	pssetbasicratepara = (struct setbasicrate_parm*)_zmalloc(sizeof(struct setbasicrate_parm)); 
 
 	if (pssetbasicratepara == NULL) {
 		_mfree((u8*) ph2c, sizeof(struct cmd_obj));
@@ -786,12 +786,12 @@ u8 setphy_cmd(_adapter *padapter, u8 modem, u8 ch)
 
 _func_enter_;	
 
-	ph2c = (struct cmd_obj*)_malloc(sizeof(struct cmd_obj));
+	ph2c = (struct cmd_obj*)_zmalloc(sizeof(struct cmd_obj));
 	if(ph2c==NULL){
 		res= _FAIL;
 		goto exit;
 		}
-	psetphypara = (struct setphy_parm*)_malloc(sizeof(struct setphy_parm)); 
+	psetphypara = (struct setphy_parm*)_zmalloc(sizeof(struct setphy_parm)); 
 
 	if(psetphypara==NULL){
 		_mfree((u8 *) ph2c, sizeof(struct	cmd_obj));
@@ -819,12 +819,12 @@ u8 setbbreg_cmd(_adapter*padapter, u8 offset, u8 val)
 	struct cmd_priv 			*pcmdpriv=&padapter->cmdpriv;	
 	u8	res=_SUCCESS;
 _func_enter_;
-	ph2c = (struct cmd_obj*)_malloc(sizeof(struct cmd_obj));
+	ph2c = (struct cmd_obj*)_zmalloc(sizeof(struct cmd_obj));
 	if(ph2c==NULL){
 		res= _FAIL;
 		goto exit;
 		}
-	pwritebbparm = (struct writeBB_parm*)_malloc(sizeof(struct writeBB_parm)); 
+	pwritebbparm = (struct writeBB_parm*)_zmalloc(sizeof(struct writeBB_parm)); 
 
 	if(pwritebbparm==NULL){
 		_mfree((u8 *) ph2c, sizeof(struct	cmd_obj));
@@ -851,12 +851,12 @@ u8 getbbreg_cmd(_adapter  *padapter, u8 offset, u8 *pval)
 	u8	res=_SUCCESS;
 	
 _func_enter_;
-	ph2c = (struct cmd_obj*)_malloc(sizeof(struct cmd_obj));
+	ph2c = (struct cmd_obj*)_zmalloc(sizeof(struct cmd_obj));
 	if(ph2c==NULL){
 		res=_FAIL;
 		goto exit;
 		}
-	prdbbparm = (struct readBB_parm*)_malloc(sizeof(struct readBB_parm)); 
+	prdbbparm = (struct readBB_parm*)_zmalloc(sizeof(struct readBB_parm)); 
 
 	if(prdbbparm ==NULL){
 		_mfree((unsigned char *) ph2c, sizeof(struct	cmd_obj));
@@ -885,12 +885,12 @@ u8 setrfreg_cmd(_adapter  *padapter, u8 offset, u32 val)
 	struct cmd_priv 			*pcmdpriv=&padapter->cmdpriv;	
 	u8	res=_SUCCESS;
 _func_enter_;
-	ph2c = (struct cmd_obj*)_malloc(sizeof(struct cmd_obj));
+	ph2c = (struct cmd_obj*)_zmalloc(sizeof(struct cmd_obj));
 	if(ph2c==NULL){
 		res= _FAIL;	
 		goto exit;
 		}
-	pwriterfparm = (struct writeRF_parm*)_malloc(sizeof(struct writeRF_parm)); 
+	pwriterfparm = (struct writeRF_parm*)_zmalloc(sizeof(struct writeRF_parm)); 
 
 	if(pwriterfparm==NULL){
 		_mfree((u8 *) ph2c, sizeof(struct	cmd_obj));
@@ -918,13 +918,13 @@ u8 getrfreg_cmd(_adapter  *padapter, u8 offset, u8 *pval)
 
 _func_enter_;
 
-	ph2c = (struct cmd_obj*)_malloc(sizeof(struct cmd_obj));
+	ph2c = (struct cmd_obj*)_zmalloc(sizeof(struct cmd_obj));
 	if(ph2c==NULL){
 		res= _FAIL;
 		goto exit;
 		}
 
-	prdrfparm = (struct readRF_parm*)_malloc(sizeof(struct readRF_parm)); 
+	prdrfparm = (struct readRF_parm*)_zmalloc(sizeof(struct readRF_parm)); 
 	if(prdrfparm ==NULL){
 		_mfree((u8 *) ph2c, sizeof(struct	cmd_obj));
 		res= _FAIL;
@@ -995,7 +995,7 @@ _func_enter_;
 		RT_TRACE(_module_rtl871x_cmd_c_,_drv_info_,(" createbss for SSid:%s\n", pmlmepriv->assoc_ssid.Ssid));
 	}
 		
-	pcmd = (struct cmd_obj*)_malloc(sizeof(struct cmd_obj));
+	pcmd = (struct cmd_obj*)_zmalloc(sizeof(struct cmd_obj));
 	if(pcmd==NULL){
 		res= _FAIL;
 		goto exit;
@@ -1034,7 +1034,7 @@ u8 createbss_cmd_ex(_adapter  *padapter, unsigned char *pbss, unsigned int sz)
 	
 _func_enter_;
 			
-	pcmd = (struct cmd_obj*)_malloc(sizeof(struct cmd_obj));
+	pcmd = (struct cmd_obj*)_zmalloc(sizeof(struct cmd_obj));
 	if(pcmd==NULL){
 		res= _FAIL;
 		goto exit;
@@ -1080,19 +1080,23 @@ _func_enter_;
 		RT_TRACE(_module_rtl871x_cmd_c_, _drv_notice_, ("+Join cmd: SSid=[%s]\n", pmlmepriv->assoc_ssid.Ssid));
 	}
 
-	pcmd = (struct cmd_obj*)_malloc(sizeof(struct cmd_obj));
+	pcmd = (struct cmd_obj*)_zmalloc(sizeof(struct cmd_obj));
 	if(pcmd==NULL){
 		res=_FAIL;
 		RT_TRACE(_module_rtl871x_cmd_c_, _drv_err_, ("joinbss_cmd: memory allocate for cmd_obj fail!!!\n"));
 		goto exit;
 	}
-	
+	/* // for IEs is pointer 
 	t_len = sizeof (ULONG) + sizeof (NDIS_802_11_MAC_ADDRESS) + 2 + 
 			sizeof (NDIS_802_11_SSID) + sizeof (ULONG) + 
 			sizeof (NDIS_802_11_RSSI) + sizeof (NDIS_802_11_NETWORK_TYPE) + 
 			sizeof (NDIS_802_11_CONFIGURATION) +	
 			sizeof (NDIS_802_11_NETWORK_INFRASTRUCTURE) +   
-			sizeof (NDIS_802_11_RATES_EX)+ sizeof (ULONG) + MAX_IE_SZ;
+			sizeof (NDIS_802_11_RATES_EX)+ sizeof(WLAN_PHY_INFO)+ sizeof (ULONG) + MAX_IE_SZ;
+	*/
+	//for IEs is fix buf size
+	t_len = sizeof(WLAN_BSSID_EX);
+			
 	
 	//for hidden ap to set fw_state here
 	if (check_fwstate(pmlmepriv, WIFI_STATION_STATE|WIFI_ADHOC_STATE) != _TRUE)
@@ -1130,13 +1134,13 @@ _func_enter_;
 
 	_memset(psecnetwork, 0, t_len);
 
-	_memcpy(psecnetwork, &pnetwork->network, t_len);
+	_memcpy(psecnetwork, &pnetwork->network, get_WLAN_BSSID_EX_sz(&pnetwork->network));
 	
 	auth=&psecuritypriv->authenticator_ie[0];
 	psecuritypriv->authenticator_ie[0]=(unsigned char)psecnetwork->IELength;
 
 	if((psecnetwork->IELength-12) < (256-1)) {
-                _memcpy(&psecuritypriv->authenticator_ie[1], &psecnetwork->IEs[12], psecnetwork->IELength-12);
+		_memcpy(&psecuritypriv->authenticator_ie[1], &psecnetwork->IEs[12], psecnetwork->IELength-12);
 	} else {
 		_memcpy(&psecuritypriv->authenticator_ie[1], &psecnetwork->IEs[12], (256-1));
 	}
@@ -1175,7 +1179,7 @@ _func_enter_;
 	}	
 
 #ifdef CONFIG_80211N_HT
-	phtpriv->ht_option = 0;
+	phtpriv->ht_option = _FALSE;
 	if(pregistrypriv->ht_enable)
 	{
 		//	Added by Albert 2010/06/23
@@ -1255,13 +1259,13 @@ _func_enter_;
 	
 	//if ((check_fwstate(pmlmepriv, _FW_LINKED)) == _TRUE) {
 
-		pdisconnect_cmd = (struct	cmd_obj*)_malloc(sizeof(struct	cmd_obj));
+		pdisconnect_cmd = (struct	cmd_obj*)_zmalloc(sizeof(struct	cmd_obj));
 		if(pdisconnect_cmd == NULL){
 			res=_FAIL;
 			goto exit;
 			}
 
-		pdisconnect = (struct	disconnect_parm*)_malloc(sizeof(struct	disconnect_parm));
+		pdisconnect = (struct	disconnect_parm*)_zmalloc(sizeof(struct	disconnect_parm));
 		if(pdisconnect == NULL) {
 			_mfree((u8 *)pdisconnect_cmd, sizeof(struct cmd_obj));
 			res= _FAIL;
@@ -1289,12 +1293,12 @@ u8 setopmode_cmd(_adapter  *padapter, NDIS_802_11_NETWORK_INFRASTRUCTURE network
 
 _func_enter_;
 
-	ph2c = (struct cmd_obj*)_malloc(sizeof(struct cmd_obj));			
+	ph2c = (struct cmd_obj*)_zmalloc(sizeof(struct cmd_obj));			
 	if(ph2c==NULL){
 		res= _FALSE;
 		goto exit;
 		}
-	psetop = (struct setopmode_parm*)_malloc(sizeof(struct setopmode_parm)); 
+	psetop = (struct setopmode_parm*)_zmalloc(sizeof(struct setopmode_parm)); 
 
 	if(psetop==NULL){
 		_mfree((u8 *) ph2c, sizeof(struct	cmd_obj));
@@ -1328,20 +1332,20 @@ u8 setstakey_cmd(_adapter *padapter, u8 *psta, u8 unicast_key)
 
 _func_enter_;
 
-	ph2c = (struct cmd_obj*)_malloc(sizeof(struct cmd_obj));
+	ph2c = (struct cmd_obj*)_zmalloc(sizeof(struct cmd_obj));
 	if ( ph2c == NULL){
 		res= _FAIL;
 		goto exit;
 	}
 
-	psetstakey_para = (struct set_stakey_parm*)_malloc(sizeof(struct set_stakey_parm));
+	psetstakey_para = (struct set_stakey_parm*)_zmalloc(sizeof(struct set_stakey_parm));
 	if(psetstakey_para==NULL){
 		_mfree((u8 *) ph2c, sizeof(struct	cmd_obj));
 		res=_FAIL;
 		goto exit;
 	}
 
-	psetstakey_rsp = (struct set_stakey_rsp*)_malloc(sizeof(struct set_stakey_rsp)); 
+	psetstakey_rsp = (struct set_stakey_rsp*)_zmalloc(sizeof(struct set_stakey_rsp)); 
 	if(psetstakey_rsp == NULL){
 		_mfree((u8 *) ph2c, sizeof(struct	cmd_obj));
 		_mfree((u8 *) psetstakey_para, sizeof(struct set_stakey_parm));
@@ -1383,12 +1387,12 @@ u8 setrttbl_cmd(_adapter  *padapter, struct setratable_parm *prate_table)
 	u8	res=_SUCCESS;
 _func_enter_;	
 
-	ph2c = (struct cmd_obj*)_malloc(sizeof(struct cmd_obj));
+	ph2c = (struct cmd_obj*)_zmalloc(sizeof(struct cmd_obj));
 	if(ph2c==NULL){
 		res= _FAIL;
 		goto exit;
 		}
-	psetrttblparm = (struct setratable_parm*)_malloc(sizeof(struct setratable_parm)); 
+	psetrttblparm = (struct setratable_parm*)_zmalloc(sizeof(struct setratable_parm)); 
 
 	if(psetrttblparm==NULL){
 		_mfree((unsigned char *) ph2c, sizeof(struct	cmd_obj));
@@ -1415,12 +1419,12 @@ u8 getrttbl_cmd(_adapter  *padapter, struct getratable_rsp *pval)
 	u8	res=_SUCCESS;
 _func_enter_;	
 
-	ph2c = (struct cmd_obj*)_malloc(sizeof(struct cmd_obj));
+	ph2c = (struct cmd_obj*)_zmalloc(sizeof(struct cmd_obj));
 	if(ph2c==NULL){
 		res= _FAIL;
 		goto exit;
 		}
-	pgetrttblparm = (struct getratable_parm*)_malloc(sizeof(struct getratable_parm)); 
+	pgetrttblparm = (struct getratable_parm*)_zmalloc(sizeof(struct getratable_parm)); 
 
 	if(pgetrttblparm==NULL){
 		_mfree((unsigned char *) ph2c, sizeof(struct	cmd_obj));
@@ -1457,20 +1461,20 @@ u8 setassocsta_cmd(_adapter  *padapter, u8 *mac_addr)
 
 _func_enter_;	
 
-	ph2c = (struct cmd_obj*)_malloc(sizeof(struct cmd_obj));
+	ph2c = (struct cmd_obj*)_zmalloc(sizeof(struct cmd_obj));
 	if(ph2c==NULL){
 		res= _FAIL;
 		goto exit;
 	}
 
-	psetassocsta_para = (struct set_assocsta_parm*)_malloc(sizeof(struct set_assocsta_parm));
+	psetassocsta_para = (struct set_assocsta_parm*)_zmalloc(sizeof(struct set_assocsta_parm));
 	if(psetassocsta_para==NULL){
 		_mfree((u8 *) ph2c, sizeof(struct	cmd_obj));
 		res=_FAIL;
 		goto exit;
 	}
 
-	psetassocsta_rsp = (struct set_stakey_rsp*)_malloc(sizeof(struct set_assocsta_rsp)); 
+	psetassocsta_rsp = (struct set_stakey_rsp*)_zmalloc(sizeof(struct set_assocsta_rsp)); 
 	if(psetassocsta_rsp==NULL){
 		_mfree((u8 *) ph2c, sizeof(struct	cmd_obj));
 		_mfree((u8 *) psetassocsta_para, sizeof(struct set_assocsta_parm));
@@ -1502,13 +1506,13 @@ u8 addbareq_cmd(_adapter*padapter, u8 tid, u8 *addr)
 	
 _func_enter_;	
 
-	ph2c = (struct cmd_obj*)_malloc(sizeof(struct cmd_obj));	
+	ph2c = (struct cmd_obj*)_zmalloc(sizeof(struct cmd_obj));	
 	if(ph2c==NULL){
 		res= _FAIL;
 		goto exit;
 	}
 	
-	paddbareq_parm = (struct addBaReq_parm*)_malloc(sizeof(struct addBaReq_parm)); 
+	paddbareq_parm = (struct addBaReq_parm*)_zmalloc(sizeof(struct addBaReq_parm)); 
 	if(paddbareq_parm==NULL){
 		_mfree((unsigned char *)ph2c, sizeof(struct	cmd_obj));
 		res= _FAIL;
@@ -1541,13 +1545,13 @@ u8 dynamic_chk_wk_cmd(_adapter*padapter)
 	
 _func_enter_;	
 
-	ph2c = (struct cmd_obj*)_malloc(sizeof(struct cmd_obj));	
+	ph2c = (struct cmd_obj*)_zmalloc(sizeof(struct cmd_obj));	
 	if(ph2c==NULL){
 		res= _FAIL;
 		goto exit;
 	}
 	
-	pdrvextra_cmd_parm = (struct drvextra_cmd_parm*)_malloc(sizeof(struct drvextra_cmd_parm)); 
+	pdrvextra_cmd_parm = (struct drvextra_cmd_parm*)_zmalloc(sizeof(struct drvextra_cmd_parm)); 
 	if(pdrvextra_cmd_parm==NULL){
 		_mfree((unsigned char *)ph2c, sizeof(struct cmd_obj));
 		res= _FAIL;
@@ -1742,13 +1746,13 @@ _func_enter_;
 
 	if(enqueue)
 	{
-		ph2c = (struct cmd_obj*)_malloc(sizeof(struct cmd_obj));	
+		ph2c = (struct cmd_obj*)_zmalloc(sizeof(struct cmd_obj));	
 		if(ph2c==NULL){
 			res= _FAIL;
 			goto exit;
 		}
 		
-		pdrvextra_cmd_parm = (struct drvextra_cmd_parm*)_malloc(sizeof(struct drvextra_cmd_parm)); 
+		pdrvextra_cmd_parm = (struct drvextra_cmd_parm*)_zmalloc(sizeof(struct drvextra_cmd_parm)); 
 		if(pdrvextra_cmd_parm==NULL){
 			_mfree((unsigned char *)ph2c, sizeof(struct cmd_obj));
 			res= _FAIL;

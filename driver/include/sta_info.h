@@ -22,6 +22,10 @@ struct wlan_acl_pool {
         struct wlan_acl_node aclnode[NUM_ACL];
 };
 
+typedef struct _RSSI_STA{
+	int	UndecoratedSmoothedPWDB;
+	int	UndecoratedSmoothedCCK;
+}RSSI_STA, *PRSSI_STA;
 
 struct	stainfo_stats	{
 
@@ -162,6 +166,8 @@ struct sta_info {
 	
 #endif	
 	
+	//for DM
+	RSSI_STA	 rssi_stat;
 	
 
 };

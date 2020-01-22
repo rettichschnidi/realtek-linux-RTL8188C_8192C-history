@@ -141,6 +141,7 @@ struct wifidirect_info{
 	u8 interface_addr[ETH_ALEN];
 	u8	social_chan[3];
 	u8	listen_channel;
+	u8 	operating_channel;
 	u8						listen_dwell;		//	This value should be between 1 and 3
 	enum P2P_ROLE		role;
 	u8	support_rate[7];
@@ -159,9 +160,14 @@ struct wifidirect_info{
 	_timer					find_phase_timer;
 	_workitem				find_phase_workitem;
 	u8					find_phase_state_exchange_cnt;
-
-	u8 p2p_group_ssid[P2P_WILDCARD_SSID_LEN+2];
-		
+	u16						wps_config_method_request;	//	Used when sending the provisioning request frame
+	u16						device_password_id_for_nego;	//	The device password ID for group negotation
+	_timer					enter_listen_state_timer;
+	_workitem				enter_listen_state_workitem;
+	u8						negotiation_dialog_token;
+	u8						nego_ssid[ WLAN_SSID_MAXLEN ];	//	SSID information for group negotitation
+	u8						nego_ssidlen;
+	u8 p2p_group_ssid[P2P_WILDCARD_SSID_LEN+2];		
 };
 
 

@@ -395,9 +395,6 @@ void ieee802_11_set_beacon(struct hostapd_data *hapd)
 	tailpos = hostapd_eid_wpa(hapd, tailpos, tail + BEACON_TAIL_BUF_SIZE -
 				  tailpos, NULL);
 
-	/* Wi-Fi Wireless Multimedia Extensions */
-	tailpos = hostapd_eid_wme(hapd, tailpos);
-
 #ifdef CONFIG_IEEE80211N
 	if (hapd->iconf->ieee80211n) {
 		u8 *ht_capab, *ht_oper;
@@ -414,8 +411,13 @@ void ieee802_11_set_beacon(struct hostapd_data *hapd)
 			wpa_printf(MSG_ERROR, "Could not set HT capabilities "
 				   "for kernel driver");
 		}
+
+		hapd->conf->wme_enabled = 1;
 	}
 #endif /* CONFIG_IEEE80211N */
+
+	/* Wi-Fi Wireless Multimedia Extensions */
+	tailpos = hostapd_eid_wme(hapd, tailpos);
 
 #ifdef CONFIG_WPS
 	if (hapd->conf->wps_state && hapd->wps_beacon_ie) {

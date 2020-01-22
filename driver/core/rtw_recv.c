@@ -81,12 +81,12 @@ _func_enter_;
 
 	os_recv_resource_init(precvpriv, padapter);
 
-	precvpriv->pallocated_frame_buf = _malloc(NR_RECVFRAME * sizeof(union recv_frame) + RXFRAME_ALIGN_SZ);
+	precvpriv->pallocated_frame_buf = _zmalloc(NR_RECVFRAME * sizeof(union recv_frame) + RXFRAME_ALIGN_SZ);
 	if(precvpriv->pallocated_frame_buf==NULL){
 		res= _FAIL;
 		goto exit;
 	}
-	_memset(precvpriv->pallocated_frame_buf, 0, NR_RECVFRAME * sizeof(union recv_frame) + RXFRAME_ALIGN_SZ);
+	//_memset(precvpriv->pallocated_frame_buf, 0, NR_RECVFRAME * sizeof(union recv_frame) + RXFRAME_ALIGN_SZ);
 
 	precvpriv->precv_frame_buf = (u8 *)N_BYTE_ALIGMENT((SIZE_PTR)(precvpriv->pallocated_frame_buf), RXFRAME_ALIGN_SZ);
 	//precvpriv->precv_frame_buf = precvpriv->pallocated_frame_buf + RXFRAME_ALIGN_SZ -
@@ -568,6 +568,7 @@ static union recv_frame * portctrl(_adapter *adapter,union recv_frame * precv_fr
 	struct sta_priv *pstapriv ;
 	union recv_frame * prtnframe;
 	u16	ether_type=0;
+	u16  eapol_type = 0x888e;//for Funia BD's WPA issue  
 	struct rx_pkt_attrib *pattrib = & precv_frame->u.hdr.attrib;
 
 _func_enter_;
@@ -597,7 +598,7 @@ _func_enter_;
 			_memcpy(&ether_type,ptr, 2);
 			ether_type= ntohs((unsigned short )ether_type);
 
-			if (ether_type == 0x888e) {
+		        if (ether_type == eapol_type) {
 				prtnframe=precv_frame;
 			}
 			else {
@@ -618,7 +619,7 @@ _func_enter_;
 
 			prtnframe=precv_frame;
 			//check is the EAPOL frame or not (Rekey)
-			if(ether_type == 0x888e){
+			if(ether_type == eapol_type){
 
 				RT_TRACE(_module_rtl871x_recv_c_,_drv_err_,("########portctrl:ether_type == 0x888e\n"));
 				//check Rekey
@@ -1071,7 +1072,10 @@ _func_enter_;
 			}
 
 
-			process_pwrbit_data(adapter, precv_frame);
+			//if(pmlmepriv->LinkDetectInfo.bBusyTraffic == _FALSE)
+			{
+				process_pwrbit_data(adapter, precv_frame);
+			}	
 			
 
 			// if NULL-frame, drop packet
@@ -1131,7 +1135,7 @@ static sint validate_recv_ctrl_frame(_adapter *padapter, union recv_frame *precv
 	u8 *pframe = precv_frame->u.hdr.rx_data;
 	//uint len = precv_frame->u.hdr.len;
 		
-	DBG_871X("+validate_recv_ctrl_frame\n");
+	//DBG_871X("+validate_recv_ctrl_frame\n");
 
 	if (GetFrameType(pframe) != WIFI_CTRL_TYPE)
 	{		
@@ -2844,7 +2848,7 @@ static int process_recv_indicatepkts(_adapter *padapter, union recv_frame *prfra
 
 	struct ht_priv	*phtpriv = &pmlmepriv->htpriv;
 
-	if(phtpriv->ht_option==1) //B/G/N Mode
+	if(phtpriv->ht_option==_TRUE) //B/G/N Mode
 	{
 		//prframe->u.hdr.preorder_ctrl = &precvpriv->recvreorder_ctrl[pattrib->priority];
 
@@ -2939,17 +2943,17 @@ static int recv_func(_adapter *padapter, void *pcontext)
 		goto _exit_recv_func;
 	}
 
+       	prframe = recvframe_chk_defrag(padapter, prframe);
+	if (prframe == NULL) {
+		RT_TRACE(_module_rtl871x_recv_c_,_drv_err_,("recvframe_chk_defrag: drop pkt\n"));
+		goto _exit_recv_func;
+	}
+
 	prframe=portctrl(padapter, prframe);
 	if(prframe==NULL)	{
 		RT_TRACE(_module_rtl871x_recv_c_,_drv_err_,("portctrl: drop pkt \n"));
 		retval = _FAIL;
 		goto _exit_recv_func;		
-	}
-
-	prframe = recvframe_chk_defrag(padapter, prframe);
-	if (prframe == NULL) {
-		RT_TRACE(_module_rtl871x_recv_c_,_drv_err_,("recvframe_chk_defrag: drop pkt\n"));
-		goto _exit_recv_func;
 	}
 
 	count_rx_stats(padapter, prframe);

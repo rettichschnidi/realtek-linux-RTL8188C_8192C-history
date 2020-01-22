@@ -31,6 +31,8 @@ u32 process_probe_req_p2p_ie(struct wifidirect_info *pwdinfo, u8 *pframe, uint l
 u32 process_assoc_req_p2p_ie(struct wifidirect_info *pwdinfo, u8 *p2p_ie, uint p2p_ielen, struct sta_info *psta);
 u32 process_p2p_devdisc_req(struct wifidirect_info *pwdinfo, u8 *pframe, uint len);
 u32 process_p2p_devdisc_resp(struct wifidirect_info *pwdinfo, u8 *pframe, uint len);
+u8 process_p2p_provdisc_req(struct wifidirect_info *pwdinfo,  u8 *pframe);
+u8 process_p2p_provdisc_resp(struct wifidirect_info *pwdinfo,  u8 *pframe);
 
 
 #endif

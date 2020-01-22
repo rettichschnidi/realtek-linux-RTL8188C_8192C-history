@@ -407,6 +407,7 @@ __inline static void _set_workitem(_workitem *pwork)
 	#define BIT(x)	( 1 << (x))
 #endif
 
+extern u8*	_zmalloc(u32 sz);
 extern u8*	_malloc(u32 sz);
 extern void	_mfree(u8 *pbuf, u32 sz);
 extern void	_memcpy(void* dec, void* sour, u32 sz);

@@ -1611,6 +1611,9 @@ _func_enter_;
 
 	mlmeext_sta_del_event_callback(adapter);
 
+	if(check_fwstate(pmlmepriv, WIFI_AP_STATE))
+		return;
+
 	_enter_critical_bh(&pmlmepriv->lock, &irqL2);
 
 	if(pmlmepriv->fw_state & WIFI_STATION_STATE)

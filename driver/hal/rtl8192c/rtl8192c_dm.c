@@ -420,13 +420,12 @@ dm_initial_gain_Multi_STA(
 	int				rssi_strength =  pdmpriv->EntryMinUndecoratedSmoothedPWDB;	
 	BOOLEAN			bMulti_STA = _FALSE;
 
-	 if ((check_fwstate(pmlmepriv, WIFI_ADHOC_MASTER_STATE) == _TRUE) ||
-		       (check_fwstate(pmlmepriv, WIFI_ADHOC_STATE) == _TRUE))
-	 {
+	//ADHOC and AP Mode
+	if(check_fwstate(pmlmepriv, WIFI_AP_STATE|WIFI_ADHOC_STATE|WIFI_ADHOC_MASTER_STATE) == _TRUE)	
+	{
 		bMulti_STA = _TRUE;
-	 }
+	}
 
-	//todo: AP Mode
 
 	if((bMulti_STA == _FALSE) 
 		|| (pDigTable->CurSTAConnectState != DIG_STA_DISCONNECT))
@@ -596,6 +595,21 @@ dm_CtrlInitGainByTwoPort(
 		pDigTable->CurSTAConnectState = DIG_STA_DISCONNECT;
 	}
 	
+
+	pDigTable->CurMultiSTAConnectState = DIG_MultiSTA_DISCONNECT;
+	if(check_fwstate(pmlmepriv, WIFI_ADHOC_STATE|WIFI_ADHOC_MASTER_STATE) == _TRUE)
+	{
+		if((is_IBSS_empty(pAdapter)==_FAIL) && (pAdapter->stapriv.asoc_sta_count > 2))
+			pDigTable->CurMultiSTAConnectState = DIG_MultiSTA_CONNECT;
+	}
+	
+	if(check_fwstate(pmlmepriv, WIFI_AP_STATE) == _TRUE)
+	{
+		if(pAdapter->stapriv.asoc_sta_count > 2)
+			pDigTable->CurMultiSTAConnectState = DIG_MultiSTA_CONNECT;					
+	}
+
+
 	dm_initial_gain_STA(pAdapter);
 	dm_initial_gain_Multi_STA(pAdapter);
 	dm_CCK_PacketDetectionThresh(pAdapter);
@@ -823,47 +837,72 @@ static VOID PWDB_Monitor(
 {
 	HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(Adapter);
 	struct dm_priv	*pdmpriv = &pHalData->dmpriv;
-	//u8		i;
+	int	i;
 	int	tmpEntryMaxPWDB=0, tmpEntryMinPWDB=0xff;
+	u8 	sta_cnt=0;
+	u32 PWDB_rssi[NUM_STA]={0};//[0~15]:MACID, [16~31]:PWDB_rssi
 
 	if(check_fwstate(&Adapter->mlmepriv, _FW_LINKED) != _TRUE)
 		return;
 
-#if 0 //todo:
-	for(i = 0; i < ASSOCIATE_ENTRY_NUM; i++)
-	{
-		if(Adapter->MgntInfo.NdisVersion == RT_NDIS_VERSION_6_2)
-		{
-			if(ACTING_AS_AP(ADJUST_TO_ADAPTIVE_ADAPTER(Adapter, FALSE)))
-				pEntry = AsocEntry_EnumStation(ADJUST_TO_ADAPTIVE_ADAPTER(Adapter, FALSE), i);
-			else
-				pEntry = AsocEntry_EnumStation(ADJUST_TO_ADAPTIVE_ADAPTER(Adapter, TRUE), i);
-		}
-		else
-		{
-			pEntry = AsocEntry_EnumStation(ADJUST_TO_ADAPTIVE_ADAPTER(Adapter, TRUE), i);	
-		}
 
-		if(pEntry!=NULL)
+	if(check_fwstate(&Adapter->mlmepriv, WIFI_AP_STATE|WIFI_ADHOC_STATE|WIFI_ADHOC_MASTER_STATE) == _TRUE)
+	{
+		_irqL irqL;
+		_list	*plist, *phead;
+		struct sta_info *psta;
+		struct sta_priv *pstapriv = &Adapter->stapriv;
+		u8 bcast_addr[ETH_ALEN]= {0xff,0xff,0xff,0xff,0xff,0xff};
+	
+		_enter_critical_bh(&pstapriv->sta_hash_lock, &irqL);
+
+		for(i=0; i< NUM_STA; i++)
 		{
-			if(pEntry->bAssociated)
+			phead = &(pstapriv->sta_hash[i]);
+			plist = get_next(phead);
+		
+			while ((end_of_queue_search(phead, plist)) == _FALSE)
 			{
-				RTPRINT_ADDR(FDM, DM_PWDB, ("pEntry->MacAddr ="), pEntry->MacAddr);
-				RTPRINT(FDM, DM_PWDB, ("pEntry->rssi = 0x%x(%d)\n", 
-					pEntry->rssi_stat.UndecoratedSmoothedPWDB,
-					pEntry->rssi_stat.UndecoratedSmoothedPWDB));
-				if(pEntry->rssi_stat.UndecoratedSmoothedPWDB < tmpEntryMinPWDB)
-					tmpEntryMinPWDB = pEntry->rssi_stat.UndecoratedSmoothedPWDB;
-				if(pEntry->rssi_stat.UndecoratedSmoothedPWDB > tmpEntryMaxPWDB)
-					tmpEntryMaxPWDB = pEntry->rssi_stat.UndecoratedSmoothedPWDB;
+				psta = LIST_CONTAINOR(plist, struct sta_info, hash_list);
+
+				plist = get_next(plist);
+
+				if(_memcmp(psta	->hwaddr, bcast_addr, NUM_STA) || 
+					_memcmp(psta->hwaddr, myid(&Adapter->eeprompriv), NUM_STA))
+					continue;
+
+				if(psta->state & WIFI_ASOC_STATE)
+				{
+					
+					if(psta->rssi_stat.UndecoratedSmoothedPWDB < tmpEntryMinPWDB)
+						tmpEntryMinPWDB = psta->rssi_stat.UndecoratedSmoothedPWDB;
+					
+					if(psta->rssi_stat.UndecoratedSmoothedPWDB > tmpEntryMaxPWDB)
+						tmpEntryMaxPWDB = psta->rssi_stat.UndecoratedSmoothedPWDB;
+
+					PWDB_rssi[sta_cnt++] = (psta->mac_id | (psta->rssi_stat.UndecoratedSmoothedPWDB<<16));
+				}				
+			
 			}
+			
 		}
-		else
+	
+		_exit_critical_bh(&pstapriv->sta_hash_lock, &irqL);
+
+
+		
+		if(pHalData->fw_ractrl == _TRUE)
 		{
-			break;
+			// Report every sta's RSSI to FW
+			for(i=0; i< sta_cnt; i++)
+			{
+				rtl8192c_set_rssi_cmd(Adapter, (u8*)&PWDB_rssi[i]);
+			}	
 		}
+				
 	}
-#endif
+
+
 
 	if(tmpEntryMaxPWDB != 0)	// If associated entry is found
 	{
@@ -883,34 +922,19 @@ static VOID PWDB_Monitor(
 		pdmpriv->EntryMinUndecoratedSmoothedPWDB = 0;
 	}
 
-#if 0
-	// Indicate Rx signal strength to FW.
-	if(Adapter->MgntInfo.bUseRAMask)
-	{
-		u4Byte	temp = 0;
-		DbgPrint("RxSS: %x =%d\n", pHalData->UndecoratedSmoothedPWDB, pHalData->UndecoratedSmoothedPWDB);
-		temp = pHalData->UndecoratedSmoothedPWDB;
-		temp = temp << 16;
-		//temp = temp | 0x800000;
 
-		FillH2CCmd92C(Adapter, H2C_RSSI_REPORT, 3, (pu1Byte)(&temp));
-	}
-	else
+	if(check_fwstate(&Adapter->mlmepriv, WIFI_STATION_STATE) == _TRUE)
 	{
-		PlatformEFIOWrite1Byte(Adapter, 0x4fe, (u1Byte)pHalData->UndecoratedSmoothedPWDB);
-		//DbgPrint("0x4fe write %x %d\n", pHalData->UndecoratedSmoothedPWDB, pHalData->UndecoratedSmoothedPWDB);
-	}
-#else
+	
+		if(pHalData->fw_ractrl == _TRUE)
+		{
+			u32 param = (u32)(pdmpriv->UndecoratedSmoothedPWDB<<16);
 
-	if(pHalData->fw_ractrl == _TRUE)
-	{
-		u32 param = (u32)(pdmpriv->UndecoratedSmoothedPWDB<<16);
-		
-		param |= 0;//macid=0 for sta mode;
-			
-		rtl8192c_set_rssi_cmd(Adapter, (u8*)&param);
+			param |= 0;//macid=0 for sta mode;
+
+			rtl8192c_set_rssi_cmd(Adapter, (u8*)&param);
+		}
 	}
-#endif
 
 }
 
@@ -3865,8 +3889,8 @@ dm_SW_AntennaSwitchInit(
 
 #endif
 
-#define	RSSI_CCK	0
-#define	RSSI_OFDM	1
+//#define	RSSI_CCK	0
+//#define	RSSI_OFDM	1
 static void dm_RSSIMonitorInit(
 	IN	PADAPTER	Adapter
 )

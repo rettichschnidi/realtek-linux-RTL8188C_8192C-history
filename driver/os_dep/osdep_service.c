@@ -27,6 +27,26 @@
 
 #define RT_TAG	'1178'
 
+u8* _zmalloc(u32 sz)
+{
+	u8 	*pbuf;
+#ifdef PLATFORM_LINUX
+	// kzalloc(sz, GFP_KERNEL);
+	pbuf = 	kmalloc(sz, /*GFP_KERNEL*/GFP_ATOMIC);
+	if (pbuf != NULL)
+		memset(pbuf, 0, sz);
+#endif	
+	
+#ifdef PLATFORM_WINDOWS
+	NdisAllocateMemoryWithTag(&pbuf,sz, RT_TAG);
+	if (pbuf != NULL)
+		NdisFillMemory(pbuf, sz, 0);
+#endif
+
+	return pbuf;	
+	
+}
+
 u8* _malloc(u32 sz)
 {
 

@@ -89,7 +89,7 @@ u32	_init_sta_priv(struct	sta_priv *pstapriv)
 	
 _func_enter_;	
 
-	pstapriv->pallocated_stainfo_buf = _malloc (sizeof(struct sta_info) * NUM_STA+ 4);
+	pstapriv->pallocated_stainfo_buf = _zmalloc (sizeof(struct sta_info) * NUM_STA+ 4);
 	if(!pstapriv->pallocated_stainfo_buf)
 		return _FAIL;
 
