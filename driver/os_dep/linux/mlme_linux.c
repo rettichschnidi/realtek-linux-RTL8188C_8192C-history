@@ -100,7 +100,6 @@ void rtw_os_indicate_connect(_adapter *adapter)
 {
 
 _func_enter_;	
-
         rtw_indicate_wx_assoc_event(adapter);
 	netif_carrier_on(adapter->pnetdev);
 
@@ -185,9 +184,9 @@ _func_enter_;
 	{
 		RT_TRACE(_module_mlme_osdep_c_,_drv_info_,("rtw_report_sec_ie, authmode=%d\n", authmode));
 		
-		buff = _rtw_malloc(IW_CUSTOM_MAX);
+		buff = _rtw_zmalloc(IW_CUSTOM_MAX);
 		
-		_rtw_memset(buff,0,IW_CUSTOM_MAX);
+		//_rtw_memset(buff,0,IW_CUSTOM_MAX);
 		
 		p=buff;
 		

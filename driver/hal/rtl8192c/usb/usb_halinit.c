@@ -1899,15 +1899,7 @@ void _ps_close_RF(_adapter *padapter)
 	// 8051 function will be turned off. So we need to prevent the situation. Designer provide three ways 
 	// for us to test. But only one WOL can work now.
 	// Solution A: Enable WOL
-	rtw_write8(padapter, 0x690, rtw_read8(padapter, 0x690)|BIT1);
-	// 2010/-8/09 MH For power down module, we need to enable register block contrl reg at 0x1c.
-	// Then enable power down control bit of register 0x04 BIT4 and BIT15 as 1.
-	if(padapter->pwrctrlpriv.bHWPowerdown)
-	{
-		// Enable register area 0x0-0xc.
-		rtw_write8(padapter,REG_RSV_CTRL, 0x0);
-		rtw_write16(padapter, REG_APS_FSMCO, 0x8812);
-	}
+	rtw_write8(padapter, 0x690, rtw_read8(padapter, 0x690)|BIT1);	
 	
 #elif (CU_SS_MODE == 2)
 	{
@@ -1985,16 +1977,7 @@ void _ps_close_RF(_adapter *padapter)
 	// for us to test. But only one WOL can work now.
 	// Solution A: Enable WOL
 	rtw_write8(padapter, 0x690, rtw_read8(padapter, 0x690)|BIT1);
-
-
-	// 2010/-8/09 MH For power down module, we need to enable register block contrl reg at 0x1c.
-	// Then enable power down control bit of register 0x04 BIT4 and BIT15 as 1.
-	if(padapter->pwrctrlpriv.bHWPowerdown)
-	{
-		// Enable register area 0x0-0xc.
-		rtw_write8(padapter,REG_RSV_CTRL, 0x0);
-		rtw_write16(padapter, REG_APS_FSMCO, 0x8812);
-	}
+	
 #endif
 }
 #endif
@@ -2287,6 +2270,33 @@ _func_enter_;
 	rtw_write8(padapter, 0xfe41, 0x8d);
 	rtw_write8(padapter, 0xfe42, 0x80);
 	rtw_write32(padapter,0x20c,0xfd0320);
+#if 1
+	//2011/01/07 ,suggest by Johnny,for solved the problem that too many protocol error on USB bus
+	if(!IS_VENDOR_UMC_A_CUT(pHalData->VersionID) )//&& !IS_92C_SERIAL(pHalData->VersionID))// TSMC , 8188
+	{		
+	    	// 0xE6=0x94
+	    	rtw_write8(padapter, 0xFE40, 0xE6);
+		rtw_write8(padapter, 0xFE41, 0x94);
+		rtw_write8(padapter, 0xFE42, 0x80); 
+
+		// 0xE0=0x19
+		rtw_write8(padapter, 0xFE40, 0xE0);
+		rtw_write8(padapter, 0xFE41, 0x19);
+		rtw_write8(padapter, 0xFE42, 0x80);
+
+		// 0xE5=0x91
+		rtw_write8(padapter, 0xFE40, 0xE5);
+		rtw_write8(padapter, 0xFE41, 0x91);
+		rtw_write8(padapter, 0xFE42, 0x80); 
+
+		// 0xE2=0x81
+		rtw_write8(padapter, 0xFE40, 0xE2);
+		rtw_write8(padapter, 0xFE41, 0x81);
+		rtw_write8(padapter, 0xFE42, 0x80);    
+	
+	}
+#endif
+
 #endif
 
 	//misc
@@ -2315,6 +2325,15 @@ _func_enter_;
 	rtw_write8(padapter, 0x15, 0xe9);//suggest by Johnny for lower temperature
 	//_dbg_dump_macreg(padapter);
 	pHalData->bDumpRxPkt = _FAIL;
+
+	#ifdef RTL8192C_RECONFIG_TO_1T1R
+	if(IS_92C_SERIAL(pHalData->VersionID))
+	{
+		PHY_Reconfig_To_1T1R(padapter);
+		rtw_write8(padapter, 0x40, 0x04);//suggest by SzuyiTasi for turn on TR_Switch of PathA
+	}
+	#endif
+
 exit:
 
 _func_exit_;
@@ -2798,7 +2817,15 @@ VOID HwSuspendModeEnable92Cu(
 	
 }	// HwSuspendModeEnable92Cu
 
-
+static void rtl8192cu_hw_power_down(_adapter *padapter)
+{
+	// 2010/-8/09 MH For power down module, we need to enable register block contrl reg at 0x1c.
+	// Then enable power down control bit of register 0x04 BIT4 and BIT15 as 1.
+		
+	// Enable register area 0x0-0xc.
+	rtw_write8(padapter,REG_RSV_CTRL, 0x0);			
+	rtw_write16(padapter, REG_APS_FSMCO, 0x8812);
+}
 u32 rtl8192cu_hal_deinit(_adapter *padapter)
  {
         printk("==> %s \n",__FUNCTION__);
@@ -2807,21 +2834,28 @@ u32 rtl8192cu_hal_deinit(_adapter *padapter)
  	printk("bkeepfwalive(%x)\n",padapter->pwrctrlpriv.bkeepfwalive);
  	if(padapter->pwrctrlpriv.bkeepfwalive)
  	{
-		_ps_close_RF(padapter);
-		return _SUCCESS;
+		_ps_close_RF(padapter);		
+		if(padapter->pwrctrlpriv.bHWPowerdown)		
+			rtl8192cu_hw_power_down(padapter);
+		
  	}
-#endif
-
-	if( padapter->bCardDisableWOHSM == _FALSE)
-	{
-		printk("card disble HWSM...........\n");
-		CardDisableHWSM(padapter, _FALSE);
-	}
 	else
+#endif
 	{
-		printk("card disble without HWSM...........\n");
-		CardDisableWithoutHWSM(padapter); // without HW Auto state machine		
-	}
+		if( padapter->bCardDisableWOHSM == _FALSE)
+		{
+			printk("card disble HWSM...........\n");
+			CardDisableHWSM(padapter, _FALSE);
+		}
+		else
+		{
+			printk("card disble without HWSM...........\n");
+			CardDisableWithoutHWSM(padapter); // without HW Auto state machine	
+
+			if(padapter->pwrctrlpriv.bHWPowerdown)		
+				rtl8192cu_hw_power_down(padapter);
+		}
+	}	
 	
 	return _SUCCESS;
  }

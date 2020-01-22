@@ -584,6 +584,7 @@ _func_enter_;
 		}	
 		
 		*pold_state = networktype;
+		//printk("%s , cur_network->network.InfrastructureMode = %d \n",__FUNCTION__,cur_network->network.InfrastructureMode);
 
 				// clear WIFI_STATION_STATE; WIFI_AP_STATE; WIFI_ADHOC_STATE; WIFI_ADHOC_MASTER_STATE
 		//pmlmepriv->fw_state &= 0xffffff87;		

@@ -350,7 +350,7 @@ int FirmwareDownload92C(
 	u8		*pFirmwareBuf;
 	u32		FirmwareLen;
 
-	pFirmware = (PRT_FIRMWARE_92C)_rtw_malloc(sizeof(RT_FIRMWARE_92C));
+	pFirmware = (PRT_FIRMWARE_92C)_rtw_zmalloc(sizeof(RT_FIRMWARE_92C));
 	if(!pFirmware)
 	{
 		rtStatus = _FAIL;
@@ -741,35 +741,11 @@ ReadChipVersion(
 	u8				ChipVersion=0;	
 	
 	value32 = rtw_read32(Adapter, REG_SYS_CFG);
-#if 0
-	if(value32 & TRP_VAUX_EN){		
-		//Test chip
-		switch(((value32 & CHIP_VER_RTL_MASK) >> CHIP_VER_RTL_SHIFT))
-		{
-			case 0: //8191C
-				version = VERSION_TEST_CHIP_91C;
-				break;
-			case 1: //8188C
-				version = VERSION_TEST_CHIP_88C;
-				break;
-			default:
-				// TODO: set default to 1T1R?
-				RT_ASSERT(FALSE,("Chip Version can't be recognized.\n"));
-				break;
-		}
-		
-	}
-	else{		
-		//Normal chip
-		version = VERSION_8192C_NORMAL_CHIP;
 
-	}
-#else
 	if (value32 & TRP_VAUX_EN){		
 		version = (value32 & TYPE_ID) ?VERSION_TEST_CHIP_92C :VERSION_TEST_CHIP_88C;		
 	}
-	else{
-		// Normal mass production chip.
+	else{		
 		ChipVersion = NORMAL_CHIP;
 		ChipVersion |= ((value32 & TYPE_ID) ? CHIP_92C : 0);
 		ChipVersion |= ((value32 & VENDOR_ID) ? CHIP_VENDOR_UMC : 0);
@@ -789,7 +765,7 @@ ReadChipVersion(
 		}
 		version = (VERSION_8192C)ChipVersion;
 	}
-#endif
+
 
 	switch(version)
 	{
@@ -1288,10 +1264,10 @@ static void _ReadHWPDSelection(IN PADAPTER Adapter,IN u8*PROMContent,IN	u8	Autol
 		Adapter->pwrctrlpriv.bSupportRemoteWakeup = _FALSE;
 	}
 	else	{
-		if(SUPPORT_HW_RADIO_DETECT(Adapter))
+		//if(SUPPORT_HW_RADIO_DETECT(Adapter))
 			Adapter->pwrctrlpriv.bHWPwrPindetect = Adapter->registrypriv.hwpwrp_detect;
-		else
-			Adapter->pwrctrlpriv.bHWPwrPindetect = _FALSE;//dongle not support new
+		//else
+			//Adapter->pwrctrlpriv.bHWPwrPindetect = _FALSE;//dongle not support new
 			
 			
 		//hw power down mode selection , 0:rf-off / 1:power down
@@ -1302,13 +1278,17 @@ static void _ReadHWPDSelection(IN PADAPTER Adapter,IN u8*PROMContent,IN	u8	Autol
 			Adapter->pwrctrlpriv.bHWPowerdown = Adapter->registrypriv.hwpdn_mode;
 				
 		// decide hw if support remote wakeup function
-		// if hw supported, 8051 (SIE) will generate WeakUP frame when autoresume
+		// if hw supported, 8051 (SIE) will generate WeakUP signal( D+/D- toggle) when autoresume
 		Adapter->pwrctrlpriv.bSupportRemoteWakeup = (PROMContent[EEPROM_TEST_USB_OPT] & BIT1)?_TRUE :_FALSE;
 
 		//if(SUPPORT_HW_RADIO_DETECT(Adapter))	
 			//Adapter->registrypriv.usbss_enable = Adapter->pwrctrlpriv.bSupportRemoteWakeup ;
 		
-		DBG_8192C("%s...bHWPwrPindetect(%d) bSupportRemoteWakeup(%x)\n",__FUNCTION__,Adapter->pwrctrlpriv.bHWPwrPindetect,Adapter->pwrctrlpriv.bSupportRemoteWakeup);
+		DBG_8192C("%s...bHWPwrPindetect(%x)-bHWPowerdown(%x) ,bSupportRemoteWakeup(%x)\n",__FUNCTION__,
+		Adapter->pwrctrlpriv.bHWPwrPindetect,Adapter->pwrctrlpriv.bHWPowerdown ,Adapter->pwrctrlpriv.bSupportRemoteWakeup);
+
+		DBG_8192C("### PS params=>  power_mgnt(%x),usbss_enable(%x) ###\n",Adapter->registrypriv.power_mgnt,Adapter->registrypriv.usbss_enable);
+		
 	}
 	
 }
@@ -1336,7 +1316,8 @@ static void _InitAdapterVariablesByPROM(IN	PADAPTER Adapter)
 	_ReadRFSetting(Adapter, PROMContent, !bAutoload);
 	_ReadHWPDSelection(Adapter, PROMContent, !bAutoload);
 
-	
+	Adapter->bDongle = PROMContent[EEPROM_EASY_REPLACEMENT];
+	DBG_8192C("%s(): REPLACEMENT = %x\n",__FUNCTION__,Adapter->bDongle);	
 }
 
 static void efuse_ReadAllMap(

@@ -944,6 +944,7 @@ typedef	enum _BOARD_TYPE_8192CUSB{
 #define	EEPROM_NORMAL_BoardType					EEPROM_RF_OPT1	//[7:5]
 #define BOARD_TYPE_NORMAL_MASK					0xE0
 #define BOARD_TYPE_TEST_MASK					0x0F
+#define EEPROM_EASY_REPLACEMENT				0x50//BIT0 1 for build-in module, 0 for external dongle
 //-------------------------------------------------------------
 //	EEPROM content definitions
 //-------------------------------------------------------------

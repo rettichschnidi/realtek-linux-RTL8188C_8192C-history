@@ -293,7 +293,7 @@ typedef enum _USB_RX_AGG_MODE{
 #define CHIP_8723_DRV_REV			BIT(3) // RTL8723 Driver Revised
 #define NORMAL_CHIP  				BIT(4)
 #define CHIP_VENDOR_UMC			BIT(5)
-#define CHIP_VENDOR_UMC_B_CUT		BIT(6) // Chip version for ECO
+#define CHIP_VENDOR_UMC_B_CUT	BIT(6) // Chip version for ECO
 
 #define IS_NORMAL_CHIP(version)  	(((version) & NORMAL_CHIP) ? _TRUE : _FALSE) 
 #define IS_92C_SERIAL(version)   		(((version) & CHIP_92C) ? _TRUE : _FALSE)
@@ -476,6 +476,7 @@ struct hal_priv
 
 	//for host message to fw
 	u8 LastHMEBoxNum;
+	u8 PowerIndex_backup[6];
 
 #ifdef CONFIG_USB_HCI
 
@@ -530,7 +531,7 @@ struct hal_priv
 #ifdef CONFIG_BT_COEXIST
 	struct btcoexist_priv		bt_coexist;	
 #endif
-
+	u8			bRxRSSIDisplay;
 
 };
 

@@ -9,6 +9,8 @@ EXTRA_CFLAGS += -Wno-unused-variable -Wno-unused-value -Wno-unused-label -Wno-un
 EXTRA_CFLAGS += -Wno-unused -Wno-unused-function
 EXTRA_CFLAGS += -I$(src)/include
 
+CONFIG_AUTOCFG_CP              =       n
+
 CONFIG_RTL8712			=	n
 CONFIG_RTL8192C			=       y
 
@@ -17,12 +19,16 @@ CONFIG_SDIO_HCI			= 	n
 CONFIG_MP_INCLUDED		=	n
 CONFIG_POWER_SAVING			=	n
 CONFIG_USB_AUTOSUSPEND			=	n
+CONFIG_HW_PWRP_DETECTION		=	n
+CONFIG_RTL8192CU_REDEFINE_1X1 =n
 
 CONFIG_PLATFORM_I386_PC		=	y
 CONFIG_PLATFORM_ANDROID_X86	=	n
 CONFIG_PLATFORM_ARM_S3C2K4	=	n
 CONFIG_PLATFORM_ARM_PXA2XX	=	n
 CONFIG_PLATFORM_ARM_S3C6K4	=	n
+CONFIG_PLATFORM_ARM_MX51_241H		= 	n
+CONFIG_PLATFORM_ARM_MX51_420C		= 	n
 CONFIG_PLATFORM_MIPS_RMI	=	n
 CONFIG_PLATFORM_RTD2880B	=	n
 CONFIG_PLATFORM_MIPS_AR9132	=	n
@@ -30,7 +36,10 @@ CONFIG_PLATFORM_MT53XX		=	n
 CONFIG_PLATFORM_RTK_DMP		=	n
 CONFIG_PLATFORM_ARM_TCC8900	=	n
 
+
 CONFIG_DRVEXT_MODULE	=	n
+
+export TopDIR ?= $(shell pwd)
 
 
 ifeq ($(CONFIG_RTL8712), y)
@@ -78,6 +87,10 @@ endif
 
 ifeq ($(CONFIG_USB_HCI), y)
  
+ifeq ($(CONFIG_AUTOCFG_CP), y)
+$(shell cp $(TopDIR)/autoconf_$(RTL871X)_usb_linux.h $(TopDIR)/include/autoconf.h)
+endif
+
 #ifeq ($(CONFIG_BEST_BATTERYLIFE), y)
 #EXTRA_CFLAGS += -DCONFIG_BEST_BATTERYLIFE
 #endif
@@ -89,6 +102,15 @@ endif
 ifeq ($(CONFIG_USB_AUTOSUSPEND), y)
 EXTRA_CFLAGS += -DCONFIG_USB_AUTOSUSPEND
 endif
+
+ifeq ($(CONFIG_HW_PWRP_DETECTION), y)
+EXTRA_CFLAGS += -DCONFIG_HW_PWRP_DETECTION
+endif
+
+
+ifeq ($(CONFIG_RTL8192CU_REDEFINE_1X1), y)
+EXTRA_CFLAGS += -DRTL8192C_RECONFIG_TO_1T1R
+endif 
 
 ifeq ($(CONFIG_PLATFORM_I386_PC), y)
 EXTRA_CFLAGS += -DCONFIG_LITTLE_ENDIAN
@@ -195,6 +217,23 @@ CROSS_COMPILE ?= /usr/src/telechip/SDK_0127_20101006/prebuilt/linux-x86/toolchai
 KSRC ?= /usr/src/telechip/SDK_0127_20101006/kernel
 endif
 
+ifeq ($(CONFIG_PLATFORM_ARM_MX51_241H), y)
+EXTRA_CFLAGS += -DCONFIG_LITTLE_ENDIAN -DCONFIG_WISTRON_PLATFORM
+ARCH := arm
+CROSS_COMPILE := /opt/freescale/usr/local/gcc-4.1.2-glibc-2.5-nptl-3/arm-none-linux-gnueabi/bin/arm-none-linux-gnueabi-
+KVER  := 2.6.31
+KSRC ?= /lib/modules/2.6.31-770-g0e46b52/source
+endif
+
+ifeq ($(CONFIG_PLATFORM_ARM_MX51_420C), y)
+EXTRA_CFLAGS += -DCONFIG_LITTLE_ENDIAN -DCONFIG_WISTRON_PLATFORM
+ARCH := arm
+CROSS_COMPILE := /opt/freescale/usr/local/gcc-4.1.2-glibc-2.5-nptl-3/arm-none-linux-gnueabi/bin/arm-none-linux-gnueabi-
+KVER  := 2.6.31
+KSRC := /home/sd4/wistron_420c/linux_wistron
+endif
+ 
+
  
 _OS_INTFS_FILES :=	os_dep/osdep_service.o \
 			os_dep/linux/os_intfs.o \
@@ -241,8 +280,8 @@ rtk_core :=	core/rtw_cmd.o \
 		core/rtw_xmit.o \
 
 
-$(MODULE_NAME)-y += $(rtk_core)
-									
+$(MODULE_NAME)-y += $(rtk_core)							
+								
 $(MODULE_NAME)-y += core/efuse/rtl8712_efuse.o
 
 $(MODULE_NAME)-y += core/led/$(RTL871X)_led.o

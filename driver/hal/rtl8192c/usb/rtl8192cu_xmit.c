@@ -891,6 +891,7 @@ s32 rtw_xmitframe_complete(_adapter *padapter, struct xmit_priv *pxmitpriv, stru
 			bulkPtr = ((pbuf / bulkSize) + 1) * bulkSize;
 		}
 	}
+	
 	if (_rtw_queue_empty(&ptxservq->sta_pending) == _TRUE)
 		list_delete(&ptxservq->tx_pending);
 
@@ -1064,7 +1065,7 @@ void rtw_dump_xframe(_adapter *padapter, struct xmit_frame *pxmitframe)
 
 		mem_addr += w_sz;
 
-		mem_addr = (u8 *)RND4(((uint)(mem_addr)));
+		mem_addr = (u8 *)RND4(((SIZE_PTR)(mem_addr)));
 
 	}
 	
