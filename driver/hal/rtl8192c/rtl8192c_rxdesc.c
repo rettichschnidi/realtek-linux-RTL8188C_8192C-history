@@ -187,7 +187,7 @@ void rtl8192c_query_rx_phy_status(union recv_frame *prframe, struct recv_stat *p
 		}
 
 		pwdb_all= query_rx_pwr_percentage(rx_pwr_all);
-		//if(pHalData->CustomerID == RT_CID_819x_Lenovo)
+		if(pHalData->CustomerID == RT_CID_819x_Lenovo)
 		{
 			// CCK gain is smaller than OFDM/MCS gain,
 			// so we add gain diff by experiences, the val is 6
@@ -378,6 +378,7 @@ void rtl8192c_query_rx_phy_status(union recv_frame *prframe, struct recv_stat *p
 			pattrib->signal_strength= (u8)(signal_scale_mapping(total_rssi/=rf_rx_num));
 		}
 	}
+	//printk("%s,rx_pwr_all(%d),RxPWDBAll(%d)\n",__FUNCTION__,rx_pwr_all,pattrib->RxPWDBAll);
 
 }
 
@@ -405,7 +406,8 @@ static void process_rssi(_adapter *padapter,union recv_frame *prframe)
 
 
 		tmp_val = padapter->recvpriv.signal_strength_data.total_val/padapter->recvpriv.signal_strength_data.total_num;
-		padapter->recvpriv.signal_strength=(s8)translate2dbm( padapter,(u8)tmp_val);
+		padapter->recvpriv.signal_strength= tmp_val;
+		padapter->recvpriv.rssi=(s8)translate2dbm( padapter,(u8)tmp_val);		
 
 		RT_TRACE(_module_rtl871x_recv_c_,_drv_info_,("UI RSSI = %d, ui_rssi.TotalVal = %d, ui_rssi.TotalNum = %d\n", tmp_val, padapter->recvpriv.signal_strength_data.total_val,padapter->recvpriv.signal_strength_data.total_num));
 	}
@@ -518,6 +520,11 @@ void rtl8192c_process_phy_info(_adapter *padapter, void *prframe)
 	// If we switch to the antenna for testing, the signal strength 
 	// of the packets in this time shall not be counted into total receiving power. 
 	// This prevents error counting Rx signal strength and affecting other dynamic mechanism.
+
+	//for after Linked,Just collect rssi of BCN && Probe_rsp 		
+	SwAntDivRSSICheck(padapter, precvframe->u.hdr.attrib.RxPWDBAll);		
+
+
 	if(GET_HAL_DATA(padapter)->RSSI_test == _TRUE)
 		return;
 #endif
@@ -532,7 +539,6 @@ void rtl8192c_process_phy_info(_adapter *padapter, void *prframe)
 	//
 	// Check EVM
 	//
-	process_link_qual(padapter,  precvframe);		
-
+	process_link_qual(padapter,  precvframe);	
 
 }

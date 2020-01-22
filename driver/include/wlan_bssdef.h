@@ -280,6 +280,13 @@ typedef struct _NDIS_802_11_TEST
 #ifndef Ndis802_11APMode
 #define Ndis802_11APMode (Ndis802_11InfrastructureMax+1)
 #endif
+typedef struct _WLAN_PHY_INFO
+{
+	u8	SignalStrength;//(in percentage)
+  	u8	SignalQuality;//(in percentage)
+  	u8	Optimum_antenna;  //for Antenna diversity
+  	u8  	Reserved_0;
+}WLAN_PHY_INFO,*PWLAN_PHY_INFO;
 
 typedef struct _WLAN_BSSID_EX
 {
@@ -293,10 +300,7 @@ typedef struct _WLAN_BSSID_EX
   NDIS_802_11_CONFIGURATION  Configuration;
   NDIS_802_11_NETWORK_INFRASTRUCTURE  InfrastructureMode;
   NDIS_802_11_RATES_EX  SupportedRates;  
-  u8	SignalStrength;//(in percentage)
-  u8	SignalQuality;//(in percentage)
-  u8	Optimum_antenna;  //for Antenna diversity
-  u8  Reserved_0;
+  WLAN_PHY_INFO	PhyInfo;  	
   ULONG  IELength;
   UCHAR  IEs[MAX_IE_SZ];	//(timestamp, beacon interval, and capability information)
 } WLAN_BSSID_EX, *PWLAN_BSSID_EX;
@@ -312,7 +316,7 @@ static __inline  uint get_WLAN_BSSID_EX_sz(WLAN_BSSID_EX *bss)
 			sizeof (NDIS_802_11_NETWORK_INFRASTRUCTURE) +   
 			sizeof (NDIS_802_11_RATES_EX)+ 
 			//all new member add here
-			sizeof(u8)+sizeof(u8)+sizeof(u8)+sizeof(u8)+	 
+			sizeof(WLAN_PHY_INFO)+	 
 			//all new member add here
 			sizeof (ULONG) + bss->IELength;	
 	return t_len;

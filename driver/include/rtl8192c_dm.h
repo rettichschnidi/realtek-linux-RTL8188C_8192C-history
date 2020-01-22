@@ -351,6 +351,7 @@ void SwAntDivRSSICheck(_adapter *padapter ,u32 RxPWDBAll);
 void SwAntDivResetBeforeLink(IN PADAPTER Adapter);
 bool SwAntDivBeforeLink8192C(IN PADAPTER Adapter);
 void dm_SW_AntennaSwitchCallback(void *FunctionContext);
+void SwAntDivRestAfterLink(	IN	PADAPTER	Adapter);
 #endif
 
 #endif	//__HAL8190PCIDM_H__

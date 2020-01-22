@@ -1715,11 +1715,10 @@ _InitAntenna_Selection(IN PADAPTER Adapter)
 #ifdef CONFIG_ANTENNA_DIVERSITY
 	HAL_DATA_TYPE	*pHalData	= GET_HAL_DATA(Adapter);
 
-	if(pHalData->AntDivCfg==0)
-		return;
+	if(pHalData->AntDivCfg==0)		return;
 	printk("==>  %s ....\n",__FUNCTION__);
 	
-	if((RF_1T1R == pHalData->rf_type)||(RF_1T2R == pHalData->rf_type))
+	if((RF_1T1R == pHalData->rf_type))
 	{
 		// Force use left antenna by default for 88C.set BIT23 to enable func of antenna diversity
 		write32(Adapter, REG_LEDCFG0, read32(Adapter, REG_LEDCFG0)|BIT23);	

@@ -58,7 +58,7 @@ static void rtw_dev_unload(_adapter *padapter);
 static int rtw_drv_init(struct usb_interface *pusb_intf,const struct usb_device_id *pdid);
 static void rtw_dev_remove(struct usb_interface *pusb_intf);
 
-//2010-07-23 DID_USB_V19
+//2010-07-23 DID_USB_V20
 static struct usb_device_id rtw_usb_id_tbl[] ={
 	//92CU
 	// Realtek demoboard*/
@@ -77,7 +77,7 @@ static struct usb_device_id rtw_usb_id_tbl[] ={
          {USB_DEVICE(0x06F8, 0xE033)},//Hercules - Edimax 
          {USB_DEVICE(0x103C, 0x1629)},//HP - Lite-On
          //{USB_DEVICE(0x0DF6, 0x0052)},//Sitecom - Edimax V18
-        // {USB_DEVICE(0x0EB0, 0x9071)},//NO Brand - Etop   V18
+         {USB_DEVICE(0x0EB0, 0x9071)},//NO Brand - Etop   
         // {USB_DEVICE(0x06F8, 0xE033)},//Hercules - Edimax  V18
         {USB_DEVICE(0x2001, 0x3308)},//D-Link - Alpha
           
@@ -87,6 +87,7 @@ static struct usb_device_id rtw_usb_id_tbl[] ={
          {USB_DEVICE(0x2001, 0x330A)},//D-Link-Alpha         
          {USB_DEVICE(0x2001, 0x3309)},//D-Link-Alpha         
          {USB_DEVICE(0x0586, 0x341F)},//Zyxel -Abocom
+         {USB_DEVICE(0x7392, 0x7822)},//Edimax -Edimax
 	{}
 };
 

@@ -629,24 +629,29 @@ _func_exit_;
 static void update_network(WLAN_BSSID_EX *dst, WLAN_BSSID_EX *src,_adapter * padapter)
 {
 	u32 last_evm = 0, tmpVal;
+	HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(padapter);
 
 _func_enter_;		
 
 #ifdef CONFIG_ANTENNA_DIVERSITY
-		//printk("update_network=> orgRSSI(%d),newRSSI(%d)\n",dst->Rssi,src->Rssi);
-		//select optimum_antenna for before linked =>For antenna diversity
-		if(dst->Rssi >=  src->Rssi )//keep org parameter
+		if((0 != pHalData->AntDivCfg) && (!IS_92C_SERIAL(pHalData->VersionID)) )
 		{
-			src->Rssi = dst->Rssi;
-			src->Optimum_antenna = dst->Optimum_antenna;						
+			
+			//printk("update_network=> orgRSSI(%d)(%d),newRSSI(%d)(%d)\n",dst->Rssi,query_rx_pwr_percentage(dst->Rssi),
+			//	src->Rssi,query_rx_pwr_percentage(src->Rssi));
+			//select optimum_antenna for before linked =>For antenna diversity
+			if(dst->Rssi >=  src->Rssi )//keep org parameter
+			{
+				src->Rssi = dst->Rssi;
+				src->PhyInfo.Optimum_antenna = dst->PhyInfo.Optimum_antenna;						
+			}			
 		}
-		else{			
-			//printk("chang Ant_(%s) to Ant_(%s)\n",(dst->Optimum_antenna==2)?"A":"B",(src->Optimum_antenna==2)?"A":"B");
-		}
-		
+	
 #endif
 	_memcpy((u8 *)dst, (u8 *)src, get_WLAN_BSSID_EX_sz(src));
-	
+#ifdef CONFIG_ANTENNA_DIVERSITY
+//	printk("## update_network=> RSSI(%d),Ant_(%s)\n",dst->Rssi,(2==dst->PhyInfo.Optimum_antenna)?"A":"B");
+#endif
 #if 0
 //	printk("update_network: rssi=0x%lx dst->Rssi=%d ,dst->Rssi=0x%lx , src->Rssi=0x%lx",(dst->Rssi+src->Rssi)/2,dst->Rssi,dst->Rssi,src->Rssi);
 	if (check_fwstate(&padapter->mlmepriv, _FW_LINKED) && is_same_network(&(padapter->mlmepriv.cur_network.network), src))
@@ -687,7 +692,7 @@ _func_exit_;
 
 static void update_current_network(_adapter *adapter, WLAN_BSSID_EX *pnetwork)
 {
-	struct	mlme_priv	*pmlmepriv = &(adapter->mlmepriv);
+	struct	mlme_priv	*pmlmepriv = &(adapter->mlmepriv);	
 	
 _func_enter_;		
 
@@ -700,13 +705,7 @@ _func_enter_;
 
 	if(is_same_network(&(pmlmepriv->cur_network.network), pnetwork))
 	{
-		//RT_TRACE(_module_rtl871x_mlme_c_,_drv_err_,"Same Network\n");
-
-		
-#ifdef  CONFIG_ANTENNA_DIVERSITY	
-		//for after Linked,Just collect rssi of BCN && Probe_rsp 
-		SwAntDivRSSICheck(adapter, query_rx_pwr_percentage(pnetwork->Rssi));		
-#endif
+		//RT_TRACE(_module_rtl871x_mlme_c_,_drv_err_,"Same Network\n");	
 
 		//if(pmlmepriv->cur_network.network.IELength<= pnetwork->IELength)
 		{
@@ -783,7 +782,7 @@ _func_enter_;
 
 			//target->Rssi=(pnetwork->network.Rssi+target->Rssi)/2;
 #ifdef CONFIG_ANTENNA_DIVERSITY
-			target->Optimum_antenna = pHalData->CurAntenna;//optimum_antenna=>For antenna diversity
+			target->PhyInfo.Optimum_antenna = pHalData->CurAntenna;//optimum_antenna=>For antenna diversity
 #endif
 			_memcpy(&(pnetwork->network), target,  get_WLAN_BSSID_EX_sz(target));
 			pnetwork->last_scanned = get_current_time();
@@ -803,7 +802,7 @@ _func_enter_;
 			bssid_ex_sz = get_WLAN_BSSID_EX_sz(target);
 			target->Length = bssid_ex_sz;
 #ifdef CONFIG_ANTENNA_DIVERSITY
-			target->Optimum_antenna = pHalData->CurAntenna;
+			target->PhyInfo.Optimum_antenna = pHalData->CurAntenna;
 #endif		
 			_memcpy(&(pnetwork->network), target, bssid_ex_sz );
 
@@ -1194,7 +1193,9 @@ _func_enter_;
 	RT_TRACE(_module_rtl871x_mlme_c_, _drv_err_, ("+indicate_connect\n"));
  
 	pmlmepriv->to_join = _FALSE;
-	
+#ifdef CONFIG_ANTENNA_DIVERSITY	
+	SwAntDivRestAfterLink(padapter);
+#endif	
 	set_fwstate(pmlmepriv, _FW_LINKED);
 
 	padapter->ledpriv.LedControlHandler(padapter, LED_CTL_LINK);
@@ -1977,14 +1978,20 @@ _func_enter_;
 		
 		dst_ssid = pnetwork->network.Ssid.Ssid;
 		src_ssid = pmlmepriv->assoc_ssid.Ssid;
-
+/*
+#ifdef CONFIG_ANTENNA_DIVERSITY
+			printk("#### dst_ssid=(%s) Opt_Ant_(%s) , cur_Ant(%s)\n", dst_ssid,
+				(2==pnetwork->network.PhyInfo.Optimum_antenna)?"A":"B",
+				(2==pHalData->CurAntenna)?"A":"B");
+#endif
+*/
 		if (((_memcmp(dst_ssid, src_ssid, pmlmepriv->assoc_ssid.SsidLength)) == _TRUE)&&
 			(pnetwork->network.Ssid.SsidLength==pmlmepriv->assoc_ssid.SsidLength))
 		{
 			RT_TRACE(_module_rtl871x_mlme_c_,_drv_err_,("dst_ssid=%s, src_ssid=%s \n", dst_ssid, src_ssid));
 #ifdef CONFIG_ANTENNA_DIVERSITY
-			printk("dst_ssid=(%s) Ant_(%s) , cur_Ant(%s)\n", dst_ssid,
-				(2==pnetwork->network.Optimum_antenna)?"A":"B",
+			printk("#### dst_ssid=(%s) Opt_Ant_(%s) , cur_Ant(%s)\n", dst_ssid,
+				(2==pnetwork->network.PhyInfo.Optimum_antenna)?"A":"B",
 				(2==pHalData->CurAntenna)?"A":"B");
 #endif
 			//remove the condition @ 20081125
@@ -2034,17 +2041,7 @@ _func_enter_;
 					}
 				}
 				else
-				{
-				
-				#ifdef CONFIG_ANTENNA_DIVERSITY
-					//switch antenna to Optimum_antenna
-					if(pHalData->CurAntenna !=  pnetwork->network.Optimum_antenna)
-					{						
-						//PHY_SetRFPath(adapter,pnetwork->network.Optimum_antenna);
-						antenna_select_cmd(adapter, pnetwork->network.Optimum_antenna, 1);
-						printk("Change to Optimum_antenna(%s)\n",(2==pHalData->CurAntenna)?"A":"B");
-					}
-				#endif
+				{				
 					goto ask_for_joinbss;
 				}				
 

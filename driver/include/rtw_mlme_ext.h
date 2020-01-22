@@ -203,7 +203,7 @@ struct mlme_ext_priv
 	_timer		survey_timer;
 	_timer		link_timer;
 	_timer		ADDBA_timer;
-	u8			chan_stay_time;
+	u8			chan_scan_time;
 
 	unsigned int	linked_to;//linked timeout
 	

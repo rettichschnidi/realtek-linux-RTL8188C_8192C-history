@@ -5,4 +5,3 @@ rmmod ieee80211_crypt_ccmp
 rmmod ieee80211_crypt_tkip
 rmmod ieee80211_crypt_wep
 rmmod ieee80211_crypt
-rmmod 8192cu

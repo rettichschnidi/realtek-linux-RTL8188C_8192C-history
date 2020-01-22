@@ -1108,6 +1108,9 @@ _func_enter_;
 		RT_TRACE(_module_rtl871x_cmd_c_, _drv_notice_, ("+Join cmd: SSid=[%s]\n", pmlmepriv->assoc_ssid.Ssid));
 	}
 
+	//printk ("+Join cmd: SSid=[%s],opt_ant(%d,Ant_%s)\n", pmlmepriv->assoc_ssid.Ssid,pnetwork->network.PhyInfo.Optimum_antenna,
+		//(2==pnetwork->network.PhyInfo.Optimum_antenna)?"A":"B");
+	
 	pcmd = (struct cmd_obj*)_malloc(sizeof(struct cmd_obj));
 	if(pcmd==NULL){
 		res=_FAIL;

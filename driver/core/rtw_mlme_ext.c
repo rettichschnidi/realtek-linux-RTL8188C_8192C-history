@@ -202,7 +202,7 @@ int	init_mlme_ext_priv(_adapter* padapter)
 			break;			
 	}	
 
-	pmlmeext->chan_stay_time = SURVEY_TO;
+	pmlmeext->chan_scan_time = SURVEY_TO;
 	pmlmeext->mlmeext_init = _TRUE;
 
 	return res;
@@ -370,7 +370,8 @@ unsigned int OnProbeRsp(_adapter *padapter, union recv_frame *precv_frame)
 	if (pmlmeext->sitesurvey_res.state == _TRUE)
 	{
 		report_survey_event(padapter, precv_frame);
-
+		if (_memcmp(GetAddr3Ptr(pframe), get_my_bssid(&pmlmeinfo->network), ETH_ALEN))				
+			pHalData->hal_ops.process_phy_info(padapter, precv_frame);
 		return _SUCCESS;
 	}
 
@@ -405,6 +406,8 @@ unsigned int OnBeacon(_adapter *padapter, union recv_frame *precv_frame)
 	if (pmlmeext->sitesurvey_res.state == _TRUE)
 	{
 		report_survey_event(padapter, precv_frame);
+		if (_memcmp(GetAddr3Ptr(pframe), get_my_bssid(&pmlmeinfo->network), ETH_ALEN))	
+			pHalData->hal_ops.process_phy_info(padapter, precv_frame);
 
 		return _SUCCESS;
 	}
@@ -412,7 +415,7 @@ unsigned int OnBeacon(_adapter *padapter, union recv_frame *precv_frame)
 	if (_memcmp(GetAddr3Ptr(pframe), get_my_bssid(&pmlmeinfo->network), ETH_ALEN))
 	{
 		pHalData->hal_ops.process_phy_info(padapter, precv_frame);
-
+	
 		if (pmlmeinfo->state & WIFI_FW_AUTH_NULL)
 		{
 			//check the vendor of the assoc AP
@@ -436,6 +439,7 @@ unsigned int OnBeacon(_adapter *padapter, union recv_frame *precv_frame)
 				//todo: the timer is used instead of the number of the beacon received
 				if ((psta->sta_stats.rx_pkts & 0xf) == 0)
 				{
+				
 					//DBG_871X("update_bcn_info\n");
 					update_beacon_info(padapter, pframe, len, psta);
 				}
@@ -1738,9 +1742,9 @@ void site_survey(_adapter *padapter)
 			
 		}
 	#ifdef CONFIG_ANTENNA_DIVERSITY	
-	printk("site_survey chan(%d) antenna( %s ).....\n",survey_channel,(pHalData->CurAntenna==2)?"A":"B");
+	//printk("site_survey chan(%d) antenna( %s ).....\n",survey_channel,(pHalData->CurAntenna==2)?"A":"B");
 	#endif
-		_set_timer(&pmlmeext->survey_timer,pmlmeext->chan_stay_time );
+		_set_timer(&pmlmeext->survey_timer,pmlmeext->chan_scan_time );
 
 	}
 	else
@@ -1753,8 +1757,8 @@ void site_survey(_adapter *padapter)
 		{				
 			pmlmeext->sitesurvey_res.bss_cnt = 0;
 			pmlmeext->sitesurvey_res.channel_idx = -1;
-			pmlmeext->chan_stay_time = SURVEY_TO /2;			
-			_set_timer(&pmlmeext->survey_timer, pmlmeext->chan_stay_time);
+			pmlmeext->chan_scan_time = SURVEY_TO /2;			
+			_set_timer(&pmlmeext->survey_timer, pmlmeext->chan_scan_time);
 			return;
 		}
 		
@@ -1810,7 +1814,7 @@ void site_survey(_adapter *padapter)
 
 		report_surveydone_event(padapter);
 		
-		pmlmeext->chan_stay_time = SURVEY_TO;
+		pmlmeext->chan_scan_time = SURVEY_TO;
 		pmlmeext->sitesurvey_res.state = _FALSE;
 
 #ifdef PLATFORM_LINUX
@@ -1863,10 +1867,10 @@ u8 collect_bss_info(_adapter *padapter, union recv_frame *precv_frame, WLAN_BSSI
 	//get the signal strength
 	//bssid->Rssi = precv_frame->u.hdr.attrib.signal_strength; // 0-100 index.	
 	bssid->Rssi = precv_frame->u.hdr.attrib.RecvSignalPower; // in dBM.raw data	
-	bssid->SignalQuality = precv_frame->u.hdr.attrib.signal_qual;//in percentage 
-	bssid->SignalStrength = precv_frame->u.hdr.attrib.signal_strength;//in percentage
+	bssid->PhyInfo.SignalQuality = precv_frame->u.hdr.attrib.signal_qual;//in percentage 
+	bssid->PhyInfo.SignalStrength = precv_frame->u.hdr.attrib.signal_strength;//in percentage
 #ifdef CONFIG_ANTENNA_DIVERSITY
-	bssid->Optimum_antenna = pHalData->CurAntenna;
+	bssid->PhyInfo.Optimum_antenna = pHalData->CurAntenna;
 #endif
 
 	// checking SSID

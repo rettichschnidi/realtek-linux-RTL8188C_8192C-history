@@ -281,7 +281,16 @@ u8 rtl8192c_join_cmd_hdl(_adapter *padapter, u8 *pbuf)
 		}
 
 	}
-
+	#ifdef CONFIG_ANTENNA_DIVERSITY
+	//switch antenna to Optimum_antenna
+	printk("rtl8192c_join_cmd_hdl cur_ant(%d),opt_ant(%d)\n",pHalData->CurAntenna,pparm->network.PhyInfo.Optimum_antenna);
+	if(pHalData->CurAntenna !=  pparm->network.PhyInfo.Optimum_antenna)		
+	{						
+		//PHY_SetRFPath(adapter,pnetwork->network.PhyInfo.Optimum_antenna);
+		antenna_select_cmd(padapter, pparm->network.PhyInfo.Optimum_antenna, 0);
+		printk("#### Change to Optimum_antenna(%s)\n",(2==pparm->network.PhyInfo.Optimum_antenna)?"A":"B");
+	}
+	#endif
 
 	joinbss_reset(padapter);
 
@@ -1305,10 +1314,13 @@ u8 antenna_select_cmd(_adapter*padapter, u8 antenna, u8 enqueue)
 	struct cmd_obj		*ph2c;
 	struct drvextra_cmd_parm	*pdrvextra_cmd_parm;	
 	struct cmd_priv	*pcmdpriv = &padapter->cmdpriv;
+	HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(padapter);
 	
 	u8	res = _SUCCESS;
-	
 _func_enter_;
+
+	if(IS_92C_SERIAL(pHalData->VersionID) ||(pHalData->AntDivCfg==0))	
+		return res;
 
 	if(enqueue)
 	{

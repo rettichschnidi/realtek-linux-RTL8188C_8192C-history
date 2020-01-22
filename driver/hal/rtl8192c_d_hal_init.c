@@ -1056,6 +1056,8 @@ _ReadBoardType(
 		pHalData->AntDivCfg = (PROMContent[EEPROM_RF_OPT1]&0x18)>>3;
 	else
 		pHalData->AntDivCfg = registry_par->antdiv_cfg ;  // 0:OFF , 1:ON,
+
+	printk("### AntDivCfg(%x)\n",pHalData->AntDivCfg);	
 #endif
 	
 

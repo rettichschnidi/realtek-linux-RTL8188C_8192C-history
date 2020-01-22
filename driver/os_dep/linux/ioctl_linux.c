@@ -433,8 +433,8 @@ static inline char *translate_scan(_adapter *padapter, struct iw_request_info* i
 	iwe.u.qual.updated = IW_QUAL_QUAL_UPDATED | IW_QUAL_LEVEL_UPDATED | IW_QUAL_NOISE_INVALID;
 	
 	//H(signal strength) = H(signal quality) + H(noise level);	
-	iwe.u.qual.level = (u8)pnetwork->network.SignalStrength; //.Rssi;
-	iwe.u.qual.qual = (u8)pnetwork->network.SignalStrength;   // signal quality
+	iwe.u.qual.level = (u8)pnetwork->network.PhyInfo.SignalStrength; //.Rssi;
+	iwe.u.qual.qual = (u8)pnetwork->network.PhyInfo.SignalStrength;   // signal quality
 	iwe.u.qual.noise = 0; // noise level
 	
 	//printk("iqual=%d, ilevel=%d, inoise=%d, iupdated=%d\n", iwe.u.qual.qual, iwe.u.qual.level , iwe.u.qual.noise, iwe.u.qual.updated);
@@ -5422,8 +5422,8 @@ static struct iw_statistics *rtw_get_wireless_stats(struct net_device *dev)
 		//printk("No link  level:%d, qual:%d, noise:%d\n", tmp_level, tmp_qual, tmp_noise);
 	}
 	else{
-		tmp_level =padapter->recvpriv.signal_strength; //dBM
-		tmp_qual =padapter->recvpriv.signal_qual;
+		tmp_level =padapter->recvpriv.rssi; 
+		tmp_qual =padapter->recvpriv.signal_strength; //padapter->recvpriv.signal_qual;
 		tmp_noise =padapter->recvpriv.noise;		
 		//printk("level:%d, qual:%d, noise:%d, rssi (%d)\n", tmp_level, tmp_qual, tmp_noise,padapter->recvpriv.rssi);
 
@@ -5432,7 +5432,7 @@ static struct iw_statistics *rtw_get_wireless_stats(struct net_device *dev)
 		piwstats->qual.noise = tmp_noise;
 	}
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,14))
-	piwstats->qual.updated = IW_QUAL_ALL_UPDATED ;//| IW_QUAL_DBM;
+	piwstats->qual.updated = IW_QUAL_ALL_UPDATED |IW_QUAL_DBM;
 #else
         piwstats->qual.updated = 0x0f;
 #endif

@@ -113,7 +113,7 @@ int bt_ampdu =1 ;// 0:Disable BT control A-MPDU, 1:Enable BT control A-MPDU.
 int AcceptAddbaReq = _TRUE;// 0:Reject AP's Add BA req, 1:Accept AP's Add BA req.
 
 #ifdef CONFIG_ANTENNA_DIVERSITY
-int  antdiv_cfg = 0; // 0:OFF , 1:ON, 2:decide by Efuse config
+int  antdiv_cfg = 2; // 0:OFF , 1:ON, 2:decide by Efuse config
 #endif
 
 char* initmac = 0;  // temp mac address if users want to use instead of the mac address in Efuse

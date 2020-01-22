@@ -4776,6 +4776,7 @@ void PHY_SetRFPath(IN	PADAPTER	pAdapter,u8 antenna)
 	HAL_DATA_TYPE	*pHalData	= GET_HAL_DATA(pAdapter);
 	PHY_SetBBReg(pAdapter, rFPGA0_XA_RFInterfaceOE, 0x300, antenna);
 #ifdef CONFIG_ANTENNA_DIVERSITY
+	printk("PHY_SetRFPath==> set RF_(%s) to RF_(%s) \n",(2==pHalData->CurAntenna)?"A":"B",(2==antenna)?"A":"B");
 	pHalData->CurAntenna = antenna ;
 #endif
 	

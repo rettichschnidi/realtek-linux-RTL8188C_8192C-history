@@ -736,10 +736,11 @@ void dm_DynamicTxPower(IN	PADAPTER	Adapter)
 	struct dm_priv *pdmpriv = &Adapter->dmpriv;	
 	//HAL_DATA_TYPE		*pHalData = GET_HAL_DATA(Adapter);
 	int	UndecoratedSmoothedPWDB;
+	if(pdmpriv->bDynamicTxPowerEnable != _TRUE)
+		return;
 
 	// If dynamic high power is disabled.
-	if( (pdmpriv->bDynamicTxPowerEnable != _TRUE) ||
-		(!(pdmpriv->DMFlag & DYNAMIC_FUNC_HP)) )		
+	if(  !(pdmpriv->DMFlag & DYNAMIC_FUNC_HP) )		
 	{
 		pdmpriv->DynamicTxHighPowerLvl = TxHighPwrLevel_Normal;
 		return;
@@ -3276,7 +3277,7 @@ bool SwAntDivBeforeLink8192C(IN PADAPTER Adapter)
 // 20100514 Luke/Joseph:
 // Add new function to reset antenna diversity state after link.
 //
-VOID
+void
 SwAntDivRestAfterLink(
 	IN	PADAPTER	Adapter
 	)
@@ -3284,7 +3285,9 @@ SwAntDivRestAfterLink(
 	HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(Adapter);
 	struct dm_priv *pdmpriv = &Adapter->dmpriv;
 	SWAT_T	*pDM_SWAT_Table = &pdmpriv->DM_SWAT_Table;
-	
+	if(IS_92C_SERIAL(pHalData->VersionID) ||(pHalData->AntDivCfg==0))	
+		return;
+	printk("======>   SwAntDivRestAfterLink <========== \n");
 	pHalData->RSSI_cnt = 0;
 	pHalData->RSSI_test = _FALSE;
 	
@@ -3292,6 +3295,8 @@ SwAntDivRestAfterLink(
 	pDM_SWAT_Table->stop_trying = 0;
 	pDM_SWAT_Table->penalty = 0;
 	pDM_SWAT_Table->failure_cnt = 0;
+	pDM_SWAT_Table->CurAntenna = pHalData->CurAntenna;
+	pDM_SWAT_Table->PreAntenna = pHalData->CurAntenna;
 }
 
 #if 1
@@ -3338,7 +3343,7 @@ dm_SW_AntennaSwitch(
 		return;
 	}
 #endif
-	printk("%s.......\n",__FUNCTION__);
+	printk("\n............................ %s.........................\n",__FUNCTION__);
 	// Handling step mismatch condition.
 	// Peak step is not finished at last time. Recover the variable and check again.
 	if( Step != pDM_SWAT_Table->try_flag	)
@@ -3396,6 +3401,7 @@ dm_SW_AntennaSwitch(
 		}
 			
 #endif
+		
 		pHalData->RSSI_cnt = 0;
 		pDM_SWAT_Table->try_flag = 0;
 		printk("dm_SW_AntennaSwitch(): Set try_flag to 0 prepare for peak!\n");
@@ -3441,7 +3447,7 @@ dm_SW_AntennaSwitch(
 			{	
 				if(curRSSI < pDM_SWAT_Table->PreRSSI) //Current antenna is worse than previous antenna
 				{
-					printk("SWAS: Switch back to another antenna");
+					printk("SWAS: Switch back to another antenna\n");
 					nextAntenna = (pDM_SWAT_Table->CurAntenna == Antenna_A)? Antenna_B : Antenna_A;
 					if(curRSSI < (pDM_SWAT_Table->PreRSSI-5))
 					{
@@ -3488,7 +3494,7 @@ dm_SW_AntennaSwitch(
 	{
 		printk("@@@@@@@@ SWAS: Change TX Antenna!\n ");		
 		//PHY_SetRFPath(Adapter,nextAntenna);
-		antenna_select_cmd(Adapter, nextAntenna, 0);
+		antenna_select_cmd(Adapter, nextAntenna, 1);
 	}
 
 	//1 5.Reset Statistics
@@ -3543,15 +3549,16 @@ void SwAntDivRSSICheck(_adapter *padapter ,u32 RxPWDBAll)
 	HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(padapter);	
 	struct	mlme_priv *pmlmepriv = &padapter->mlmepriv;	
 
-
+	if(IS_92C_SERIAL(pHalData->VersionID) ||pHalData->AntDivCfg==0)
+		return;
+	
 	if(check_fwstate(pmlmepriv, _FW_LINKED) == _TRUE)		
 	{			
 		pHalData->RSSI_sum += RxPWDBAll;
 		pHalData->RSSI_cnt++;
-		printk("%s Ant_(%s),RSSI_sum(%d),RSSI_cnt(%d)\n",__FUNCTION__,(2==pHalData->CurAntenna)?"A":"B",pHalData->RSSI_sum,pHalData->RSSI_cnt);
+		//printk("%s Ant_(%s),RSSI_sum(%d),RSSI_cnt(%d)\n",__FUNCTION__,(2==pHalData->CurAntenna)?"A":"B",pHalData->RSSI_sum,pHalData->RSSI_cnt);
 	}
-	else
-		printk("%s fw_state(%x) \n",__FUNCTION__,pmlmepriv->fw_state );
+	
 }
 
 
@@ -3568,7 +3575,7 @@ dm_SW_AntennaSwitchInit(
 	pHalData->RSSI_sum = 0;
 	pHalData->RSSI_cnt = 0;
 	pDM_SWAT_Table->CurAntenna = pHalData->CurAntenna;
-	pDM_SWAT_Table->PreAntenna = Antenna_A;
+	pDM_SWAT_Table->PreAntenna = pHalData->CurAntenna;
 	pDM_SWAT_Table->try_flag = 0xff;
 	pDM_SWAT_Table->stop_trying = 0;
 	pDM_SWAT_Table->failure_cnt = 0;
