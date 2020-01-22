@@ -952,7 +952,7 @@ static int netdev_open(struct net_device *pnetdev)
 	struct pwrctrl_priv *pwrctrlpriv = &padapter->pwrctrlpriv;
 
 	RT_TRACE(_module_os_intfs_c_,_drv_info_,("+871x_drv - dev_open\n"));
-	printk("+871x_drv - drv_open, bup=%d\n", padapter->bup);
+	printk("+8192cu_drv - drv_open, bup=%d\n", padapter->bup);
 
        if(padapter->bup == _FALSE)
     	{    
@@ -1061,12 +1061,12 @@ netdev_open_error:
 	
 }
 
-#ifdef CONFIG_PM
+
 int pm_netdev_open(struct net_device *pnetdev)
 {
 	return netdev_open(pnetdev);
 }
-#endif
+
 
 #ifdef CONFIG_IPS
 int  ips_netdrv_open(_adapter *padapter)
@@ -1143,7 +1143,18 @@ static int netdev_close(struct net_device *pnetdev)
 	}
 	else*/
 	{
-		printk("(2)871x_drv - drv_close, bup=%d, hw_init_completed=%d\n", padapter->bup, padapter->hw_init_completed);
+		printk("(2)8192cu_drv - drv_close, bup=%d, hw_init_completed=%d"
+			#ifdef CONFIG_PLATFORM_ANDROID
+			" bdisassoc_by_assoc=%d"
+			#endif
+			"\n"
+			, padapter->bup
+			, padapter->hw_init_completed
+			#ifdef CONFIG_PLATFORM_ANDROID
+			, padapter->bdisassoc_by_assoc
+			#endif
+			
+			);
 
 		//s1.
 		if(pnetdev)   
@@ -1152,9 +1163,9 @@ static int netdev_close(struct net_device *pnetdev)
 				netif_stop_queue(pnetdev);
      		}
 		
-		#ifdef CONFIG_PLATFORM_ANDROID	
-		if(!padapter->bdisassoc_by_assoc){
-		#endif
+		#ifndef CONFIG_PLATFORM_ANDROID	
+		//if(!padapter->bdisassoc_by_assoc){
+		//#endif
 		
 		//s2.	
 		//s2-1.  issue rtw_disassoc_cmd to fw
@@ -1166,9 +1177,9 @@ static int netdev_close(struct net_device *pnetdev)
 		//s2-4.
 		rtw_free_network_queue(padapter,_TRUE);
 
-		#ifdef CONFIG_PLATFORM_ANDROID
-		} 
-		padapter->bdisassoc_by_assoc=0;//FON
+		//#ifdef CONFIG_PLATFORM_ANDROID
+		//} 
+		//padapter->bdisassoc_by_assoc=0;//FON
 #endif
 
 	}

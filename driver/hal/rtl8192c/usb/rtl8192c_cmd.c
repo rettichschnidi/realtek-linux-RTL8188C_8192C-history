@@ -881,19 +881,30 @@ void dynamic_chk_wk_hdl(_adapter *padapter, u8 *pbuf, int sz)
 {
 	HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(padapter);
 	struct mlme_ext_priv *pmlmeext = &padapter->mlmeextpriv;
+	struct mlme_priv *pmlmepriv = &(padapter->mlmepriv);
 
-	if(pmlmeext->linked_to > 0)
+
+	/*
+	 * Commented by Jeff 2010/12/25
+	 * Long-time site survey will occpuy the medium causing no beacon
+	 * or probe respons is received form current AP.
+	 * If under site surveying, we don't decrese the "linked_to" counter
+	 * to prevent "linked_status_chk" 's over killing.
+	*/
+	if(check_fwstate(pmlmepriv, WIFI_SITE_MONITOR) == _FALSE)
 	{
-		pmlmeext->linked_to--;	
-		if(pmlmeext->linked_to==0)
-		    linked_status_chk(padapter);		
+		if(pmlmeext->linked_to > 0)
+		{
+			pmlmeext->linked_to--;	
+			if(pmlmeext->linked_to==0)
+			    linked_status_chk(padapter);		
+		}
 	}
 
 	if(pHalData->hal_ops.hal_dm_watchdog)
 		pHalData->hal_ops.hal_dm_watchdog(padapter);
 
 	//check_hw_pbc(padapter, pdrvextra_cmd->pbuf, pdrvextra_cmd->sz);	
-
 }
 
 u8 rtl8192c_drvextra_cmd_hdl(_adapter *padapter, unsigned char *pbuf)
@@ -1057,6 +1068,10 @@ void FillH2CCmd(_adapter* padapter, u8 ElementID, u32 CmdLen, u8* pCmdBuffer)
 	}
 	if(CmdLen > RTL92C_MAX_CMD_LEN){
 		return ;
+	}
+	if(padapter->bFWReady == _FALSE)		
+	{
+		return;
 	}
 	//pay attention to if  race condition happened in  H2C cmd setting.
 	do{

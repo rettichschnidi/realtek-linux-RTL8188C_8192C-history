@@ -359,7 +359,7 @@ void rtl8192cu_interface_configure(_adapter *padapter)
 #endif
 
 #if USB_RX_AGGREGATION_92C
-	pHalData->UsbRxAggMode		= USB_RX_AGG_DMA_USB;// USB_RX_AGG_DMA;
+	pHalData->UsbRxAggMode		=USB_RX_AGG_DMA;  // USB_RX_AGG_MIX;
 	pHalData->UsbRxAggBlockCount	= 8; //unit : 512b
 	pHalData->UsbRxAggBlockTimeout	= 0x6;
 	pHalData->UsbRxAggPageCount	= 48; //uint :128 b //0x0A;	// 10 = MAX_RX_DMA_BUFFER_SIZE/2/pHalData->UsbBulkOutSize
@@ -1361,7 +1361,7 @@ _InitUsbAggregationSetting(
 			valueDMA &= ~RXDMA_AGG_EN;
 			valueUSB |= USB_AGG_EN;
 			break;
-		case USB_RX_AGG_DMA_USB:
+		case USB_RX_AGG_MIX:
 			valueDMA |= RXDMA_AGG_EN;
 			valueUSB |= USB_AGG_EN;
 			break;
@@ -1385,7 +1385,7 @@ _InitUsbAggregationSetting(
 			rtw_write8(Adapter, REG_USB_AGG_TH, pHalData->UsbRxAggBlockCount);
 			rtw_write8(Adapter, REG_USB_AGG_TO, pHalData->UsbRxAggBlockTimeout);
 			break;
-		case USB_RX_AGG_DMA_USB:
+		case USB_RX_AGG_MIX:
 			rtw_write8(Adapter, REG_RXDMA_AGG_PG_TH, pHalData->UsbRxAggPageCount);
 			rtw_write8(Adapter, REG_USB_DMA_AGG_TO, pHalData->UsbRxAggPageTimeout);
 			rtw_write8(Adapter, REG_USB_AGG_TH, pHalData->UsbRxAggBlockCount);
@@ -2286,6 +2286,7 @@ _func_enter_;
 	rtw_write8(padapter, 0xfe40, 0xe0);
 	rtw_write8(padapter, 0xfe41, 0x8d);
 	rtw_write8(padapter, 0xfe42, 0x80);
+	rtw_write32(padapter,0x20c,0xfd0320);
 #endif
 
 	//misc

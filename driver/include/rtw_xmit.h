@@ -327,7 +327,7 @@ struct	xmit_priv	{
 	u64	tx_bytes;
 	u64	tx_pkts;
 	u64	tx_drop;
-	
+	u16 nqos_ssn;
 	struct hw_xmit *hwxmits;
 	u8	hwxmit_entry;
 

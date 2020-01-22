@@ -1245,9 +1245,9 @@ _ReadThermalMeter(
 		pEEPROM->EEPROMThermalMeter = 0x12;
 	
 	//pHalData->ThermalMeter[0] = pEEPROM->EEPROMThermalMeter;//?
-	//pHalData->ThermalValue = pEEPROM->EEPROMThermalMeter;
+	pHalData->ThermalValue = pEEPROM->EEPROMThermalMeter;
 
-	pHalData->ThermalValue = 0;//set to 0, will be update when do dm_txpower_tracking
+//	pHalData->ThermalValue = 0;//set to 0, will be update when do dm_txpower_tracking
 	
 	//RTPRINT(FINIT, INIT_TxPower, ("ThermalMeter = 0x%x\n", pHalData->EEPROMThermalMeter));
 	

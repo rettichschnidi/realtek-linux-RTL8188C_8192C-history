@@ -65,11 +65,11 @@ extern void cancel_all_timer(_adapter *padapter);
 extern int  ips_netdrv_open(_adapter *padapter);
 extern void ips_dev_unload(_adapter *padapter);
 #endif
-#ifdef CONFIG_PM
+
 extern int pm_netdev_open(struct net_device *pnetdev);
 int rtw_suspend(struct usb_interface *intf, pm_message_t message);
 int rtw_resume(struct usb_interface *intf);
-#endif
+
 
 extern u8 reset_drv_sw(_adapter *padapter);
 static void rtw_dev_unload(_adapter *padapter);
@@ -156,14 +156,8 @@ static drv_priv drvpriv = {
 	.rtw_usb_drv.probe = rtw_drv_init,
 	.rtw_usb_drv.disconnect = rtw_dev_remove,
 	.rtw_usb_drv.id_table = rtw_usb_id_tbl,
-
-#ifdef CONFIG_PM	
 	.rtw_usb_drv.suspend =  rtw_suspend,
 	.rtw_usb_drv.resume = rtw_resume,
-#else	
-	.rtw_usb_drv.suspend = NULL,
-	.rtw_usb_drv.resume = NULL,	
-#endif
 #ifdef CONFIG_AUTOSUSPEND	
 	.rtw_usb_drv.supports_autosuspend = 1,	
 #endif
@@ -394,6 +388,9 @@ static void rtw_intf_stop(_adapter *padapter)
 void ips_dev_unload(_adapter *padapter)
 {
 	struct net_device *pnetdev= (struct net_device*)padapter->pnetdev;
+	struct xmit_priv	*pxmitpriv = &(padapter->xmitpriv);
+	u8 trycnt = 100;
+	RT_TRACE(_module_hci_intfs_c_,_drv_err_,("+ips_dev_unload\n"));
 
 	RT_TRACE(_module_hci_intfs_c_,_drv_err_,("+ips_dev_unload\n"));
 	printk("%s...\n",__FUNCTION__);
@@ -404,7 +401,24 @@ void ips_dev_unload(_adapter *padapter)
 		//padapter->bDriverStopped = _TRUE;
 
 		//s3.
-		rtw_write8(padapter,0x522,0xff);//pause tx/rx
+		rtw_write8(padapter,0x522,0xff);//pause tx
+		//keep sn
+		pxmitpriv->nqos_ssn = rtw_read16(padapter,0x4dc);
+		//RX DMA stop
+		rtw_write32(padapter,0x284,(rtw_read32(padapter,0x284)|BIT18));
+		do{
+			if(!(rtw_read32(padapter,0x284)&BIT17))
+				break;				
+		}while(trycnt--);
+		if(trycnt ==0)
+		{
+			printk("Stop RX DMA failed \n");
+		}
+		//RQPN Load 0
+		rtw_write16(padapter,0x214,0x0);
+		rtw_write32(padapter,0x200,0x80000000);
+		rtw_mdelay_os(6);
+		
 		rtw_intf_stop(padapter);//cancel read /write port
 
 		//s5.
@@ -526,7 +540,7 @@ static void disable_ht_for_spec_devid(const struct usb_device_id *pdid)
 #endif
 }
 
-#ifdef CONFIG_PM
+
 int rtw_suspend(struct usb_interface *pusb_intf, pm_message_t message)
 {
 	struct net_device *pnetdev=usb_get_intfdata(pusb_intf);
@@ -682,7 +696,7 @@ error_exit:
 	printk("%s, Open net dev failed \n",__FUNCTION__);
 	return (-1);
 }
-#endif
+
 
 static u8 key_char2num(u8 ch)
 {

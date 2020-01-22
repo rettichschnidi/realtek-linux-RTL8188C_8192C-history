@@ -72,6 +72,7 @@ _func_enter_;
 	pmlmepriv->pscanned = NULL;
 	pmlmepriv->fw_state = 0;
 	pmlmepriv->cur_network.network.InfrastructureMode = Ndis802_11AutoUnknown;
+	pmlmepriv->passive_mode=1;// 1: active, 0: pasive. Maybe someday we should rename this varable to "active_mode" (Jeff)
 
 	_rtw_spinlock_init(&(pmlmepriv->lock));	
 	_rtw_init_queue(&(pmlmepriv->free_bss_pool));
@@ -1784,7 +1785,7 @@ _func_enter_;
 
 	if( (current_tx_pkts>pregistrypriv->busy_thresh)||(current_rx_pkts>pregistrypriv->busy_thresh)) 
 	{	
-		//printk("traffic_busy Curr_tx(%lld),Curr_rx(%lld)\n",current_tx_pkts,current_rx_pkts);
+		//printk("%s traffic_busy = true,Curr_tx(%lld),Curr_rx(%lld)\n",__FUNCTION__,current_tx_pkts,current_rx_pkts);
 		psitesurveyctrl->traffic_busy= _TRUE;
 	}
 	else 

@@ -9,30 +9,28 @@ EXTRA_CFLAGS += -Wno-unused-variable -Wno-unused-value -Wno-unused-label -Wno-un
 EXTRA_CFLAGS += -Wno-unused -Wno-unused-function
 EXTRA_CFLAGS += -I$(src)/include
 
-CONFIG_BUILT_IN                 =       n
-
 CONFIG_RTL8712			=	n
 CONFIG_RTL8192C			=       y
 
 CONFIG_USB_HCI			=	y
 CONFIG_SDIO_HCI			= 	n
 CONFIG_MP_INCLUDED		=	n
-CONFIG_POWER_SAVING	 					= 	n
-CONFIG_USB_AUTOSUSPEND 				= 	n
-CONFIG_PLATFORM_I386_PC	      =	y
-CONFIG_PLATFORM_ANDROID_X86		=		n
-CONFIG_PLATFORM_ARM_S3C2K4		= 	n
-CONFIG_PLATFORM_ARM_PXA2XX		= 	n
-CONFIG_PLATFORM_ARM_S3C6K4		= 	n
-CONFIG_PLATFORM_MIPS_RMI	= 	n
+CONFIG_POWER_SAVING			=	n
+CONFIG_USB_AUTOSUSPEND			=	n
+
+CONFIG_PLATFORM_I386_PC		=	y
+CONFIG_PLATFORM_ANDROID_X86	=	n
+CONFIG_PLATFORM_ARM_S3C2K4	=	n
+CONFIG_PLATFORM_ARM_PXA2XX	=	n
+CONFIG_PLATFORM_ARM_S3C6K4	=	n
+CONFIG_PLATFORM_MIPS_RMI	=	n
 CONFIG_PLATFORM_RTD2880B	=	n
-CONFIG_PLATFORM_MIPS_AR9132	= 	n
-CONFIG_PLATFORM_MT53XX			=	n
-CONFIG_PLATFORM_RTK_DMP			=	n
+CONFIG_PLATFORM_MIPS_AR9132	=	n
+CONFIG_PLATFORM_MT53XX		=	n
+CONFIG_PLATFORM_RTK_DMP		=	n
+CONFIG_PLATFORM_ARM_TCC8900	=	n
 
-CONFIG_DRVEXT_MODULE	        =       n
-
-export TopDIR ?= $(shell pwd)
+CONFIG_DRVEXT_MODULE	=	n
 
 
 ifeq ($(CONFIG_RTL8712), y)
@@ -80,12 +78,6 @@ endif
 
 ifeq ($(CONFIG_USB_HCI), y)
  
-ifeq ($(CONFIG_BUILT_IN), y)
-$(shell cp $(src)/autoconf_$(RTL871X)_usb_linux.h $(src)/include/autoconf.h)
-else
-$(shell cp $(TopDIR)/autoconf_$(RTL871X)_usb_linux.h $(TopDIR)/include/autoconf.h)
-endif
-
 #ifeq ($(CONFIG_BEST_BATTERYLIFE), y)
 #EXTRA_CFLAGS += -DCONFIG_BEST_BATTERYLIFE
 #endif
@@ -196,6 +188,13 @@ KVER:=
 KSRC ?= /root/Desktop/SVN/linux-2.6.12
 endif
 
+ifeq ($(CONFIG_PLATFORM_ARM_TCC8900), y)
+EXTRA_CFLAGS += -DCONFIG_LITTLE_ENDIAN -DCONFIG_PLATFORM_ANDROID
+ARCH ?= arm
+CROSS_COMPILE ?= /usr/src/telechip/SDK_0127_20101006/prebuilt/linux-x86/toolchain/arm-eabi-4.3.1/bin/arm-eabi-
+KSRC ?= /usr/src/telechip/SDK_0127_20101006/kernel
+endif
+
  
 _OS_INTFS_FILES :=	os_dep/osdep_service.o \
 			os_dep/linux/os_intfs.o \
@@ -241,22 +240,8 @@ rtk_core :=	core/rtw_cmd.o \
 		core/rtw_sta_mgt.o \
 		core/rtw_xmit.o \
 
-ifeq ($(CONFIG_BUILT_IN), y)
-
-obj-y += rtk_core.o
-
-obj-y += $(MODULE_NAME).o
-
-#obj-y := $(MODULE_NAME).o
-
-else
-
-obj-m := $(MODULE_NAME).o
 
 $(MODULE_NAME)-y += $(rtk_core)
-
-endif
-
 									
 $(MODULE_NAME)-y += core/efuse/rtl8712_efuse.o
 
@@ -271,7 +256,12 @@ $(MODULE_NAME)-$(CONFIG_MP_INCLUDED) += mp/rtl871x_mp.o \
 					mp/rtl871x_mp_ioctl.o \
 					ioctl/rtl871x_ioctl_rtl.o
 
+obj-$(CONFIG_RTL8192CU) := $(MODULE_NAME).o
+
+
 else
+
+export CONFIG_RTL8192CU = m
 
 all: modules
 

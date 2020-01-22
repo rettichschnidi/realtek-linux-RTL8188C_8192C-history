@@ -2972,6 +2972,7 @@ void mlmeext_sta_del_event_callback(_adapter *padapter)
 
 	if (is_client_associated_to_ap(padapter) || is_IBSS_empty(padapter))
 	{
+		u32 v ;
 		//set_opmode_cmd(padapter, infra_client_with_mlme);	
 
 		//switch to the 20M Hz mode after disconnect
@@ -2981,6 +2982,8 @@ void mlmeext_sta_del_event_callback(_adapter *padapter)
 	
 		//Set RCR to not to receive data frame when NO LINK state
 		//rtw_write32(padapter, REG_RCR, rtw_read32(padapter, REG_RCR) & ~RCR_ADF);
+		v= rtw_read32(padapter, REG_RCR);
+		v &= ~(RCR_CBSSID_DATA | RCR_CBSSID_BCN );
 		rtw_write16(padapter, REG_RXFLTMAP2,0x00);
 
 		//reset TSF
@@ -3041,6 +3044,14 @@ void linked_status_chk(_adapter *padapter)
 
 	if (is_client_associated_to_ap(padapter))
 	{
+	#if 0
+		printk("============ linked status check ===================\n");
+		printk("pathA Rx SNRdb:%d\n",padapter->recvpriv.RxSNRdB[0]);
+		printk("Rx RSSI:%d\n",padapter->recvpriv.rssi);
+		printk("Rx Signal_strength:%d\n",padapter->recvpriv.signal_strength);
+		printk("Rx Signal_qual:%d \n",padapter->recvpriv.signal_qual);
+		printk("============ linked status check ===================\n");
+	#endif	
 		//linked infrastructure client mode
 		if ((psta = rtw_get_stainfo(pstapriv, pmlmeinfo->network.MacAddress)) != NULL)
 		{
@@ -3050,7 +3061,7 @@ void linked_status_chk(_adapter *padapter)
 				//	Commented by Albert 2010/07/21
 				//	In this case, there is no any rx packet received by driver.
 				
-			        if(retry<3)
+			        if(retry<8)// Alter the retry limit to 8 
 				{
 					if(retry==0)
 					{

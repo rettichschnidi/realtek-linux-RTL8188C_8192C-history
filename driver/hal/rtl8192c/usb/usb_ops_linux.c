@@ -54,7 +54,7 @@ struct zero_bulkout_context{
 static int usbctrl_vendorreq(struct dvobj_priv  *pdvobjpriv, u8 request, u16 value, u16 index, void *pdata, u16 len, u8 requesttype)
 {
 	unsigned int pipe;
-	int status;
+	int status = 0;
 	u8 reqtype;
 	
 	struct usb_device *udev=pdvobjpriv->pusbdev;
@@ -688,7 +688,7 @@ static int recvbuf2recvframe(_adapter *padapter, _pkt *pskb)
 		switch(pHalData->UsbRxAggMode)
 		{
 			case USB_RX_AGG_DMA:
-			case USB_RX_AGG_DMA_USB:
+			case USB_RX_AGG_MIX:
 				pkt_offset = (u16)_RND128(pkt_offset);
 				break;
 				case USB_RX_AGG_USB:
@@ -1123,7 +1123,7 @@ _func_enter_;
 	}
 
 	
-	if(rtw_txframes_pending(padapter))	
+	//if(rtw_txframes_pending(padapter))	
 	{
 		tasklet_hi_schedule(&pxmitpriv->xmit_tasklet);
 	}

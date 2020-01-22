@@ -456,7 +456,11 @@ inline static char *translate_scan(_adapter *padapter,
 	//iwe.u.qual.updated = IW_QUAL_QUAL_UPDATED | IW_QUAL_LEVEL_UPDATED | IW_QUAL_NOISE_INVALID;
 	
 	// we only update signal_level (signal strength) that is rssi.
-	iwe.u.qual.updated = IW_QUAL_QUAL_UPDATED | IW_QUAL_LEVEL_UPDATED | IW_QUAL_NOISE_INVALID;
+	iwe.u.qual.updated = IW_QUAL_QUAL_UPDATED | IW_QUAL_LEVEL_UPDATED | IW_QUAL_NOISE_INVALID
+	#ifdef CONFIG_PLATFORM_ANDROID
+		| IW_QUAL_DBM
+	#endif
+	;
 	
 	//H(signal strength) = H(signal quality) + H(noise level);	
 #ifdef CONFIG_PLATFORM_ANDROID
@@ -696,6 +700,7 @@ _func_enter_;
                                         padapter->securitypriv.binstallGrpkey = _TRUE;	
 					//DEBUG_ERR(("\n param->u.crypt.key_len=%d\n", param->u.crypt.key_len));
 					//DEBUG_ERR(("\n ~~~~stastakey:groupkey\n"));
+					padapter->securitypriv.dot118021XGrpKeyid = param->u.crypt.idx;
 					rtw_set_key(padapter,&padapter->securitypriv,param->u.crypt.idx);
 				}						
 			}
@@ -1757,7 +1762,7 @@ static int rtw_wx_set_scan(struct net_device *dev, struct iw_request_info *a,
 		goto exit;
 	} 
 
-
+/*
 	if(pmlmepriv->scan_interval>10)
 		pmlmepriv->scan_interval = 0;
 
@@ -1767,7 +1772,7 @@ static int rtw_wx_set_scan(struct net_device *dev, struct iw_request_info *a,
 		ret = 0;
 		goto exit;
 	}
-		
+*/		
 
 #if WIRELESS_EXT >= 17
 	if (wrqu->data.length == sizeof(struct iw_scan_req)) 
@@ -3619,8 +3624,20 @@ static int rtw_dbg_port(struct net_device *dev,
 			printk("write_bbreg(0x%x)=0x%x\n", arg, read_bbreg(padapter, arg, 0xffffffff));	
 			break;
 		case 0x74://read_rf		
+			{
+				u32 value ;
+				value = PHY_QueryRFReg(padapter, minor_cmd, arg, 0xffffffff);	
+				printk("read RF_reg path(0x%02x),offset(0x%x),value(0x%08x)\n",minor_cmd,arg,value);
+			}
 			break;
 		case 0x75://write_rf		
+			{
+				u32 value = extra_arg;
+				PHY_SetRFReg(padapter, minor_cmd, arg, 0xffffffff, value);
+				printk("write RF_reg path(0x%02x),offset(0x%x),value(0x%08x)\n",minor_cmd,arg,value);
+				value = PHY_QueryRFReg(padapter, minor_cmd, arg, 0xffffffff);	
+				printk("read RF_reg path(0x%02x),offset(0x%x),value(0x%08x)\n",minor_cmd,arg,value);
+			}
 			break;	
 
 		case 0x7F:
@@ -3814,13 +3831,13 @@ static int rtw_dbg_port(struct net_device *dev,
 							
 					}
 					break;
-				case 0x0c:
+				case 0x0c://dump rx packet
 					{
 						printk("dump rx packet (%d)\n",extra_arg);
 						pHalData->bDumpRxPkt =extra_arg;						
 					}
 					break;
-				case 0x0d:
+				case 0x0d://dump cam
 					{
 						//u8 entry = (u8) extra_arg;
 						u8 entry=0;
@@ -3829,11 +3846,27 @@ static int rtw_dbg_port(struct net_device *dev,
 							read_cam(padapter,entry);
 					}				
 					break;
-				case 0xdd://dump registers
+				case 0xdd://dump mac registers
 					{
 						int i,j=1,path;
 						u32 value;		
-						for(i=0;i<0x1000;i+=4)
+						if(extra_arg==0){
+							for(i=0x0;i<0x300;i+=4)
+							{	
+								if(j%4==1)	printk("0x%02x",i);
+								
+								printk(" 0x%08x ",rtw_read32(padapter,i));		
+								if((j++)%4 == 0)	printk("\n");	
+							}
+							for(i=0x400;i<0x800;i+=4)
+							{	
+								if(j%4==1)	printk("0x%02x",i);
+								printk(" 0x%08x ",rtw_read32(padapter,i));		
+								if((j++)%4 == 0)	printk("\n");	
+							}
+						}
+						else if(extra_arg==1){
+							for(i=0x800;i<0x1000;i+=4)
 						{
 							if(j%4==1)
 							{
@@ -3844,7 +3877,14 @@ static int rtw_dbg_port(struct net_device *dev,
 							printk(" 0x%08x ",rtw_read32(padapter,i));		
 							if((j++)%4 == 0)	printk("\n");	
 						}						
+						}
 
+					}
+					break;
+				case 0xcc://dump rf registers
+					{
+						int i,j=1,path;
+						u32 value;			
 						for(path=0;path<2;path++)
 						{
 							printk("\nRF_Path(%x)\n",path);
@@ -3856,6 +3896,23 @@ static int rtw_dbg_port(struct net_device *dev,
 								if((j++)%4==0)	printk("\n");	
 							}	
 						}					
+					}
+					break;
+				case 0xee://turn on/off dynamic funcs
+					{	
+						struct dm_priv *pdmpriv = &padapter->dmpriv;
+						if(extra_arg == 0){
+							pdmpriv->DMFlag = DYNAMIC_FUNC_DISABLE;
+						}
+						else if(extra_arg == 1){
+							pdmpriv->DMFlag &= (~DYNAMIC_FUNC_DIG);
+						}
+						else if(extra_arg == 2){
+							pdmpriv->DMFlag &= (~DYNAMIC_FUNC_SS);
+						}
+						else if(extra_arg == 3){
+							pdmpriv->DMFlag |= (DYNAMIC_FUNC_DIG|DYNAMIC_FUNC_SS) ;
+						}			
 					}
 					break;
 				case 0xfd:
@@ -5904,7 +5961,7 @@ static struct iw_statistics *rtw_get_wireless_stats(struct net_device *dev)
 		piwstats->qual.noise = tmp_noise;
 	}
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,14))
-	piwstats->qual.updated = IW_QUAL_ALL_UPDATED |IW_QUAL_DBM;
+	piwstats->qual.updated = IW_QUAL_QUAL_UPDATED | IW_QUAL_LEVEL_UPDATED | IW_QUAL_NOISE_INVALID | IW_QUAL_DBM;
 #else
         piwstats->qual.updated = 0x0f;
 #endif
