@@ -21,13 +21,14 @@
 		2.15 Miracast_for_Realtek_WiFi.pdf
 
 	3. driver/
-		3.1 rtl8188C_8192C_usb_linux_v4.0.2_9000.20130911.tar.gz
-			Naming rule: rtlCHIPS_linux_vM.N.P_ssss.yyyymmdd[_beta].tar.gz
+		3.1 rtl8188C_8192C_usb_linux_v4.0.5_11249.20140422.tar.gz
+			Naming rule: rtlCHIPS_linux_vM.N.P[.H]_sssss.yyyymmdd[_beta].tar.gz
 			where:
 				CHIPS: supported chips
 				M: Major version
 				N: miNor version
 				P: Patch number
+				H: Hotfix number
 				s: SVN number
 				y: package year
 				m: package month
@@ -48,62 +49,38 @@
 		4.5 p2p_hostapd.conf
 			 Configure file for hostapd for Wi-Fi Direct (P2P)
 
-		4.6 wpa_supplicant_8_jb_4.1_rtw_r7473.20130517.tar.gz
-			 wpa_supplicant_8 from Android 4.1 SDK and patched by Realtek
-			 could be used for pure-linux and Android 4.1. Support only cfg80211/nl80211.
-
-		4.7 wpa_supplicant_8_jb_4.2_rtw_r8680.20130821.tar.gz
+		4.6 wpa_supplicant_8_jb_4.2_rtw_r8680.20130821.tar.gz
 			 wpa_supplicant_8 from Android 4.2 SDK and patched by Realtek
 			 could be used for pure-linux and Android 4.2. Support only cfg80211/nl80211.
+
+		4.7 wpa_supplicant_8_kk_4.4_rtw_r10450.20140220.tar.gz
+			 wpa_supplicant_8 from Android 4.4 SDK and patched by Realtek
+			 could be used for pure-linux and Android 4.4. Support only cfg80211/nl80211.
 
 	5. wireless_tools/
 		5.1 wireless_tools.30.rtl.tar.gz
 
-	6. hardware_wps_pbc/
-		6.1 Readme.txt
-		6.2 sample.c
+	6. android_ref_codes_JB_4.2
+		6.1 linux-3.0.42_STATION_INFO_ASSOC_REQ_IES.diff
+			Kernel patch file for cfg80211's STATION_INFO_ASSOC_REQ_IES event for kernel 3.0.
 
-	7. WiFi_Direct_User_Interface/
-		7.1 p2p_api_test_linux.c
-		7.2 p2p_ui_test_linux.c
-		7.3 p2p_test.h
-		7.4 Start_Guide_P2P_User_Interface_Linux.pdf
-
-	8. android_reference_codes/
-		8.1 realtek_wifi_SDK_for_android_20120618.tar.gz
-			This tar ball includes our android wifi reference codes
-
-		8.2 realtek_wifi_SDK_for_android.txt
-			Guide for porting Realtek wifi onto your Android system
-
-	9. android_reference_codes_ICS_nl80211/
-		9.1 realtek_wifi_SDK_for_android_ICS_20120621.tar.gz
-			This tar ball includes our android wifi reference codes for Android 4.0
-
-		9.2 Realtek_Wi-Fi_SDK_for_Android_ICS.pdf
-			Guide for porting Realtek wifi onto your Android 4.0 system
-
-	10. android_ref_codes_JB_4.1
-		10.1 linux-3.0.42_STATION_INFO_ASSOC_REQ_IES.diff
-			Kernel patch file for config80211's STATION_INFO_ASSOC_REQ_IES event for kernel 3.0.
-
-		10.2 realtek_wifi_SDK_for_android_JB_4.1_20130306.tar.gz
-			This tar ball includes our android wifi reference codes for Android 4.1
-
-		10.3 Realtek_Wi-Fi_SDK_for_Android_JB_4.1.pdf
-			Guide for porting Realtek wifi onto your Android 4.1 system
-
-	11. android_ref_codes_JB_4.2
-		11.1 linux-3.0.42_STATION_INFO_ASSOC_REQ_IES.diff
-			Kernel patch file for config80211's STATION_INFO_ASSOC_REQ_IES event for kernel 3.0.
-
-		11.2 realtek_wifi_SDK_for_android_JB_4.2_20130208.tar.gz
+		6.2 realtek_wifi_SDK_for_android_JB_4.2_20130208.tar.gz
 			This tar ball includes our android wifi reference codes for Android 4.2
 
-		11.3 Realtek_Wi-Fi_SDK_for_Android_JB_4.2.pdf
+		6.3 Realtek_Wi-Fi_SDK_for_Android_JB_4.2.pdf
 			Guide for porting Realtek wifi onto your Android 4.2 system
 
-	12. install.sh
+	7. android_ref_codes_KK_4.4
+		7.1 linux-3.0.42_STATION_INFO_ASSOC_REQ_IES.diff
+			Kernel patch file for cfg80211's STATION_INFO_ASSOC_REQ_IES event for kernel 3.0.
+
+		7.2 realtek_wifi_SDK_for_android_KK_4.4_20140117.tar.gz
+			This tar ball includes our android wifi reference codes for Android 4.3
+
+		7.3 Realtek_Wi-Fi_SDK_for_Android_KK_4.4.pdf
+			Guide for porting Realtek wifi onto your Android 4.4 system
+
+	8. install.sh
 		Script to compile and install WiFi driver easily in PC-Linux
 
 ==================================================================================================================
@@ -127,12 +104,11 @@
 			(*) Please refer to document/RTK_P2P_WFD_Programming_guide.pdf
 			(*) Please use wpa_supplicant_hostapd-0.8_rtw_r7475.20130812.tar.gz
 			(*) Please refer to document/linux_dhcp_server_notes.txt
-			(*) Please refer to WiFi_Direct_User_Interface/
 		Wi-Fi Direct with nl80211
 			(*) Please use:
-					wpa_supplicant_8_jb_4.1_rtw_r7473.20130517.tar.gz
-				or
 					wpa_supplicant_8_jb_4.2_rtw_r8680.20130821.tar.gz
+				or
+					wpa_supplicant_8_kk_4.4_rtw_r10450.20140220.tar.gz
 			(*) For P2P instruction/command, please refer to:
 					README-P2P inside the wpa_supplicant folder of the wpa_supplicant_8 you choose
 			(*) For DHCP server, please refer to:
@@ -143,9 +119,9 @@
 			(*) Please use:
 					wpa_supplicant_hostapd-0.8_rtw_r7475.20130812.tar.gz
 				or
-					wpa_supplicant_8_jb_4.1_rtw_r7473.20130517.tar.gz
-				or
 					wpa_supplicant_8_jb_4.2_rtw_r8680.20130821.tar.gz
+				or
+					wpa_supplicant_8_kk_4.4_rtw_r10450.20140220.tar.gz
 			(*) For WPS instruction/command, please refert to:
 					README-WPS inside the wpa_supplicant folder of the wpa_supplicant_8 you choose
 ==================================================================================================================
@@ -155,7 +131,6 @@
 ==================================================================================================================
 		User Guide for Applying Wi-Fi solution onto Andriod System
 ==================================================================================================================
-			(*) For Android 1.6 ~ 2.3, Please refer to android_reference_codes/realtek_wifi_SDK_for_android.txt
-			(*) For Android 4.0, please refer to android_reference_codes_ICS_nl80211/Realtek_Wi-Fi_SDK_for_Android_ICS.pdf
-			(*) For Android 4.1, please refer to android_ref_codes_JB_4.1/Realtek_Wi-Fi_SDK_for_Android_JB_4.1.pdf
+			(*) For Android 1.6 ~ 2.3, 4.0, 4.1, 4.3, please contact us for further information
 			(*) For Android 4.2, please refer to android_ref_codes_JB_4.2/Realtek_Wi-Fi_SDK_for_Android_JB_4.2.pdf
+			(*) For Android 4.4, please refer to android_ref_codes_KK_4.4/Realtek_Wi-Fi_SDK_for_Android_KK_4.4.pdf
