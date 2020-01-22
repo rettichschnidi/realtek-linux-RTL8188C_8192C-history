@@ -12,20 +12,24 @@
 #define CMD_SZ 100
 #define SSID_SZ	32
 
+#define SEC 1000000
 #define SCAN_POOL_NO	8
-#define NEGO_RETRY_INTERVAL 10000000
-#define PRE_NEGO_INTERVAL 500000
+#define NEGO_RETRY_INTERVAL 10 * SEC
+#define NEGO_QUERY_INTERVAL 0.5 * SEC
+#define PRE_NEGO_INTERVAL 0.5 * SEC
 #define MAX_PROV_RETRY 15
 #define PROV_RETRY_INTERVAL 5
-#define PROV_WAIT_TIME	1000000
+#define PROV_WAIT_TIME	1 * SEC
 #define MAX_NEGO_RETRY 60
-#define NEGO_WAIT_TIME	500000
+#define NEGO_WAIT_TIME	0.5 * SEC
 #define	WPS_RETRY 120
-#define SUPPLICANT_INIT_TIME 1000000
-#define HOSTAPD_INIT_TIME	1000000
-#define SUPPLICANT_INTERVAL 1000000
-#define HOSTAPD_INTERVAL 1000000
-#define POLLING_INTERVAL	1000000
+#define SUPPLICANT_INIT_TIME 1 * SEC
+#define HOSTAPD_INIT_TIME	1 * SEC
+#define SUPPLICANT_INTERVAL 1 * SEC
+#define HOSTAPD_INTERVAL 1 * SEC
+#define POLLING_INTERVAL	1 * SEC
+#define _TRUE 1
+#define _FALSE 0
 
 #define WPS_CONFIG_METHOD_LABEL		0x0004
 #define WPS_CONFIG_METHOD_DISPLAY	0x0008
@@ -97,6 +101,7 @@ struct p2p{
 	int p2p_get;	//p2p_get==1 : print messages from ioctl p2p_get
 	char print_line[CMD_SZ];
 	int have_p2p_dev;	//have_p2p_dev==1 : after scanning p2p device
+	int show_scan_result;
 	int	count_line;
 	char peer_ifaddr[18];
 	char cmd[CMD_SZ];
@@ -123,6 +128,7 @@ struct p2p{
 	int res_go;	//created if p2p device becomes GO
 	struct scan scan_pool[SCAN_POOL_NO];
 	int connect_go;
+	int no_sta_connected;
 };
 
 void ui_screen(struct p2p *p);

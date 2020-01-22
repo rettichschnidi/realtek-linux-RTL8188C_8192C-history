@@ -107,9 +107,10 @@ void ui_screen(struct p2p *p)
 	
 	printf("****************************************************************************************************\n");
 	
-	if( (p->have_p2p_dev == 1) && (p->enable >= P2P_ROLE_DEVICE) && ( p->wpsing == 0 ) && (p->status >= P2P_STATE_LISTEN && p->status <= P2P_STATE_FIND_PHASE_SEARCH) )
+	if( ( p->show_scan_result == 1 ) && ( p->have_p2p_dev == 1 ) )
+	//if( (p->have_p2p_dev == 1) && (p->enable >= P2P_ROLE_DEVICE) && ( p->wpsing == 0 ) && (p->status >= P2P_STATE_LISTEN && p->status <= P2P_STATE_FIND_PHASE_SEARCH) )
 	{
-		scan_result(p);
+			scan_result(p);
 	}
 	else
 	{
@@ -119,7 +120,8 @@ void ui_screen(struct p2p *p)
 	}	
 	
 	printf("****************************************************************************************************\n");
-	
+
+	p->show_scan_result = 0;
 }
 
 void init_p2p(struct p2p *p)
@@ -148,24 +150,59 @@ void init_p2p(struct p2p *p)
 	strcpy(p->redo_msg, "Re-do GO handshake" );
 	strcpy(p->fail_msg, "GO handshake unsuccessful" );
 	strcpy(p->nego_msg, "Start P2P negotiation" );
+	strcpy(p->wpa_conf, "./wpa_0_8.conf" );
+	strcpy(p->wpa_path, "./wpa_supplicant" );
+	strcpy(p->wpacli_path, "./wpa_cli" );
+	strcpy(p->ap_conf, "./p2p_hostapd.conf" );
+	strcpy(p->ap_path, "./hostapd" );
+	strcpy(p->apcli_path, "./hostapd_cli" );
 	strcpy(p->scan_msg, "Device haven't enable p2p functionalities" );
 	
-	strcpy(p->wpa_conf, "../wpa_supplicant_hostapd/wpa_0_8.conf" );
-	strcpy(p->wpa_path, "../wpa_supplicant_hostapd/wpa_supplicant_hostapd-0.8/wpa_supplicant/wpa_supplicant" );
-	strcpy(p->wpacli_path, "../wpa_supplicant_hostapd/wpa_supplicant_hostapd-0.8/wpa_supplicant/wpa_cli" );
-	strcpy(p->ap_conf, "../wpa_supplicant_hostapd/p2p_hostapd.conf" );
-	strcpy(p->ap_path, "../wpa_supplicant_hostapd/wpa_supplicant_hostapd-0.8/hostapd/hostapd" );
-	strcpy(p->apcli_path, "../wpa_supplicant_hostapd/wpa_supplicant_hostapd-0.8/hostapd/hostapd_cli" );
 }
+
+void rename_intf(struct p2p *p)
+{
+	FILE *pfin = NULL;
+	FILE *pfout = NULL;
+	
+	pfin = fopen( p->ap_conf, "r" );
+	pfout = fopen( "./p2p_hostapd_temp.conf", "w" );
+	
+	if ( pfin )
+	{
+		while( !feof( pfin ) ){
+			memset(p->parse, 0x00, CMD_SZ);
+			fgets(p->parse, CMD_SZ, pfin);
+			
+			if(strncmp(p->parse, "interface=", 10) == 0)
+			{
+				memset(p->parse, 0x00, CMD_SZ);
+				sprintf( p->parse, "interface=%s\n", p->ifname );
+				fputs( p->parse, pfout );
+			}
+			else
+				fputs(p->parse, pfout);
+		}
+	}
+
+	fclose( pfout );
+	
+	system( "rm -rf ./p2p_hostapd.conf" );
+	system( "mv ./p2p_hostapd_temp.conf ./p2p_hostapd.conf" );
+	
+	return;
+}
+
 
 //int main()
 int main(int argc, char **argv)
 {
 	char	peerifa[40] = { 0x00 };
 	char	scan[CMD_SZ];	
+	struct p2p p2pstruct;
 	struct p2p *p=NULL;
-	
-	p = (struct p2p* )malloc(sizeof(struct p2p));
+
+	p = &p2pstruct;	
 	if( p != NULL)
 	{
 		memset(p, 0x00, sizeof(struct p2p));
@@ -180,6 +217,8 @@ int main(int argc, char **argv)
 	p2p_get_hostapd_conf(p);
 	usleep(50000);
   
+  rename_intf(p);
+  
 	do
 	{
 		ui_screen(p);
@@ -193,15 +232,18 @@ int main(int argc, char **argv)
 			
 			if( strncmp(scan, "e", 1) == 0 )	//Enable
 			{
+				p->show_scan_result = 1;
 				ui_screen(p);
 				printf("Please insert enable mode;[0]Disable, [1]Device, [2]Client, [3]GO:");
 				scanf("%d",&p->enable);
 	
 				p2p_enable(p);
+				p->show_scan_result = 1;
 			}
 			else if( strncmp(scan, "a", 1) == 0 )	// Scan P2P device
 			{
 				p2p_scan(p);
+				p->show_scan_result = 1;
 			}
 			else if( strncmp(scan, "d", 1) == 0 )	// Set device name
 			{
@@ -209,21 +251,26 @@ int main(int argc, char **argv)
 				printf("Please insert device name :");
 				scanf("\n%[^\n]", p->dev_name);
 				p2p_setDN(p);
+				p->show_scan_result = 1;
 			}
 			else if( strncmp(scan, "i", 1) == 0 )	// Intent
 			{
+				p->show_scan_result = 1;
 				ui_screen(p);
 				printf("Please insert intent from [0~15(must be softap)] :");
 				scanf("%d",&p->intent);
 				p2p_intent(p);
+				p->show_scan_result = 1;
 			}
 			else if( strncmp(scan, "w", 1) == 0 )	// WPS_info
 			{
+				p->show_scan_result = 1;
 				ui_screen(p);
 				printf("Please insert WPS method\n");
 				printf("[0]None, [1]Peer Display PIN, [2]Self Display Pin, [3]PBC :");
 				scanf("%d",&p->wps_info);
 				p2p_wpsinfo(p);
+				p->show_scan_result = 1;
 			}
 			else if( strncmp(scan, "c", 1) == 0 )	// PIN_code
 			{
@@ -234,17 +281,26 @@ int main(int argc, char **argv)
 				strcpy(ins_no_again, "Invalid number, insert again, eg:12345670 :" );
 	
 				p2p_pincode(p, ins_no, ins_no_again);
+				p->show_scan_result = 1;
 			}
 			else if( strncmp(scan, "m", 1) == 0 )	// Set peer device address
 			{
+				p->show_scan_result = 1;
 				ui_screen(p);
 				printf("Please insert number in scan list:");
 				p2p_devaddr(p);
+				p->show_scan_result = 1;
 			}
 			else if( strncmp(scan, "r", 1) == 0 )	// Get role
+			{
 				p2p_role(p,1);
+				p->show_scan_result = 1;
+			}
 			else if( strncmp(scan, "s", 1) == 0 )	// Get status
+			{
 				p2p_status(p, 1);
+				p->show_scan_result = 1;
+			}
 			else if( strncmp(scan, "p", 1) == 0 )	// Provision discovery
 			{
 				char msg[CMD_SZ];
@@ -260,13 +316,14 @@ int main(int argc, char **argv)
 					strcpy( msg, "Please insert peer P2P device at first" );			
 	
 					p2p_prov_disc_no_addr(p, msg);
+					p->show_scan_result = 1;
 				}
 				else
 				{
 					strcpy( msg, "Please insert WPS configuration method ;[0]display, [1]keypad, [2]pbc, [3]label:\n" );
 					strcpy( dis_msg, "Please insert PIN code displays on peer device screen:" );
 					strcpy( label_msg, "Please insert PIN code displays on peer label:" );
-					
+
 					p2p_prov_disc(p, msg, dis_msg, label_msg);
 				}
 			}
@@ -276,6 +333,7 @@ int main(int argc, char **argv)
 			}
 			else if( strncmp(scan, "f", 1) == 0 ) // Reflash current state
 			{
+				p->show_scan_result = 1;
 				p2p_status(p, 0);
 				p2p_role(p, 0);
 				p2p_ifaddr(p);
@@ -325,6 +383,7 @@ int main(int argc, char **argv)
 				strcpy( msg, "Please insert desired operation channel:" );			
 	
 				p2p_set_opch(p, msg, 1);
+				p->show_scan_result = 1;
 			}
 			else if( strncmp(scan, "t", 1) == 0 )	// Set SoftAP ssid
 			{
@@ -333,6 +392,7 @@ int main(int argc, char **argv)
 				strcpy( msg, "Please insert desired SoftAP ssid:" );			
 	
 				p2p_softap_ssid(p, msg, 1);
+				p->show_scan_result = 1;
 			}
 			else if( strncmp(scan, "l", 1) == 0 )	// Set Listen channel
 			{
@@ -341,6 +401,7 @@ int main(int argc, char **argv)
 				strcpy( msg, "Please insert desired Listen channel, only ch.1.6.11 are available:" );			
 
 				p2p_listen_ch(p, msg);
+				p->show_scan_result = 1;
 			}
 			else if( strncmp(scan, "q", 1) == 0 )	// Quit
 			{
@@ -353,6 +414,7 @@ int main(int argc, char **argv)
 			else	// Insert wrong commamd
 			{
 				p->p2p_get=1;
+				p->show_scan_result = 1;
 				memset( p->print_line, 0x00, CMD_SZ );
 				sprintf( p->print_line, " BAD argument");
 			}
@@ -462,7 +524,6 @@ int main(int argc, char **argv)
 	p->enable= -1 ;
 	p2p_enable(p);
 
-	free(p);
 	system( "rm -f ./supp_status.txt" );
 	system( "rm -f ./temp.txt" );
 	system( "rm -f ./scan.txt" );

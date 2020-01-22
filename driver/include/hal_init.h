@@ -273,7 +273,10 @@ typedef enum _wowlan_subcode{
 	WOWLAN_DUMP_REG      = 5,
 	WOWLAN_ENABLE        = 6,
 	WOWLAN_DISABLE       = 7,
-	WOWLAN_STATUS		= 8
+	WOWLAN_STATUS		= 8,
+	WOWLAN_DEBUG_RELOAD_FW	= 9,
+	WOWLAN_DEBUG_1		=10,
+	WOWLAN_DEBUG_2		=11
 }wowlan_subcode;
 
 struct wowlan_ioctl_param{

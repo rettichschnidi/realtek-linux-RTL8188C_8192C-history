@@ -347,6 +347,7 @@ struct mlme_priv {
 	_timer	dynamic_chk_timer; //dynamic/periodic check timer
 
  	u8 	key_mask; //use for ips to set wep key after ips_leave
+	u8	acm_mask; // for wmm acm mask
 	u8	ChannelPlan;
 	RT_SCAN_TYPE scan_mode; // active: 1, passive: 0
 

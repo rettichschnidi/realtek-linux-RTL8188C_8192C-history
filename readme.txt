@@ -16,10 +16,9 @@
 		2.10 linux_dhcp_server_notes.txt
 		2.11 Quick_Start_Guide_for_Bridge.pdf
 		2.13 RTK_Wi-Fi_Direct_Programming_guide.pdf
-		2.14 RTL8192D_operation_mode.pdf
 
 	3. driver/ 
-		3.1 rtl8188C_8192C_8192D_usb_linux_v3.4.2_3727.20120404.tar.gz
+		3.1 rtl8188C_8192C_usb_linux_v3.4.3_4369.20120622.tar.gz
 			Naming rule: rtlCHIPS_linux_vM.N.P_ssss.yyyymmdd.tar.gz
 			where:
 				CHIPS: supported chips
@@ -32,7 +31,7 @@
 				d: package day
 		
 	4. wpa_supplicant_hostapd/
-		4.1 wpa_supplicant_hostapd-0.8_rtw_20111118.zip
+		4.1 wpa_supplicant_hostapd-0.8_rtw_20120622.zip
 			
 			4.1.1 wpa_supplicant
 				The tool help the wlan network to communicate under the
@@ -69,14 +68,14 @@
 		7.4 Start_Guide_P2P_User_Interface_Linux.pdf
 		
 	8. android_reference_codes/
-		8.1 realtek_wifi_SDK_for_android_20111103.tar.gz
+		8.1 realtek_wifi_SDK_for_android_20120618.tar.gz
 			This tar ball includes our android wifi reference codes
 			
 		8.2 realtek_wifi_SDK_for_android.txt
 			Guide for porting Realtek wifi onto your Android system
 			
 	9. android_reference_codes_ICS_nl80211/
-		9.1 realtek_wifi_SDK_for_android_ICS_20120404.tar.gz
+		9.1 realtek_wifi_SDK_for_android_ICS_20120621.tar.gz
 			This tar ball includes our android wifi reference codes for Android 4.x (ICS)
 			
 		9.2 Realtek_Wi-Fi_SDK_for_Android_ICS.pdf
@@ -97,19 +96,19 @@
 		User Guide for Soft-AP mode
 ==================================================================================================================
 			(*) Please refer to document/Quick_Start_Guide_for_SoftAP.pdf
-			(*) Please use wpa_supplicant_hostapd-0.8_rtw_20111118.zip
+			(*) Please use wpa_supplicant_hostapd-0.8_rtw_20120622.zip
 			(*) Please refer to document/linux_dhcp_server_notes.txt
 ==================================================================================================================
 		User Guide for Wi-Fi Direct
 ==================================================================================================================
 			(*) Please refer to document/RTK_Wi-Fi_Direct_Programming_guide.pdf
-			(*) Please use wpa_supplicant_hostapd-0.8_rtw_20111118.zip
+			(*) Please use wpa_supplicant_hostapd-0.8_rtw_20120622.zip
 			(*) Please refer to document/linux_dhcp_server_notes.txt
 			(*) Please refer to WiFi_Direct_User_Interface/
 ==================================================================================================================
 		User Guide for WPS2.0
 ==================================================================================================================
-			(*) Please use wpa_supplicant_hostapd-0.8_rtw_20111118.zip
+			(*) Please use wpa_supplicant_hostapd-0.8_rtw_20120622.zip
 ==================================================================================================================
 		User Guide for Power Saving Mode
 ==================================================================================================================

@@ -3801,7 +3801,97 @@ static int wpa_driver_nl80211_send_mlme(void *priv, const u8 *data,
 	return wpa_driver_nl80211_send_frame(drv, data, data_len, encrypt);
 }
 
+#define RTL871X_HIDDEN_SSID_SUPPORT
+#ifdef RTL871X_HIDDEN_SSID_SUPPORT
+#include "../ap/hostapd.h"
+#include "../ap/ap_config.h"
+#include "wireless_copy.h"
 
+#define RTL_IOCTL_HOSTAPD (SIOCIWFIRSTPRIV + 28)
+
+enum {
+	RTL871X_HOSTAPD_SET_HIDDEN_SSID = 20,
+};
+
+typedef struct ieee_param {
+	u32 cmd;
+	u8 sta_addr[ETH_ALEN];
+       union {
+		struct {
+			u8 name;
+			u32 value;
+		} wpa_param;
+	} u;
+	   
+} ieee_param;
+
+static int rtl871x_hostapd_ioctl(const char *iface, ieee_param *param, int len)
+{
+	int ret = 0;
+	struct iwreq iwr;
+	int ioctl_sock;
+
+	os_memset(&iwr, 0, sizeof(iwr));
+	os_strlcpy(iwr.ifr_name, iface, IFNAMSIZ);
+	iwr.u.data.pointer = (caddr_t) param;
+	iwr.u.data.length = len;
+
+	ioctl_sock = socket(PF_INET, SOCK_DGRAM, 0);
+	if (ioctl_sock < 0) {
+		wpa_printf(MSG_ERROR, "socket[PF_INET,SOCK_DGRAM]");
+		ret = -1;
+		goto exit;
+	}
+
+
+	if (ioctl(ioctl_sock, RTL_IOCTL_HOSTAPD, &iwr) < 0) {
+		wpa_printf(MSG_ERROR, "ioctl[RTL_IOCTL_HOSTAPD]");
+		ret =-1;
+		goto close_sock;
+	}
+	
+close_sock:
+	close(ioctl_sock);
+
+exit:
+	return ret;
+}
+
+static int rtl871x_set_hidden_ssid_ops(const char *iface, u8 value)
+{
+	int ret;
+	ieee_param pparam;
+
+	pparam.cmd = RTL871X_HOSTAPD_SET_HIDDEN_SSID;
+	pparam.u.wpa_param.name = 0;
+	pparam.u.wpa_param.value = value;
+
+	ret = rtl871x_hostapd_ioctl(iface, &pparam, sizeof(ieee_param));
+
+	return ret;	
+}
+
+const u8 * get_ie(u8 *ies, size_t ies_len, u8 id)
+{
+	const u8 *end, *pos;
+
+	pos = ies;
+	end = pos + ies_len;
+
+	while (pos + 1 < end) {
+		if (pos + 2 + pos[1] > end)
+			break;
+
+		//printf("id:%u, clen:%u\n", pos[0], pos[1]);
+		
+		if (pos[0] == id)
+			return pos;
+		pos += 2 + pos[1];
+	}
+
+	return NULL;
+}
+#endif //RTL871X_HIDDEN_SSID_SUPPORT
 static int wpa_driver_nl80211_set_beacon(void *priv,
 					 const u8 *head, size_t head_len,
 					 const u8 *tail, size_t tail_len,
@@ -3814,11 +3904,54 @@ static int wpa_driver_nl80211_set_beacon(void *priv,
 	int ret;
 	int beacon_set;
 	int ifindex = if_nametoindex(bss->ifname);
+
+#ifdef RTL871X_HIDDEN_SSID_SUPPORT
+	u8 *ssid_ie;
+	u8 ssid_len;
+	u8 expend_len = 0;
+	struct hostapd_data *hapd = (struct hostapd_data *)(drv->ctx);
+	struct hostapd_bss_config *conf = NULL;
+#endif
+	
 	beacon_set = bss->beacon_set;
 
 	msg = nlmsg_alloc();
 	if (!msg)
 		return -ENOMEM;
+
+#ifdef RTL871X_HIDDEN_SSID_SUPPORT
+	if(hapd && hapd->conf)
+		conf = hapd->conf;
+		
+	rtl871x_set_hidden_ssid_ops(bss->ifname, conf?conf->ignore_broadcast_ssid:0);
+
+	ssid_ie = get_ie((head+24+12), (head_len-24-12), WLAN_EID_SSID);
+	
+	if(conf && conf->ignore_broadcast_ssid == 2)
+	{
+		ssid_len = ssid_ie[1];
+		
+		//confirm the ssid_len
+		if(ssid_len != conf->ssid.ssid_len) 
+		{
+			wpa_printf(MSG_ERROR, "%s ssid_len(%u) != hapd->conf->ssid.ssid_len(%u)!!\n", __func__
+				, ssid_len, conf->ssid.ssid_len
+			);
+		}
+
+		os_memcpy(ssid_ie+2, conf->ssid.ssid, ssid_len);
+	}
+	else if(conf && conf->ignore_broadcast_ssid == 1)
+	{
+		expend_len = conf->ssid.ssid_len;
+		wpa_printf(MSG_INFO, "%s ignore_broadcast_ssid:%d, %s,%d, expend_len:%u\n", __func__
+			, conf->ignore_broadcast_ssid
+			, conf->ssid.ssid
+			, conf->ssid.ssid_len
+			, expend_len
+		);		
+	}
+#endif //#ifdef RTL871X_HIDDEN_SSID_SUPPORT
 
 	wpa_printf(MSG_DEBUG, "nl80211: Set beacon (beacon_set=%d)",
 		   beacon_set);
@@ -3827,7 +3960,34 @@ static int wpa_driver_nl80211_set_beacon(void *priv,
 
 	genlmsg_put(msg, 0, 0, genl_family_get_id(drv->nl80211), 0,
 		    0, cmd, 0);
-	NLA_PUT(msg, NL80211_ATTR_BEACON_HEAD, head_len, head);
+#ifdef RTL871X_HIDDEN_SSID_SUPPORT
+	if(conf && conf->ignore_broadcast_ssid == 1)
+	{
+		u8 *ssid_ie_next = head+24+12+2;
+		size_t head_remain_len = head_len-24-12-2;
+		u8 *head_new;
+
+		if((head_new=os_zalloc(head_len+expend_len))==NULL) {
+			wpa_printf(MSG_ERROR, "%s os_zalloc for head_new fail", __func__);
+			nlmsg_free(msg);
+			return -ENOMEM;
+		}
+
+		os_memcpy(head_new, head, 24+12); //header and fixed ie
+		head_new[24+12] = WLAN_EID_SSID;
+		head_new[24+12+1] = expend_len;
+		os_memcpy(head_new+24+12+2, conf->ssid.ssid, expend_len);
+		os_memcpy(head_new+24+12+2+expend_len, ssid_ie_next, head_remain_len);
+
+		NLA_PUT(msg, NL80211_ATTR_BEACON_HEAD, head_len+expend_len, head_new);
+
+		os_free(head_new);
+	}
+	else
+#endif //RTL871X_HIDDEN_SSID_SUPPORT
+	{
+		NLA_PUT(msg, NL80211_ATTR_BEACON_HEAD, head_len, head);
+	}
 	NLA_PUT(msg, NL80211_ATTR_BEACON_TAIL, tail_len, tail);
 	NLA_PUT_U32(msg, NL80211_ATTR_IFINDEX, ifindex);
 	NLA_PUT_U32(msg, NL80211_ATTR_BEACON_INTERVAL, beacon_int);

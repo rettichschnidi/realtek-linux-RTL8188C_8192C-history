@@ -1808,11 +1808,11 @@ static int cfg80211_rtw_scan(struct wiphy *wiphy, struct net_device *ndev,
 		rtw_free_network_queue(padapter, _TRUE);
 
 		//Commented by Kurt 20120114
-		//For pwdinfo->find_phase_state_exchange_cnt = 2 means we just do site survey on social channels
+		//For pwdinfo->find_phase_state_exchange_cnt = 3 means we just do site survey on social channels
 		if(social_channel == 0)
 			pwdinfo->find_phase_state_exchange_cnt = 0;
 		else
-			pwdinfo->find_phase_state_exchange_cnt = 2;
+			pwdinfo->find_phase_state_exchange_cnt = 3;
 	}
 #endif //CONFIG_P2P
 

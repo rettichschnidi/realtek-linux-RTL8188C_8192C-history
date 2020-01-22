@@ -16,6 +16,7 @@
 
 #include <stdlib.h>
 #include <fcntl.h>
+#include <ctype.h>
 #include <errno.h>
 #include <string.h>
 #include <dirent.h>
@@ -49,7 +50,6 @@ extern void get_dhcp_info();
 extern int init_module(void *, unsigned long, const char *);
 extern int delete_module(const char *, unsigned int);
 
-static char iface[PROPERTY_VALUE_MAX];
 // TODO: use new ANDROID_SOCKET mechanism, once support for multiple
 // sockets is in
 
@@ -182,7 +182,57 @@ bad:
 	return ret;
 }
 
+static char g_ifname[PROPERTY_VALUE_MAX];
 
+int get_wifi_ifname_from_property(char *ifname)
+{
+	ifname[0] = '\0';
+	if(property_get("wifi.interface", ifname, WIFI_TEST_INTERFACE)
+		&& strcmp(ifname, WIFI_TEST_INTERFACE) != 0
+	)
+	{
+		return 0;
+	}
+	return -1;
+}
+
+int get_wifi_ifname_from_proc(char *ifname)
+{
+	char linebuf[1024];
+	FILE *f = fopen("/proc/net/wireless", "r");
+	
+	ifname[0] = '\0';
+	if (f) {
+		while(fgets(linebuf, sizeof(linebuf)-1, f)) {
+			
+			if (strchr(linebuf, ':')) {
+				char *dest = ifname;
+				char *p = linebuf;
+				
+				while(*p && isspace(*p))
+					++p;
+				while (*p && *p != ':') {
+					*dest++ = *p++;
+				}
+				*dest = '\0';
+				LOGD("%s: %s\n", __func__, ifname);
+				fclose(f);
+				return 0;
+			}
+		}
+		fclose(f);
+	} 
+	return -1;
+}
+
+char *get_wifi_ifname()
+{
+	//Update g_ifname first
+	//get_wifi_ifname_from_property(g_ifname);
+	get_wifi_ifname_from_proc(g_ifname);
+	
+	return g_ifname[0]?g_ifname:NULL;
+}
 
 static int insmod(const char *filename, const char *args)
 {
@@ -223,13 +273,13 @@ static int rmmod(const char *modname)
 int do_dhcp_request(int *ipaddr, int *gateway, int *mask,
                     int *dns1, int *dns2, int *server, int *lease) {
     /* For test driver, always report success */
-    if (strcmp(iface, WIFI_TEST_INTERFACE) == 0)
+    if (strcmp(get_wifi_ifname(), WIFI_TEST_INTERFACE) == 0)
         return 0;
 
     if (ifc_init() < 0)
         return -1;
 
-    if (do_dhcp(iface) < 0) {
+    if (do_dhcp(get_wifi_ifname()) < 0) {
         ifc_close();
         return -1;
     }
@@ -283,7 +333,7 @@ int wifi_load_driver()
 {
 #ifdef WIFI_DRIVER_MODULE_PATH
     char driver_status[PROPERTY_VALUE_MAX];
-    int count = 100; /* wait at most 20 seconds for completion */
+    int count = 50; /* wait at most 5 seconds for completion */
 
     if (is_wifi_driver_loaded()) {
         return 0;
@@ -293,7 +343,16 @@ int wifi_load_driver()
         return -1;
 
     if (strcmp(FIRMWARE_LOADER,"") == 0) {
-        /* usleep(WIFI_DRIVER_LOADER_DELAY); */
+
+        while (get_wifi_ifname() == NULL && count-- > 0) {
+            usleep(100000);
+        }
+
+        if(get_wifi_ifname() == NULL) {
+            LOGE("%s: get_wifi_ifname fail\n", __func__);
+            goto timeout;
+        }
+		
         property_set(DRIVER_PROP_NAME, "ok");
     }
     else {
@@ -309,8 +368,10 @@ int wifi_load_driver()
                 return -1;
             }
         }
-        usleep(200000);
+        usleep(100000);
     }
+
+timeout:
     property_set(DRIVER_PROP_NAME, "timeout");
     wifi_unload_driver();
     return -1;
@@ -322,17 +383,16 @@ int wifi_load_driver()
 
 int wifi_unload_driver()
 {
-    usleep(200000); /* allow to finish interface down */
 #ifdef WIFI_DRIVER_MODULE_PATH
     if (rmmod(DRIVER_MODULE_NAME) == 0) {
-        int count = 20; /* wait at most 10 seconds for completion */
+        int count = 100; /* wait at most 10 seconds for completion */
         while (count-- > 0) {
             if (!is_wifi_driver_loaded())
                 break;
-            usleep(500000);
+            usleep(100000);
         }
-        usleep(500000); /* allow card removal */
-        if (count) {
+
+        if (!is_wifi_driver_loaded()) {
             return 0;
         }
         return -1;
@@ -417,12 +477,23 @@ int update_ctrl_interface(const char *config_file) {
         return 0;
     }
 
+    #if 1
+    if(get_wifi_ifname() == NULL) {
+        LOGE("%s get_wifi_ifname() fail", __func__);
+        free(pbuf);
+        return -1;
+    }
+
+    strlcpy(ifc, get_wifi_ifname(), sizeof(ifc));
+    #else
     if (!strcmp(config_file, SUPP_CONFIG_FILE)) {
         property_get("wifi.interface", ifc, WIFI_TEST_INTERFACE);
     } else {
         //strcpy(ifc, CONTROL_IFACE_PATH);
         property_get("wifi.interface", ifc, WIFI_TEST_INTERFACE);
     }
+    #endif
+	
     if ((sptr = strstr(pbuf, "ctrl_interface="))) {
         char *iptr = sptr + strlen("ctrl_interface=");
         int ilen = 0;
@@ -602,8 +673,12 @@ int wifi_start_supplicant_common(const char *config_file)
         serial = pi->serial;
     }
 #endif
-    property_get("wifi.interface", iface, WIFI_TEST_INTERFACE);
-    snprintf(daemon_cmd, PROPERTY_VALUE_MAX, "%s:-i%s -c%s", SUPPLICANT_NAME, iface, config_file);
+    if(get_wifi_ifname() == NULL) {
+        LOGE("%s get_wifi_ifname() fail", __func__);
+        return -1;
+    }
+	
+    snprintf(daemon_cmd, PROPERTY_VALUE_MAX, "%s:-i%s -c%s", SUPPLICANT_NAME, get_wifi_ifname(), config_file);
     property_set("ctl.start", daemon_cmd);
     sched_yield();
 
@@ -637,13 +712,18 @@ int wifi_start_supplicant()
 	int ret;
 	char ifname[IFNAMSIZ];
 	char buf[256];
+
+	if(get_wifi_ifname() == NULL) {
+		LOGE("%s get_wifi_ifname() fail", __func__);
+		ret = -1;
+		goto exit;
+	}
 	
-	property_get("wifi.interface", iface, WIFI_TEST_INTERFACE);
-	strlcpy(ifname, iface, sizeof(ifname));
+	strlcpy(ifname, get_wifi_ifname(), sizeof(ifname));
 	
 	rtw_issue_driver_cmd(ifname, "BLOCK 1", buf, 256);
 	ret = wifi_start_supplicant_common(SUPP_CONFIG_FILE);
-	
+exit:
     return ret;
 }
 
@@ -688,10 +768,15 @@ int wifi_connect_to_supplicant()
         return -1;
     }
 
+    if(get_wifi_ifname() == NULL) {
+        LOGE("%s get_wifi_ifname() fail", __func__);
+        return -1;
+    }
+	
     //if (access(IFACE_DIR, F_OK) == 0) {
-    //    snprintf(ifname, sizeof(ifname), "%s/%s", IFACE_DIR, iface);
+    //    snprintf(ifname, sizeof(ifname), "%s/%s", IFACE_DIR, get_wifi_ifname());
     //} else {
-        strlcpy(ifname, iface, sizeof(ifname));
+        strlcpy(ifname, get_wifi_ifname(), sizeof(ifname));
     //}
 
     ctrl_conn = wpa_ctrl_open(ifname);
@@ -721,10 +806,7 @@ int wifi_connect_to_supplicant()
     }
 
 	{
-		char ifname[IFNAMSIZ];
 		char buf[256];
-	
-		strlcpy(ifname, iface, sizeof(ifname));
 		rtw_issue_driver_cmd(ifname, "BLOCK 0", buf, 256);
 	}
 

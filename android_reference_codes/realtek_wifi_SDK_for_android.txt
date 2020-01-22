@@ -1,6 +1,6 @@
 ================================================================================
 Realtek Wi-Fi SDK for Android
-Version 2.0
+Version 2.1
 ================================================================================
 	This document provides a simple guide to help engineers to apply Realtek
 Wi-Fi solution onto their Android system. For now, we have supported the
@@ -10,7 +10,7 @@ following Wi-Fi functionality on Android up to 2.3:
 	
 	To port Realtek Wi-Fi driver onto Android platform, you can go through the
 following guide with reference codes within our driver package's
-realtek_wifi_SDK_for_android_20111103.tar.gz.
+realtek_wifi_SDK_for_android_20120618.tar.gz.
 
 
 	Because Android's SDK may differ from platform to platform, our reference
@@ -234,7 +234,22 @@ Reference files:
 	frameworks/base/core/res/res/values/config.xml
 
 ================================================================================
-8. Driver Configuration and Compilation 
+8. Patch for WifiSettings.java
+================================================================================
+	The WifiSettings UI page has bug which doesn't get lastest WiFi information.
+We provide patch to fix this problem. Add the following 4 line at the beginning
+of function updateAccessPoints():
+
+        mLastInfo = mWifiManager.getConnectionInfo();
+        mLastState = WifiInfo.getDetailedStateOf(mLastInfo.getSupplicantState());
+        if(mLastState == DetailedState.OBTAINING_IPADDR && mLastInfo.getIpAddress() != 0)
+            mLastState = DetailedState.CONNECTED;
+
+Reference files:
+	packages\apps\Settings\src\com\android\settings\wifi\WifiSettings.java
+
+================================================================================
+9. Driver Configuration and Compilation 
 ================================================================================
 a. MODULE_NAME defined in Makefile
 	For android to rmmod the wifi driver module, the driver module name, which

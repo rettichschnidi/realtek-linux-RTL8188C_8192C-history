@@ -107,7 +107,7 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
     /**
      * Delay between restarts upon failure to setup connection with supplicant
      */
-    private static final int P2P_RESTART_INTERVAL_MSECS = 5000;
+    private static final int P2P_RESTART_INTERVAL_MSECS = 1000;
 
     /**
      * Number of times we attempt to restart p2p

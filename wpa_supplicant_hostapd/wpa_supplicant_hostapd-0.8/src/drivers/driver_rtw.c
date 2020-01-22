@@ -1325,6 +1325,47 @@ static int rtl871x_sta_remove_ops(void *priv, const u8 *addr)
 
 }
 
+#define RTL871X_HIDDEN_SSID_SUPPORT
+#ifdef RTL871X_HIDDEN_SSID_SUPPORT
+static int rtl871x_set_hidden_ssid_ops(const char *iface, void *priv, u8 value)
+{
+	int ret;
+	ieee_param pparam;	
+	struct rtl871x_driver_data *drv = priv;
+	struct hostapd_data *hapd = drv->hapd;
+
+	printf("%s\n", __func__);
+
+	pparam.cmd = RTL871X_HOSTAPD_SET_HIDDEN_SSID;
+	pparam.u.wpa_param.name = 0;
+	pparam.u.wpa_param.value = value;
+
+	ret = rtl871x_hostapd_ioctl(drv, &pparam, sizeof(ieee_param));
+
+	return ret;	
+}
+
+static const u8 * get_ie(u8 *ies, size_t ies_len, u8 id)
+{
+	const u8 *end, *pos;
+
+	pos = ies;
+	end = pos + ies_len;
+
+	while (pos + 1 < end) {
+		if (pos + 2 + pos[1] > end)
+			break;
+
+		//printf("id:%u, clen:%u\n", pos[0], pos[1]);
+		
+		if (pos[0] == id)
+			return pos;
+		pos += 2 + pos[1];
+	}
+
+	return NULL;
+}
+#endif //RTL871X_HIDDEN_SSID_SUPPORT
 
 //static int rtl871x_set_beacon_ops(const char *iface, void *priv,
 //			   u8 *head, size_t head_len,
@@ -1338,13 +1379,49 @@ static int rtl871x_set_beacon_ops(void *priv, const u8 *head, size_t head_len,
 	ieee_param *pparam;
 	struct rtl871x_driver_data *drv = priv;
 	struct hostapd_data *hapd = drv->hapd;
+
+	u8 *ssid_ie;
+	u8 ssid_len;
+	u8 expend_len = 0;
 	
 	if((head_len<24) ||(!head))
 		return -1;
 
 	printf("%s\n", __func__);
 
-	sz = head_len+tail_len+12-24 + 2;// 12+2 = cmd+sta_addr+reserved, sizeof(ieee_param)=64, no packed
+
+#ifdef RTL871X_HIDDEN_SSID_SUPPORT
+	rtl871x_set_hidden_ssid_ops(drv->iface, priv, hapd->conf->ignore_broadcast_ssid);
+
+	ssid_ie = get_ie((head+24+12), (head_len-24-12), WLAN_EID_SSID);
+	
+	if(hapd->conf->ignore_broadcast_ssid == 2)
+	{
+		ssid_len = ssid_ie[1];
+		
+		//confirm the ssid_len
+		if(ssid_len != hapd->conf->ssid.ssid_len) 
+		{
+			printf("%s ssid_len(%u) != hapd->conf->ssid.ssid_len(%u)!!\n", __func__
+				, ssid_len, hapd->conf->ssid.ssid_len
+			);
+		}
+
+		memcpy(ssid_ie+2, hapd->conf->ssid.ssid, ssid_len);
+	}
+	else if(hapd->conf->ignore_broadcast_ssid == 1)
+	{
+		expend_len = hapd->conf->ssid.ssid_len;
+		printf("%s ignore_broadcast_ssid:%d, %s,%d, expend_len:%u\n", __func__
+			, hapd->conf->ignore_broadcast_ssid
+			, hapd->conf->ssid.ssid
+			, hapd->conf->ssid.ssid_len
+			, expend_len
+		);		
+	}
+#endif //RTL871X_HIDDEN_SSID_SUPPORT
+
+	sz = head_len+tail_len+12-24 + 2 + expend_len;// 12+2 = cmd+sta_addr+reserved, sizeof(ieee_param)=64, no packed
 	pparam = os_zalloc(sz);
 	if (pparam == NULL) {
 		return -ENOMEM;
@@ -1354,9 +1431,27 @@ static int rtl871x_set_beacon_ops(void *priv, const u8 *head, size_t head_len,
 
 	memcpy(pparam->u.bcn_ie.reserved, &hapd->conf->max_num_sta, 2);//for set max_num_sta
 
-	memcpy(pparam->u.bcn_ie.buf, (head+24), (head_len-24));// 24=beacon header len.
-	
-	memcpy(&pparam->u.bcn_ie.buf[head_len-24], tail, tail_len);
+#ifdef RTL871X_HIDDEN_SSID_SUPPORT
+	if(hapd->conf->ignore_broadcast_ssid == 1)
+	{
+		u8 *ssid_ie_next = head+24+12+2;
+		size_t head_remain_len = head_len-24-12-2;
+
+		memcpy(pparam->u.bcn_ie.buf, (head+24), 12); 
+		
+		pparam->u.bcn_ie.buf[12] = WLAN_EID_SSID;
+		pparam->u.bcn_ie.buf[13] = expend_len;
+		memcpy(pparam->u.bcn_ie.buf+12+2, hapd->conf->ssid.ssid, expend_len);
+		
+		memcpy(pparam->u.bcn_ie.buf+12+2+expend_len, ssid_ie_next, head_remain_len);// 24=beacon header len.	
+		memcpy(&pparam->u.bcn_ie.buf[head_len-24+expend_len], tail, tail_len);
+	}
+	else
+#endif //RTL871X_HIDDEN_SSID_SUPPORT
+	{
+		memcpy(pparam->u.bcn_ie.buf, (head+24), (head_len-24));// 24=beacon header len.
+		memcpy(&pparam->u.bcn_ie.buf[head_len-24], tail, tail_len);
+	}
 	
 	ret = rtl871x_hostapd_ioctl(drv, pparam, sz);
 

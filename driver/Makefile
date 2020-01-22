@@ -1,4 +1,5 @@
-EXTRA_CFLAGS += -O1 
+EXTRA_CFLAGS += $(USER_EXTRA_CFLAGS)
+EXTRA_CFLAGS += -O1
 #EXTRA_CFLAGS += -O3
 #EXTRA_CFLAGS += -Wall 
 #EXTRA_CFLAGS += -Wextra 
@@ -17,7 +18,7 @@ EXTRA_CFLAGS += -Wno-uninitialized
 
 EXTRA_CFLAGS += -I$(src)/include
 
-CONFIG_AUTOCFG_CP = y
+CONFIG_AUTOCFG_CP = n
 
 CONFIG_RTL8192C = y
 CONFIG_RTL8192D = n
@@ -113,6 +114,9 @@ ifeq ($(CONFIG_USB_HCI), y)
 MODULE_NAME = 8192du
 FW_FILES := hal/$(RTL871X)/usb/Hal8192DUHWImg.o \
 			hal/$(RTL871X)/usb/Hal8192DUTestHWImg.o
+ifneq ($(CONFIG_WAKE_ON_WLAN), n)
+FW_FILES += hal/$(RTL871X)/usb/Hal8192DUHWImg_wowlan.o
+endif
 endif
 ifeq ($(CONFIG_PCI_HCI), y)
 MODULE_NAME = 8192de
@@ -408,7 +412,7 @@ endif
 ifeq ($(CONFIG_PLATFORM_ARM_TCC8920), y)
 EXTRA_CFLAGS += -DCONFIG_LITTLE_ENDIAN #-DCONFIG_MINIMAL_MEMORY_USAGE
 ARCH := arm
-CROSS_COMPILE ?= /media/DATA-1/telechips/SDK_2302_20110425/prebuilt/linux-x86/toolchain/arm-eabi-4.4.3/bin/arm-eabi-
+CROSS_COMPILE := /media/DATA-2/telechips/ics_sdk/prebuilt/linux-x86/toolchain/arm-eabi-4.4.3/bin/arm-eabi-
 KSRC := /media/DATA-2/telechips/ics_sdk/kernel
 MODULE_NAME := wlan
 endif

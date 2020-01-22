@@ -3989,6 +3989,10 @@ static int rtw_p2p_set_op_ch(struct net_device *dev,
 	{
 		pwdinfo->operating_channel = op_ch;
 	}
+	else if(IsLegal5GChannel(padapter, op_ch))
+	{
+		pwdinfo->operating_channel = op_ch;
+	}
 	else
 	{
 		ret = -1;
@@ -6633,6 +6637,38 @@ static int rtw_set_wps_probe_resp(struct net_device *dev, struct ieee_param *par
 
 }
 
+static int rtw_set_hidden_ssid(struct net_device *dev, struct ieee_param *param, int len)
+{
+	int ret=0;
+	_adapter *padapter = (_adapter *)rtw_netdev_priv(dev);	
+	struct mlme_priv *pmlmepriv = &(padapter->mlmepriv);
+	struct mlme_ext_priv	*pmlmeext = &(padapter->mlmeextpriv);
+	struct mlme_ext_info	*pmlmeinfo = &(pmlmeext->mlmext_info);
+
+	u8 value;
+
+	if(check_fwstate(pmlmepriv, WIFI_AP_STATE) != _TRUE)
+		return -EINVAL;
+
+	if(param->u.wpa_param.name != 0) //dummy test...
+	{
+		DBG_871X("%s name(%u) != 0\n", __FUNCTION__, param->u.wpa_param.name);
+	}
+	
+	value = param->u.wpa_param.value;
+
+	//use the same definition of hostapd's ignore_broadcast_ssid
+	if(value != 1 && value != 2)
+		value = 0;
+
+	DBG_871X("%s value(%u)\n", __FUNCTION__, value);
+	pmlmeinfo->hidden_ssid_mode = value;
+
+	return ret;		
+
+}
+
+
 static int rtw_set_wps_assoc_resp(struct net_device *dev, struct ieee_param *param, int len)
 {
 	int ret=0;
@@ -6767,6 +6803,12 @@ static int rtw_hostapd_ioctl(struct net_device *dev, struct iw_point *p)
 			ret = rtw_set_wps_assoc_resp(dev, param, p->length);
 			
 	 		break;
+
+		case RTL871X_HOSTAPD_SET_HIDDEN_SSID:
+
+			ret = rtw_set_hidden_ssid(dev, param, p->length);
+
+			break;
 			
 		default:
 			DBG_8192C("Unknown hostapd request: %d\n", param->cmd);

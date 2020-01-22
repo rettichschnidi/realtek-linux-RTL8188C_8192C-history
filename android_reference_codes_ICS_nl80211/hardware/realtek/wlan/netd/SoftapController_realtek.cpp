@@ -305,6 +305,7 @@ int SoftapController::setSoftap(int argc, char *argv[]) {
 
 					"max_num_sta=%d\n"
 					"wpa_group_rekey=%d\n"
+					//"ignore_broadcast_ssid=%d\n" //unmask this and set to 1 or 2 for hidden ssid
 					
 					, iface //interface
 					, "nl80211" //driver
@@ -313,6 +314,7 @@ int SoftapController::setSoftap(int argc, char *argv[]) {
 					, 6 //channel
 					, 8 //max_num_sta
 					, 86400 //wpa_group_rekey
+					//, 1 //ignore_broadcast_ssid
 	);
 
     if (argc > 5) {

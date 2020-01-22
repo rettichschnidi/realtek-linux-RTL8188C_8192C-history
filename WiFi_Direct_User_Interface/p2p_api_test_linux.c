@@ -21,19 +21,139 @@ char lower(char s)
 	return s;
 }
 
+int p2p_check_success(struct p2p *p)
+{
+	int ret = 0;
+	
+	if( p->status == P2P_STATE_GONEGO_OK )
+		ret = 1;
+		
+	return ret;
+}
+
+int read_all_sta(struct p2p *p)
+{
+	int sta_count = 0;
+	FILE *pf;
+	
+	memset( p->cmd, 0x00, CMD_SZ );
+	sprintf( p->cmd, "%s all_sta > supp_status.txt", p->apcli_path);
+	system( p->cmd );
+	pf = fopen( "./supp_status.txt", "r" );
+	if ( pf )
+	{
+		while( !feof( pf ) ){
+			memset( p->parse, 0x00, CMD_SZ );
+			fgets( p->parse, CMD_SZ, pf );
+			if( strncmp( p->parse, "dot11RSNAStatsSTAAddress=", 25) == 0 )
+			{
+				sta_count++;
+				if( p->no_sta_connected == sta_count )
+					return _TRUE;
+			}
+		}
+
+		fclose( pf );
+	}
+	
+	return _FALSE;
+}
+
+void do_wps(struct p2p *p)
+{
+		FILE *pf = NULL;
+		int ret = _FALSE, parsing_ok = _FALSE;
+		
+		do
+		{
+			memset( p->cmd, 0x00, CMD_SZ );
+			if( p->ap_open == _TRUE )
+			{
+				if(p->wps_info==1 || p->wps_info==2)
+					sprintf( p->cmd, "%s wps_pin any %d > supp_status.txt", p->apcli_path, p->pin);
+				else if(p->wps_info==3)
+					sprintf( p->cmd, "%s wps_pbc any > supp_status.txt", p->apcli_path);
+			}
+			else if(p->wpa_open == _TRUE)
+			{
+				if(p->connect_go==1)
+				{
+					if(p->wps_info==1 || p->wps_info==2)
+						sprintf( p->cmd, "%s wps_pin %s %d > supp_status.txt ", p->wpacli_path, p->peer_devaddr, p->pin);
+					else if(p->wps_info==3)
+						sprintf( p->cmd, "%s wps_pbc %s > supp_status.txt ", p->wpacli_path, p->peer_devaddr);
+				}
+				else if( strncmp(p->peer_ifaddr, "00:00:00:00:00:00", 17)==0 )
+				{
+					if(p->wps_info==1 || p->wps_info==2)
+						sprintf( p->cmd, "%s wps_pin any %d > supp_status.txt ", p->wpacli_path, p->pin);
+					else if(p->wps_info==3)
+						sprintf( p->cmd, "%s wps_pbc any > supp_status.txt ", p->wpacli_path);
+				}
+				else
+				{
+					if(p->wps_info==1 || p->wps_info==2)
+						sprintf( p->cmd, "%s wps_pin %s %d > supp_status.txt ", p->wpacli_path, p->peer_ifaddr, p->pin);
+					else if(p->wps_info==3)
+						sprintf( p->cmd, "%s wps_pbc %s > supp_status.txt ", p->wpacli_path, p->peer_ifaddr);
+				}
+			}
+			system( p->cmd );
+	
+			pf = fopen( "./supp_status.txt", "r" );	
+			if ( pf )
+			{
+				while( !feof( pf ) ){
+					memset(p->parse, 0x00, CMD_SZ);
+					fgets(p->parse, CMD_SZ, pf);
+
+					if(p->ap_open == _TRUE)
+					{
+						if( (p->wps_info==1 || p->wps_info==2) && (strncmp(p->parse, "", 2) == 0) )
+								parsing_ok = _TRUE;
+						else if( (p->wps_info==3) && (strncmp(p->parse, "OK", 2) == 0) )
+								parsing_ok = _TRUE;
+					}
+					else if(p->wpa_open == _TRUE)
+					{
+						if( (p->wps_info==1 || p->wps_info==2) &&	(strncmp(p->parse, "Selected", 8) == 0) )
+								parsing_ok = _TRUE;
+						else if( (p->wps_info==3) && (strncmp(p->parse, "OK", 2) == 0) )
+								parsing_ok = _TRUE;
+					}
+					
+					if( parsing_ok == _TRUE )
+					{
+						ret = _TRUE;
+						p->wpsing = _TRUE;
+					}
+				}
+		
+				fclose( pf );
+			}
+			
+			if( ret == 0 )
+				usleep( HOSTAPD_INIT_TIME );
+		}
+		while( ret == 0 );
+}
+
 void p2p_enable(struct p2p *p)
 {
+	p->have_p2p_dev = 0;
+	p->connect_go = 0;
+			
 	if(p->enable == -1 )
 	{
-		if(p->wpa_open == 1){
-			p->wpa_open = 0;
+		if(p->wpa_open == _TRUE){
+			p->wpa_open = _FALSE;
 			system("killall wpa_supplicant");
 #ifdef DHCP
 			system("killall dhclient");
 #endif			
 		}
-		if(p->ap_open ==1){
-			p->ap_open = 0;
+		if(p->ap_open == _TRUE){
+			p->ap_open = _FALSE;
 			system("killall hostapd");
 #ifdef DHCP
 			system("killall dhcpd");
@@ -54,10 +174,12 @@ void p2p_enable(struct p2p *p)
 	
 	if( p->enable == P2P_ROLE_DISABLE )
 	{
-		p->have_p2p_dev = 0;
 		p->wps_info = 0;
 		p->pin = 12345670;
 
+		p2p_status(p, 0);
+		p2p_role(p, 0);
+		
 		if(p->res == 0)
 		{
 			p->res = 1;
@@ -68,13 +190,13 @@ void p2p_enable(struct p2p *p)
 			p->res_go = 1;
 		}
 				
-		p->wpa_open = 0;
+		p->wpa_open = _FALSE;
 		system("killall wpa_supplicant");
 #ifdef DHCP
 		system("killall dhclient");
 #endif
 		system("clear");
-		p->ap_open = 0;
+		p->ap_open = _FALSE;
 		system("killall hostapd");
 #ifdef DHCP
 		system("killall dhcpd");
@@ -97,15 +219,15 @@ void p2p_enable(struct p2p *p)
 			sprintf( p->print_line, "Thread creation failed" );
 		}
 		
-		if(p->wpa_open == 1){
-			p->wpa_open = 0;
+		if(p->wpa_open == _TRUE){
+			p->wpa_open = _FALSE;
 			system("killall wpa_supplicant");
 #ifdef DHCP
 			system("killall dhclient");
 #endif
 		}
-		if(p->ap_open ==1){
-			p->ap_open = 0;
+		if(p->ap_open == _TRUE){
+			p->ap_open = _FALSE;
 			system("killall hostapd");
 #ifdef DHCP
 			system("killall dhcpd");
@@ -120,14 +242,15 @@ void p2p_enable(struct p2p *p)
 		p2p_softap_ssid(p, NULL, 0);
 
 		p2p_setDN(p);
+		p2p_role(p, 0);
 
-		p2p_scan( p );
+		p2p_scan(p);
 		
 	}
 	else if( p->enable == P2P_ROLE_CLIENT )
 	{
-		if(p->ap_open ==1){
-			p->ap_open = 0;
+		if(p->ap_open == _TRUE){
+			p->ap_open = _FALSE;
 			system("killall hostapd");
 #ifdef DHCP
 			system("killall dhcpd");
@@ -140,8 +263,8 @@ void p2p_enable(struct p2p *p)
 	}
 	else if( p->enable == P2P_ROLE_GO )
 	{
-		if(p->wpa_open == 1){
-			p->wpa_open = 0;
+		if(p->wpa_open == _TRUE){
+			p->wpa_open = _FALSE;
 			system("killall wpa_supplicant");
 #ifdef DHCP
 			system("killall dhclient");
@@ -156,13 +279,15 @@ void p2p_enable(struct p2p *p)
 		usleep(50000);
 		p2p_softap_ssid(p, NULL, 0);
 
-		if(p->ap_open != 1)
+		p2p_setDN(p);
+
+		if(p->ap_open != _TRUE)
 		{
 			memset( p->cmd, 0x00, CMD_SZ );
 			sprintf( p->cmd, "%s -B %s > temp.txt",p->ap_path, p->ap_conf);
 			system( p->cmd );
 	
-			p->ap_open = 1;
+			p->ap_open = _TRUE;
 		}
 
 #ifdef P2P_AUTO
@@ -204,17 +329,18 @@ void p2p_scan(struct p2p *p)
 void scan_result(struct p2p *p)
 {
 	FILE *pf=NULL;
+	int no_dev=0;
+	char cms[30] = { 0x00 };
+	char dns[SSID_SZ] = { 0x00 };
+	char parse[100] = { 0x00 };
+	struct scan *pscan_pool;
 	
 	pf = fopen( "./scan.txt", "r" );
 	if ( pf )
 	{
-		int no_dev=0;
-		char cms[30] = { 0x00 };
-		char dns[SSID_SZ] = { 0x00 };
-		char parse[100] = { 0x00 };
-		
 		p->count_line=0;
-		while( (!feof( pf )) && (no_dev <= SCAN_POOL_NO)){
+		while( (!feof( pf )) && (no_dev < SCAN_POOL_NO))
+		{
 			memset( parse, 0x00, CMD_SZ );
 			fgets( parse, CMD_SZ, pf );
 
@@ -227,13 +353,13 @@ void scan_result(struct p2p *p)
 			}
 			else if( strncmp(parse+20, "Address:", 8) == 0 )
 			{
-				struct scan *pscan_pool = &p->scan_pool[no_dev];
-				memset( pscan_pool->addr, 0x00, CMD_SZ );
+				pscan_pool = &p->scan_pool[no_dev];
+				memset( pscan_pool->addr, 0x00, 18 );
 				strncpy( pscan_pool->addr, parse+29, 17);
 			}
 			else if( strncmp(parse+20, "ESSID:", 6) == 0 )
 			{
-				struct scan *pscan_pool = &p->scan_pool[no_dev];
+				pscan_pool = &p->scan_pool[no_dev];
 
 				p2p_wps_cm(p, pscan_pool->addr, cms);
 				p2p_device_name(p, pscan_pool->addr, dns);
@@ -252,6 +378,7 @@ void scan_result(struct p2p *p)
 				
 			}
 		}
+		
 		if( p->count_line < (SCAN_POOL_NO + 1) )
 		{
 			for(p->count_line; p->count_line < SCAN_POOL_NO+1; p->count_line++ )
@@ -290,11 +417,13 @@ void p2p_pincode(struct p2p *p, char *ins_no, char *ins_no_again)
 {
 	int pin_check=0;
 	p->p2p_get=0;
+	p->show_scan_result = 1;
 	ui_screen(p);
 	printf("%s", ins_no);
 	scanf("%d",&pin_check);
 	while( wps_pin_checksum(pin_check) != 0 )
 	{
+		p->show_scan_result = 1;
 		ui_screen(p);
 		printf("%s", ins_no_again);	
 		scanf("%d",&pin_check);
@@ -315,7 +444,6 @@ void p2p_devaddr(struct p2p *p)
 
 	if( pscan_pool->go == 1)
 		p->connect_go = 1;
-
 }
 
 void p2p_role(struct p2p *p, int flag)
@@ -386,8 +514,9 @@ void p2p_prov_disc(struct p2p *p, char *msg, char *dis_msg, char *label_msg)
 {
 	int wps_cm, retry_count=0;
 	char prov[100] = { 0x00 };
-	
+
 	p->p2p_get=0;
+	p->show_scan_result = 1;
 	ui_screen(p);
 	printf("%s", msg);
 	scanf("%d",&wps_cm);
@@ -482,6 +611,7 @@ void p2p_prov_disc(struct p2p *p, char *msg, char *dis_msg, char *label_msg)
 {
 	int wps_cm;
 	p->p2p_get=0;
+	p->show_scan_result = 1;
 	ui_screen(p);
 	printf("%s", msg);
 	scanf("%d",&wps_cm);
@@ -504,7 +634,8 @@ void p2p_prov_disc(struct p2p *p, char *msg, char *dis_msg, char *label_msg)
 void p2p_set_nego(struct p2p *p)
 {
 	FILE *pf=NULL;
-	int success = 0;
+	int retry_count = 0, success = 0;
+	int retry = NEGO_RETRY_INTERVAL, query = NEGO_QUERY_INTERVAL;
 
 	p->p2p_get=1;
 	memset( p->print_line, 0x00, CMD_SZ );
@@ -517,52 +648,37 @@ void p2p_set_nego(struct p2p *p)
 
 	usleep( PRE_NEGO_INTERVAL );
 
-	do
+	p2p_status(p, 0);
+
+	while( !p2p_check_success(p) && (retry_count < 120 / NEGO_QUERY_INTERVAL ))
 	{
+		retry_count++;
 
-		p2p_status(p, 0);
-		p2p_role(p, 0);
-		
-		if( p->status != P2P_STATE_GONEGO_OK ){
+		if( (retry_count % ( retry / query ) )==0 )
+		{
+			memset( p->cmd, 0x00, CMD_SZ );
+			sprintf( p->cmd, "iwpriv %s p2p_set nego=%s ", p->ifname, p->peer_devaddr);
+			system( p->cmd );
 			
-			if( p->role == P2P_ROLE_CLIENT || p->role == P2P_ROLE_GO )
-				break;
-			
-			int check_status = 0;
-			
-			while(check_status < MAX_NEGO_RETRY && p->status != P2P_STATE_GONEGO_OK )
-			{
-				p2p_status(p, 1);
-				ui_screen(p);
-
-				if( p->status == P2P_STATE_GONEGO_OK )
-				{
-					success = 1;
-					break;
-				}
-				
-				usleep(1000000);
-				check_status++;
-			}
-			
-			//usleep( NEGO_RETRY_INTERVAL );
+			usleep( NEGO_QUERY_INTERVAL );
+			p2p_status(p, 1);
 		}
 		else
 		{
-			p->p2p_get = 1;
-			memset( p->print_line, 0x00, CMD_SZ );
-			sprintf( p->print_line, "%s", p->ok_msg );
-			p2p_ifaddr(p);
 			ui_screen(p);
-			break;
+			usleep( NEGO_QUERY_INTERVAL );
+			p2p_status(p, 1);
 		}
-			
 	}
-	while( p->status != P2P_STATE_GONEGO_OK );
 
-	if( p->status == P2P_STATE_GONEGO_OK || p->role == P2P_ROLE_CLIENT || p->role == P2P_ROLE_GO )
+	if( p2p_check_success(p) )
 	{
 		p2p_role(p ,0);
+		p->p2p_get = 1;
+		memset( p->print_line, 0x00, CMD_SZ );
+		sprintf( p->print_line, "%s", p->ok_msg );
+		p2p_ifaddr(p);
+		ui_screen(p);		
 		
 		if( p->role == P2P_ROLE_CLIENT )
 		{
@@ -599,28 +715,7 @@ void p2p_ifaddr(struct p2p *p)
 	memset( p->cmd, 0x00, CMD_SZ );
 	sprintf( p->cmd, "iwpriv %s p2p_get peer_ifa > status.txt", p->ifname);
 	system( p->cmd );
-/*
-	pf = fopen( "./status.txt", "r" );
-	if ( pf )
-	{
-		memset( p->parse, 0x00, CMD_SZ );
-		fgets( p->parse, CMD_SZ, pf );
-		fgets( p->parse, CMD_SZ, pf );
-		strncpy(addr_12, p->parse, 12 );
-
-		for(i=0; i<6; i++)
-		{
-			p->peer_ifaddr[3*i] = addr_12[2*i];
-			p->peer_ifaddr[3*i+1] = addr_12[2*i+1];
-			if(i==5)
-				p->peer_ifaddr[3*i+2] = '\0';
-			else
-				p->peer_ifaddr[3*i+2] = ':';
-		}
-
-		fclose( pf );
-	}
-*/	
+	
 	pf = fopen( "./status.txt", "r" );
 	if ( pf )
 	{
@@ -644,10 +739,10 @@ void p2p_client_mode(struct p2p *p)
 	int count = 0, ret = 0;
 	int inactive_count = 0, inactive_restart = 0;
 
-	if(p->wpa_open==1)
+	if(p->wpa_open==_TRUE)
 		return;
 	else
-		p->wpa_open = 1;
+		p->wpa_open = _TRUE;
 
 	p2p_ifaddr(p);
 	
@@ -662,77 +757,7 @@ void p2p_client_mode(struct p2p *p)
 
 	usleep( SUPPLICANT_INIT_TIME );
 	
-	if(p->wps_info==1 || p->wps_info==2)
-	{
-		do
-		{
-			memset( p->cmd, 0x00, CMD_SZ );
-
-			if(p->connect_go == 1)
-				sprintf( p->cmd, "%s wps_pin %s %d > supp_status.txt ", p->wpacli_path, p->peer_devaddr, p->pin);
-			else
-				sprintf( p->cmd, "%s wps_pin %s %d > supp_status.txt ", p->wpacli_path, p->peer_ifaddr, p->pin);
-
-
-			system( p->cmd );
-	
-			pf = fopen( "./supp_status.txt", "r" );	
-			if ( pf )
-			{
-				while( !feof( pf ) ){
-					memset(p->parse, 0x00, CMD_SZ);
-					fgets(p->parse, CMD_SZ, pf);
-					if(strncmp(p->parse, "Selected", 8) == 0)
-					{
-						ret = 1;
-						p->wpsing = 1;
-					}
-				}
-		
-				fclose( pf );
-			}
-			
-			if( ret == 0 )
-				usleep( SUPPLICANT_INIT_TIME );
-		}
-		while( ret == 0 );
-		
-	}
-	else if(p->wps_info==3)
-	{
-		do
-		{
-		memset( p->cmd, 0x00, CMD_SZ );
-		
-		if(p->connect_go == 1)
-			sprintf( p->cmd, "%s wps_pbc %s > supp_status.txt ", p->wpacli_path, p->peer_devaddr);
-		else
-			sprintf( p->cmd, "%s wps_pbc %s > supp_status.txt ", p->wpacli_path, p->peer_ifaddr);
-		
-		system( p->cmd );
-	
-			pf = fopen( "./supp_status.txt", "r" );	
-			if ( pf )
-			{
-				while( !feof( pf ) ){
-					memset(p->parse, 0x00, CMD_SZ);
-					fgets(p->parse, CMD_SZ, pf);
-					if(strncmp(p->parse, "OK", 2) == 0)
-					{
-						ret = 1;
-						p->wpsing = 1;
-					}
-				}
-		
-				fclose( pf );
-			}
-			
-			if( ret == 0 )
-				usleep( SUPPLICANT_INIT_TIME );
-		}
-		while( ret == 0 );
-
-	}
+	do_wps(p);
 	
 	usleep( SUPPLICANT_INTERVAL );
 		
@@ -754,7 +779,7 @@ void p2p_client_mode(struct p2p *p)
 					int i;
 					if( strncmp( p->parse, "wpa_state=COMPLETED", 19) == 0 ){
 						count = WPS_RETRY;
-						p->wpsing=0;
+						p->wpsing = _FALSE;
 #ifdef DHCP
 						memset( p->cmd, 0x00, CMD_SZ );
 						sprintf( p->cmd, "dhclient %s", p->ifname);
@@ -768,11 +793,7 @@ void p2p_client_mode(struct p2p *p)
 							if( p->wps_info == 2 )
 							{
 								memset( p->cmd, 0x00, CMD_SZ );
-
-								if(p->connect_go == 1)
-									sprintf( p->cmd, "%s wps_pin %s %d > supp_status.txt ", p->wpacli_path, p->peer_devaddr, p->pin);
-								else
-									sprintf( p->cmd, "%s wps_pin %s %d > supp_status.txt ", p->wpacli_path, p->peer_ifaddr, p->pin);
+								sprintf( p->cmd, "%s wps_pin %s %d > supp_status.txt ", p->wpacli_path, p->peer_ifaddr, p->pin);
 								system( p->cmd );
 								
 								inactive_restart = 1;
@@ -812,180 +833,98 @@ void p2p_client_mode(struct p2p *p)
 		usleep( SUPPLICANT_INTERVAL );
 	
 	}
+	
+	p->wpsing = _FALSE;
 }
 
 void p2p_go_mode(struct p2p *p)
 {
-	FILE *pf = NULL;
-	int count = 0, ret = 0, i = -1;
+	int count = 0, i = -1;
 	char addr_lower[18];
 
 	p2p_ifaddr(p);
+	p->no_sta_connected++;
 
 	p->p2p_get=1;
 	memset( p->print_line, 0x00, CMD_SZ );
 	strcpy( p->print_line, "Start hostapd");
 	ui_screen(p);
 
-	if(p->ap_open != 1)
+	if(p->ap_open != _TRUE)
 	{
 		memset( p->cmd, 0x00, CMD_SZ );
 		sprintf( p->cmd, "%s -B %s > temp.txt",p->ap_path, p->ap_conf);
 		system( p->cmd );
 
 		usleep( HOSTAPD_INIT_TIME );
+		p->ap_open = _TRUE;
 	}
 
-	if(p->wps_info==1 || p->wps_info==2)
-	{
-		do
-		{
-		memset( p->cmd, 0x00, CMD_SZ );
-		sprintf( p->cmd, "%s wps_pin any %d > supp_status.txt", p->apcli_path, p->pin);
-		system( p->cmd );
-	
-			pf = fopen( "./supp_status.txt", "r" );	
-			if ( pf )
-			{
-				while( !feof( pf ) ){
-					memset(p->parse, 0x00, CMD_SZ);
-					fgets(p->parse, CMD_SZ, pf);
-					if(strncmp(p->parse, "", 2) == 0)
-					{
-						ret = 1;
-						p->wpsing = 1;
-					}
-				}
-		
-				fclose( pf );
-			}
-			
-			if( ret == 0 )
-				usleep( HOSTAPD_INIT_TIME );
-		}
-		while( ret == 0 );
-	}
-	else if(p->wps_info==3)
-	{
-		do
-		{
-		memset( p->cmd, 0x00, CMD_SZ );
-		sprintf( p->cmd, "%s wps_pbc any > supp_status.txt", p->apcli_path);
-		system( p->cmd );
-						
-			pf = fopen( "./supp_status.txt", "r" );	
-			if ( pf )
-			{
-				while( !feof( pf ) ){
-					memset(p->parse, 0x00, CMD_SZ);
-					fgets(p->parse, CMD_SZ, pf);
-					if(strncmp(p->parse, "OK", 2) == 0)
-					{
-						ret = 1;
-						p->wpsing = 1;
-					}
-				}
-		
-				fclose( pf );
-			}
-			
-			if( ret == 0 )
-				usleep( HOSTAPD_INIT_TIME );
-		}
-		while( ret == 0 );
-	}
+	do_wps(p);
 
 	usleep( HOSTAPD_INTERVAL );
-		
+
+
 	while( count < WPS_RETRY )		//query status
 	{
-	
-		memset( p->cmd, 0x00, CMD_SZ );
-		sprintf( p->cmd, "%s all_sta > supp_status.txt", p->apcli_path);
-		system( p->cmd );
-		
-		pf = fopen( "./supp_status.txt", "r" );
-		if ( pf )
+		if( read_all_sta(p) == _TRUE )
 		{
-			for(i=0;i<17;i++)
-			{
-				if( p->ap_open != 1 )
-					addr_lower[i] = lower(p->peer_ifaddr[i]);
-				else
-					addr_lower[i] = lower(p->peer_devaddr[i]);
-			}
-			addr_lower[17]='\0';
-     			
-			while( !feof( pf ) ){
-				memset( p->parse, 0x00, CMD_SZ );
-				fgets( p->parse, CMD_SZ, pf );
-				if( strncmp( p->parse, "dot11RSNAStatsSTAAddress=", 25) == 0 )
-				{
-					if( strncmp( p->parse+25, addr_lower, 17) == 0 )
-					{
-						count = WPS_RETRY;
-						p->wpsing = 0;
+			count = WPS_RETRY;
+			p->wpsing = _FALSE;
 
-						p->p2p_get=1;
-						memset(p->print_line, 0x00, CMD_SZ);
-						for(i=0; i<CMD_SZ; i++){
-							if(p->parse[i] == '\n'){
-								p->parse[i] = ' ';
-							}
-						}		
-						sprintf(p->print_line, "%s", p->parse);
-						ui_screen(p);
+			p->p2p_get=1;
+			memset(p->print_line, 0x00, CMD_SZ);
+			for(i=0; i<CMD_SZ; i++){
+				if(p->parse[i] == '\n'){
+					p->parse[i] = ' ';
+				}
+			}		
+			sprintf(p->print_line, "%s", p->parse);
+			ui_screen(p);
 #ifdef DHCP
-						memset( p->cmd, 0x00, CMD_SZ );
-						sprintf( p->cmd, "ifconfig %s 192.168.1.254", p->ifname);
-						system( p->cmd );
-	
-						usleep(50000);
-						
-						system( "/etc/rc.d/init.d/dhcpd start" );
-						system( "clear" );
+			memset( p->cmd, 0x00, CMD_SZ );
+			sprintf( p->cmd, "ifconfig %s 192.168.1.254", p->ifname);
+			system( p->cmd );
+
+			usleep(50000);
+			
+			system( "/etc/rc.d/init.d/dhcpd start" );
+			system( "clear" );
 #endif //DHCP
 
-						//After starting hostapd and doing WPS connection successful,
-						//We create a thread to query driver if some other p2p devices connected.
-						p2p_status(p, 0);
-						usleep(50000);
+			//After starting hostapd and doing WPS connection successful,
+			//We create a thread to query driver if some other p2p devices connected.
+			p2p_status(p, 0);
+			usleep(50000);
 
 #ifdef P2P_AUTO
-						p->res_go = pthread_create(&p->pthread_go, NULL, &polling_client, (void *)p);
+			p->res_go = pthread_create(&p->pthread_go, NULL, &polling_client, (void *)p);
 
-						if( p->res_go != 0 )
-						{
-							p->p2p_get=1;
-							memset( p->print_line, 0x00, CMD_SZ );
-							sprintf( p->print_line, "Thread creation failed" );
-						}
-#endif
-						
-						break;
-					}
-				}
+			if( p->res_go != 0 )
+			{
+				p->p2p_get=1;
+				memset( p->print_line, 0x00, CMD_SZ );
+				sprintf( p->print_line, "Thread creation failed" );
 			}
-
-			fclose( pf );
+#endif
+			break;		
 		}
-		
-		if( count == WPS_RETRY)
-			break;
+		else
+		{
+			if( count == WPS_RETRY)
+				break;
 
-		count++;
-		usleep( HOSTAPD_INTERVAL );
+			count++;
+			usleep( HOSTAPD_INTERVAL );
 		
-		p->p2p_get=1;
-		memset( p->print_line, 0x00, CMD_SZ );
-		sprintf( p->print_line, "hostapd open, count:%d", count);
-		ui_screen(p);
-
+			p->p2p_get=1;
+			memset( p->print_line, 0x00, CMD_SZ );
+			sprintf( p->print_line, "hostapd open, count:%d", count);
+			ui_screen(p);
+		}
 	}
 
-	if(p->ap_open != 1)
-		p->ap_open = 1;
-
+	p->wpsing = _FALSE;
 }
 
 void p2p_get_hostapd_conf(struct p2p *p)
@@ -1032,6 +971,7 @@ void p2p_set_opch(struct p2p *p, char *msg, int print)
 {
 	if(print == 1)
 	{
+		p->show_scan_result = 1;
 		ui_screen(p);
 		printf("%s", msg);	
 		scanf("%d",&p->op_ch);
@@ -1046,6 +986,7 @@ void p2p_softap_ssid(struct p2p *p, char *msg, int print)
 {
 	if(print == 1)
 	{
+		p->show_scan_result = 1;
 		ui_screen(p);
 		printf("%s", msg);
 		scanf("%s",p->apd_ssid);
@@ -1058,6 +999,7 @@ void p2p_softap_ssid(struct p2p *p, char *msg, int print)
 
 void p2p_listen_ch(struct p2p *p, char *msg)
 {
+	p->show_scan_result = 1;
 	ui_screen(p);
 	printf("%s", msg);
 	scanf("%d",&p->listen_ch);
@@ -1309,6 +1251,14 @@ void *polling_client(void *arg)
 	struct p2p *p=(struct p2p*)arg;
 	
 	while( p->res_go == 0 ){
+
+		if( p->no_sta_connected > 0 && ( p->wpsing == _FALSE ) )
+		{
+			if( read_all_sta(p) == _FALSE )
+			{
+				p->no_sta_connected--;
+			}
+		}
 
 		p2p_status(p, 0);
 		if( p->status == P2P_STATE_RX_PROVISION_DIS_REQ || p->status == P2P_STATE_GONEGO_FAIL || p->status == P2P_STATE_GONEGO_ING )

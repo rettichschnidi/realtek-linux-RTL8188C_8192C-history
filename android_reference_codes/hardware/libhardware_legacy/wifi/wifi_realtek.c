@@ -950,9 +950,9 @@ int wifi_send_command(struct wpa_ctrl *ctrl, const char *cmd, char *reply, size_
     } else if (ret < 0 || strncmp(reply, "FAIL", 4) == 0) {
         return -1;
     }
-    if (strncmp(cmd, "PING", 4) == 0) {
+    //if (strncmp(cmd, "PING", 4) == 0) {
         reply[*reply_len] = '\0';
-    }
+    //}
     LOGD("command: %s",cmd);
     LOGD("reply: %s", reply);
     return 0;
@@ -1133,6 +1133,10 @@ int set_hostapd_config_file(int argc, char *argv[])
 
 	len = snprintf(buf, sizeof(buf), "wps_state=2\n");
 	write(fd, buf, len);
+
+	//unmask this to set hidden ssid
+	//len = snprintf(buf, sizeof(buf), "ignore_broadcast_ssid=1\n");
+	//    write(fd, buf, len);
 	
 	hostapd_conif_valid = 1;
 	close(fd);
