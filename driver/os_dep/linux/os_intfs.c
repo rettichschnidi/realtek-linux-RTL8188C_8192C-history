@@ -136,6 +136,12 @@ int rtw_hwpwrp_detect = 1;
 int rtw_hwpwrp_detect = 0; //HW power  ping detect 0:disable , 1:enable
 #endif
 
+#ifdef CONFIG_USB_HCI
+int rtw_hw_wps_pbc = 1;
+#else
+int rtw_hw_wps_pbc = 0;
+#endif
+
 char* ifname = "wlan%d";
 
 char* rtw_initmac = 0;  // temp mac address if users want to use instead of the mac address in Efuse
@@ -173,6 +179,11 @@ module_param(rtw_hwpwrp_detect, int, 0644);
 #ifdef CONFIG_ADAPTOR_INFO_CACHING_FILE
 char *adaptor_info_caching_file_path= "/data/misc/wifi/rtw_cache";
 module_param(adaptor_info_caching_file_path, charp, 0644);
+#endif
+
+#ifdef CONFIG_LAYER2_ROAMING
+uint max_roaming_times=2;
+module_param(max_roaming_times, uint, 0644);
 #endif
 
 static uint loadparam( _adapter *padapter,  _nic_hdl	pnetdev);
@@ -500,9 +511,15 @@ _func_enter_;
 	registry_par->hwpwrp_detect = (u8)rtw_hwpwrp_detect;//0:disable,1:enable
 #endif
 
+	registry_par->hw_wps_pbc = (u8)rtw_hw_wps_pbc;
+
 #ifdef CONFIG_ADAPTOR_INFO_CACHING_FILE
 	snprintf(registry_par->adaptor_info_caching_file_path, PATH_LENGTH_MAX, "%s",adaptor_info_caching_file_path);
 	registry_par->adaptor_info_caching_file_path[PATH_LENGTH_MAX-1]=0;
+#endif
+
+#ifdef CONFIG_LAYER2_ROAMING
+	registry_par->max_roaming_times = (u8)max_roaming_times;
 #endif
 
 _func_exit_;
@@ -555,7 +572,7 @@ static const struct net_device_ops rtw_netdev_ops = {
 };
 #endif
 
-int rtw_init_netdev_name(struct net_device *pnetdev)
+int rtw_init_netdev_name(struct net_device *pnetdev, const char *ifname)
 {
 	_adapter *padapter = rtw_netdev_priv(pnetdev);
 
@@ -580,8 +597,11 @@ int rtw_init_netdev_name(struct net_device *pnetdev)
 			DBG_8192C("Force onboard module driver disappear !!!\n");
 			TargetAdapter = rtw_netdev_priv(TargetNetdev);
 			TargetAdapter->DriverState = DRIVER_DISAPPEAR;
-			if(TargetAdapter->pid != 0)
-				padapter->pid = TargetAdapter->pid;
+
+			padapter->pid[0] = TargetAdapter->pid[0];
+			padapter->pid[1] = TargetAdapter->pid[1];
+			padapter->pid[2] = TargetAdapter->pid[2];
+			
 			dev_put(TargetNetdev);
 			unregister_netdev(TargetNetdev);
 #ifdef CONFIG_PROC_DEBUG
@@ -604,24 +624,27 @@ int rtw_init_netdev_name(struct net_device *pnetdev)
 	return 0;
 }
 
-struct net_device *rtw_init_netdev(void)	
+struct net_device *rtw_init_netdev(_adapter *old_padapter)	
 {
 	_adapter *padapter;
 	struct net_device *pnetdev;
 
 	RT_TRACE(_module_os_intfs_c_,_drv_info_,("+init_net_dev\n"));
 
-	//pnetdev = alloc_netdev(sizeof(_adapter), "wlan%d", ether_setup);
+	if(old_padapter != NULL) 
+		pnetdev = rtw_alloc_etherdev_with_old_priv(sizeof(_adapter), (void *)old_padapter);
+	else 
 	pnetdev = rtw_alloc_etherdev(sizeof(_adapter));
+	
 	if (!pnetdev)
 		return NULL;
+
+	padapter = rtw_netdev_priv(pnetdev);
+	padapter->pnetdev = pnetdev;	
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
 	SET_MODULE_OWNER(pnetdev);
 #endif
-	
-	padapter = rtw_netdev_priv(pnetdev);
-	padapter->pnetdev = pnetdev;	
 	
 	//pnetdev->init = NULL;
 #if (LINUX_VERSION_CODE>=KERNEL_VERSION(2,6,29))
@@ -822,11 +845,7 @@ u8 rtw_reset_drv_sw(_adapter *padapter)
 
 	pmlmepriv->LinkDetectInfo.bBusyTraffic = _FALSE;
 
-	if(pmlmepriv->fw_state & _FW_UNDER_SURVEY)			
-		pmlmepriv->fw_state ^= _FW_UNDER_SURVEY;
-	
-	if(pmlmepriv->fw_state & _FW_UNDER_LINKING) 		
-		pmlmepriv->fw_state ^= _FW_UNDER_LINKING;
+	_clr_fwstate_(pmlmepriv, _FW_UNDER_SURVEY |_FW_UNDER_LINKING);
 
 #ifdef CONFIG_AUTOSUSPEND	
 	#if (LINUX_VERSION_CODE>=KERNEL_VERSION(2,6,22) && LINUX_VERSION_CODE<=KERNEL_VERSION(2,6,34))
@@ -839,6 +858,9 @@ u8 rtw_reset_drv_sw(_adapter *padapter)
 		padapter->HalFunc.sreset_reset_value(padapter);
 #endif
 	pwrctrlpriv->pwr_state_check_cnts = 0;
+
+	//mlmeextpriv
+	padapter->mlmeextpriv.sitesurvey_res.state= SCAN_DISABLE;
 
 	return ret8;
 }
@@ -876,7 +898,14 @@ _func_enter_;
 		ret8=_FAIL;
 		goto exit;
 	}
-		
+
+	if(init_mlme_ext_priv(padapter) == _FAIL)
+	{
+		RT_TRACE(_module_os_intfs_c_,_drv_err_,("\n Can't init mlme_ext_priv\n"));
+		ret8=_FAIL;
+		goto exit;
+	}
+
 	if(_rtw_init_xmit_priv(&padapter->xmitpriv, padapter) == _FAIL)
 	{
 		DBG_871X("Can't _rtw_init_xmit_priv\n");
@@ -955,9 +984,12 @@ void rtw_cancel_all_timer(_adapter *padapter)
 	padapter->HalFunc.DeInitSwLeds(padapter);
 	RT_TRACE(_module_os_intfs_c_,_drv_info_,("rtw_cancel_all_timer:cancel DeInitSwLeds! \n"));
 
-#ifdef CONFIG_IPS
-	// cancel ips timer
 	_cancel_timer_ex(&padapter->pwrctrlpriv.pwr_state_check_timer);
+
+
+#ifdef CONFIG_SET_SCAN_DENY_TIMER
+	_cancel_timer_ex(&padapter->mlmepriv.set_scan_deny_timer);
+	RT_TRACE(_module_os_intfs_c_,_drv_info_,("rtw_cancel_all_timer:cancel set_scan_deny_timer! \n"));
 #endif
 
 	// cancel dm  timer
@@ -1019,6 +1051,11 @@ static int netdev_open(struct net_device *pnetdev)
 	RT_TRACE(_module_os_intfs_c_,_drv_info_,("+871x_drv - dev_open\n"));
 	DBG_8192C("+871x_drv - drv_open, bup=%d\n", padapter->bup);
 
+	if(pwrctrlpriv->ps_flag == _TRUE){
+		padapter->net_closed = _FALSE;
+		goto netdev_open_normal_process;
+	}
+		
        if(padapter->bup == _FALSE)
     	{    
 		padapter->bDriverStopped = _FALSE;
@@ -1044,7 +1081,7 @@ static int netdev_open(struct net_device *pnetdev)
 		}
 
 
-		if (init_mlme_ext_priv(padapter) == _FAIL)
+		if (init_hw_mlme_ext(padapter) == _FAIL)
 		{
 			RT_TRACE(_module_os_intfs_c_,_drv_err_,("can't init mlme_ext_priv\n"));
 			goto netdev_open_error;
@@ -1074,7 +1111,7 @@ static int netdev_open(struct net_device *pnetdev)
 	if(( pwrctrlpriv->power_mgnt != PS_MODE_ACTIVE ) ||(padapter->pwrctrlpriv.bHWPwrPindetect))
 	{
 		padapter->pwrctrlpriv.bips_processing = _FALSE;	
-		_set_timer(&padapter->pwrctrlpriv.pwr_state_check_timer, padapter->pwrctrlpriv.pwr_state_check_inverval);
+		rtw_set_pwr_state_check_timer(&padapter->pwrctrlpriv);
  	}
 
 	//netif_carrier_on(pnetdev);//call this func when rtw_joinbss_event_callback return success       
@@ -1083,10 +1120,12 @@ static int netdev_open(struct net_device *pnetdev)
 	else
 		netif_wake_queue(pnetdev);
 
+netdev_open_normal_process:
+
 	RT_TRACE(_module_os_intfs_c_,_drv_info_,("-871x_drv - dev_open\n"));
 	DBG_8192C("-871x_drv - drv_open, bup=%d\n", padapter->bup);
 		
-	 return 0;
+	return 0;
 	
 netdev_open_error:
 
@@ -1129,7 +1168,7 @@ int  ips_netdrv_open(_adapter *padapter)
 		padapter->intf_start(padapter);
 	}
 
-	_set_timer(&padapter->pwrctrlpriv.pwr_state_check_timer, padapter->pwrctrlpriv.pwr_state_check_inverval);
+	rtw_set_pwr_state_check_timer(&padapter->pwrctrlpriv);
   	_set_timer(&padapter->mlmepriv.dynamic_chk_timer,5000);
 
 	 return _SUCCESS;
@@ -1160,31 +1199,23 @@ void rtw_ips_dev_unload(_adapter *padapter)
 		rtw_hal_deinit(padapter);
 	}
 
-	//s6.
-	if(padapter->dvobj_deinit)
-	{
-		padapter->dvobj_deinit(padapter);
-	}
-	else
-	{
-		RT_TRACE(_module_hci_intfs_c_,_drv_err_,("Initialize hcipriv.hci_priv_init error!!!\n"));
-	}
-
 }
 
 int rtw_ips_pwr_up(_adapter *padapter)
 {	
 	int result;
+	u32 start_time = rtw_get_current_time();
 	DBG_8192C("===>  rtw_ips_pwr_up..............\n");
 	rtw_reset_drv_sw(padapter);
 	result = ips_netdrv_open(padapter);
- 	DBG_8192C("<===  rtw_ips_pwr_up..............\n");
+ 	DBG_8192C("<===  rtw_ips_pwr_up.............. in %dms\n", rtw_get_passing_time_ms(start_time));
 	return result;
 
 }
 
 void rtw_ips_pwr_down(_adapter *padapter)
 {
+	u32 start_time = rtw_get_current_time();
 	DBG_8192C("===> rtw_ips_pwr_down...................\n");
 
 	padapter->bCardDisableWOHSM = _TRUE;
@@ -1194,7 +1225,7 @@ void rtw_ips_pwr_down(_adapter *padapter)
 	
 	rtw_ips_dev_unload(padapter);
 	padapter->bCardDisableWOHSM = _FALSE;
-	DBG_8192C("<=== rtw_ips_pwr_down.....................\n");
+	DBG_8192C("<=== rtw_ips_pwr_down..................... in %dms\n", rtw_get_passing_time_ms(start_time));
 }
 #endif
 
@@ -1210,7 +1241,7 @@ int pm_netdev_open(struct net_device *pnetdev,u8 bnormal)
 
 	return status;
 }
-extern int rfpwrstate_check(_adapter *padapter);
+//extern int rfpwrstate_check(_adapter *padapter);
 static int netdev_close(struct net_device *pnetdev)
 {
 	_adapter *padapter = (_adapter *)rtw_netdev_priv(pnetdev);
@@ -1219,7 +1250,9 @@ static int netdev_close(struct net_device *pnetdev)
 
 	if(padapter->pwrctrlpriv.bInternalAutoSuspend == _TRUE)
 	{
-		rfpwrstate_check(padapter);
+		//rfpwrstate_check(padapter);
+		if(padapter->pwrctrlpriv.current_rfpwrstate == rf_off)
+			padapter->pwrctrlpriv.ps_flag = _TRUE;
 	}
 	padapter->net_closed = _TRUE;
 
@@ -1232,7 +1265,7 @@ static int netdev_close(struct net_device *pnetdev)
 		rtw_dev_unload(padapter);
 	}
 	else*/
-	{
+	if(padapter->pwrctrlpriv.current_rfpwrstate == rf_on){
 		DBG_8192C("(2)871x_drv - drv_close, bup=%d, hw_init_completed=%d\n", padapter->bup, padapter->hw_init_completed);
 
 		//s1.
@@ -1243,21 +1276,19 @@ static int netdev_close(struct net_device *pnetdev)
      		}
 
 #ifndef CONFIG_ANDROID
-
 		//s2.	
 		//s2-1.  issue rtw_disassoc_cmd to fw
 		rtw_disassoc_cmd(padapter);	
 		//s2-2.  indicate disconnect to os
 		rtw_indicate_disconnect(padapter);
 		//s2-3. 
-	       rtw_free_assoc_resources(padapter);	
+		rtw_free_assoc_resources(padapter);
 		//s2-4.
 		rtw_free_network_queue(padapter,_TRUE);
 #endif
+		// Close LED
+		padapter->ledpriv.LedControlHandler(padapter, LED_CTL_POWER_OFF);
 	}
-
-	// Close LED
-	padapter->ledpriv.LedControlHandler(padapter, LED_CTL_POWER_OFF);
 
 	RT_TRACE(_module_os_intfs_c_,_drv_info_,("-871x_drv - drv_close\n"));
 	DBG_8192C("-871x_drv - drv_close, bup=%d\n", padapter->bup);

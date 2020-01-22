@@ -22,9 +22,9 @@
 
 #include <basic_types.h>
 
-/*Created on  2011/ 4/11,  3: 2*/
+/*Created on  2011/ 6/22,  2:27*/
 
-#define ImgArrayLength 24338
+#define ImgArrayLength 29642
 extern u8 Rtl8192DEFwImgArray[ImgArrayLength];
 #define MainArrayLength 1
 extern u8 Rtl8192DEFwMainArray[MainArrayLength];

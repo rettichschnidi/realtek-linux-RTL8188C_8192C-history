@@ -688,11 +688,12 @@ extern int writeFile(struct file *fp,char *buf,int len);
 #endif
 
 
-#ifdef MEM_ALLOC_REFINE_ADAPTOR
+#if 1 //#ifdef MEM_ALLOC_REFINE_ADAPTOR
 struct rtw_netdev_priv_indicator {
 	void *priv;
 	u32 sizeof_priv;
 };
+struct net_device *rtw_alloc_etherdev_with_old_priv(int sizeof_priv, void *old_priv);
 extern struct net_device * rtw_alloc_etherdev(int sizeof_priv);
 #define rtw_netdev_priv(netdev) ( ((struct rtw_netdev_priv_indicator *)netdev_priv(netdev))->priv )
 extern void rtw_free_netdev(struct net_device * netdev);
@@ -702,5 +703,23 @@ extern void rtw_free_netdev(struct net_device * netdev);
 #define rtw_free_netdev(netdev) free_netdev((netdev))
 #endif
 
+#ifdef PLATFORM_LINUX
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,27))
+#define rtw_signal_process(pid, sig) kill_pid(find_vpid((pid)),(sig), 1)
+#else
+#define rtw_signal_process(pid, sig) kill_proc((pid), (sig), 1)
 #endif
+#endif //PLATFORM_LINUX
+
+#ifdef DBG_DELAY_OS
+#define rtw_mdelay_os(ms) _rtw_mdelay_os((ms), __FUNCTION__, __LINE__)
+#define rtw_udelay_os(ms) _rtw_udelay_os((ms), __FUNCTION__, __LINE__)
+extern void _rtw_mdelay_os(int ms, const char *func, const int line);
+extern void _rtw_udelay_os(int us, const char *func, const int line);
+#endif
+
+#endif
+
+extern u64 rtw_modular64(u64 x, u64 y);
+extern u64 rtw_division64(u64 x, u64 y);
 

@@ -2640,11 +2640,11 @@ _func_enter_;
 	if (_LOOPBOOK_MODE_ == type) {
 		pmppriv->mode = type;
 		set_fwstate(pmlmepriv, WIFI_MP_LPBK_STATE); //append txdesc
-		RT_TRACE(_module_mp_, _drv_info_, ("test mode change to loopback mode:0x%08x.\n", pmlmepriv->fw_state));
+		RT_TRACE(_module_mp_, _drv_info_, ("test mode change to loopback mode:0x%08x.\n", get_fwstate(pmlmepriv)));
 	} else if (_2MAC_MODE_ == type){
 		pmppriv->mode = type;
 		_clr_fwstate_(pmlmepriv, WIFI_MP_LPBK_STATE);
-		RT_TRACE(_module_mp_, _drv_info_, ("test mode change to 2mac mode:0x%08x.\n", pmlmepriv->fw_state));
+		RT_TRACE(_module_mp_, _drv_info_, ("test mode change to 2mac mode:0x%08x.\n", get_fwstate(pmlmepriv)));
 	} else
 		status = NDIS_STATUS_NOT_ACCEPTED;
 

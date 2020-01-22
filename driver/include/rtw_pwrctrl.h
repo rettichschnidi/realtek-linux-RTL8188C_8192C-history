@@ -169,6 +169,11 @@ enum _PS_BBRegBackup_ {
 	PSBBREG_TOTALCNT
 };
 
+enum { // for ips_mode
+	IPS_NORMAL = 0,
+	IPS_LEVEL_2
+};
+
 struct	pwrctrl_priv {
 	_pwrlock	lock;
 	volatile u8 rpwm; // requested power state for fw
@@ -207,6 +212,8 @@ struct	pwrctrl_priv {
 	
 	_timer 	ips_check_timer;
 
+	u8	ips_mode; 
+	u8	ips_mode_req; // used to accept the mode setting request, will update to ipsmode later
 
 	u8	bLeisurePs;
 	u8	LpsIdleCount;
@@ -225,6 +232,8 @@ struct	pwrctrl_priv {
 	u8		pwr_state_check_cnts;
 	uint 		bips_processing;
 
+	int 		ps_flag;
+
 	rt_rf_power_state 	current_rfpwrstate;
 	rt_rf_power_state	change_rfpwrstate;
 
@@ -237,7 +246,20 @@ struct	pwrctrl_priv {
 	
 };
 
+#define rtw_get_ips_mode_req(pwrctrlpriv) \
+	(pwrctrlpriv)->ips_mode_req
 
+#define rtw_ips_mode_req(pwrctrlpriv, ips_mode) \
+	(pwrctrlpriv)->ips_mode_req = (ips_mode)
+
+#define _rtw_set_pwr_state_check_timer(pwrctrlpriv, ms) \
+	do { \
+		/*DBG_871X("%s _rtw_set_pwr_state_check_timer(%p, %d)\n", __FUNCTION__, (pwrctrlpriv), (ms));*/ \
+		_set_timer(&(pwrctrlpriv)->pwr_state_check_timer, (ms)); \
+	} while(0)
+	
+#define rtw_set_pwr_state_check_timer(pwrctrlpriv) \
+	_rtw_set_pwr_state_check_timer((pwrctrlpriv), (pwrctrlpriv)->pwr_state_check_inverval)
 
 extern void rtw_init_pwrctrl_priv(_adapter *adapter);
 extern void rtw_free_pwrctrl_priv(_adapter * adapter);

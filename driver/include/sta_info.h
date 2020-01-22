@@ -26,6 +26,7 @@
 #include <drv_types.h>
 #include <wifi.h>
 
+#define IBSS_START_MAC_ID	2
 #define NUM_STA 32
 #define NUM_ACL 64
 

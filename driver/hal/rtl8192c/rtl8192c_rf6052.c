@@ -211,6 +211,7 @@ rtl8192c_PHY_RF6052SetCckTxPower(
 	HAL_DATA_TYPE		*pHalData = GET_HAL_DATA(Adapter);
 	struct mlme_priv	*pmlmepriv = &Adapter->mlmepriv;
 	struct dm_priv		*pdmpriv = &pHalData->dmpriv;
+	struct mlme_ext_priv 		*pmlmeext = &Adapter->mlmeextpriv;
 	//PMGNT_INFO		pMgntInfo=&Adapter->MgntInfo;	
 	u32			TxAGC[2]={0, 0}, tmpval=0;
 	BOOLEAN		TurboScanOff = _FALSE;
@@ -229,12 +230,12 @@ rtl8192c_PHY_RF6052SetCckTxPower(
 		TurboScanOff = _TRUE;
 	}
 
-	if( check_fwstate(pmlmepriv, _FW_UNDER_SURVEY) == _TRUE)
+	if(pmlmeext->sitesurvey_res.state == SCAN_PROCESS)
 	{
 		TxAGC[RF90_PATH_A] = 0x3f3f3f3f;
 		TxAGC[RF90_PATH_B] = 0x3f3f3f3f;
 
-		//TurboScanOff = _TRUE;
+		TurboScanOff = _TRUE;//disable turbo scan
 		
 		if(TurboScanOff)
 		{

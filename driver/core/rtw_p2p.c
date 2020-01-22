@@ -1420,7 +1420,6 @@ void process_p2p_ps_ie(PADAPTER padapter, u8 *IEs, u32 IELength)
 	struct wifidirect_info	*pwdinfo = &( padapter->wdinfo );
 	u8	find_p2p = _FALSE, find_p2p_ps = _FALSE;
 	u8	noa_offset, noa_num, noa_index;
-	u32	tsf_low, tsf_high;
 	u32	offset, cnt;
 
 _func_enter_;
@@ -1487,12 +1486,6 @@ _func_enter_;
 					}
 					else if( pwdinfo->noa_num > 0 )
 					{
-						//Get Current TSF value
-						_rtw_memcpy(&tsf_low, &IEs[0], 4);
-						_rtw_memcpy(&tsf_high, &IEs[4], 4);
-						pwdinfo->tsf_low = tsf_low;
-						pwdinfo->tsf_high = tsf_high;
-
 						pwdinfo->p2p_ps_enable = _TRUE;
 						p2p_ps_wk_cmd(padapter, P2P_PS_ENABLE, 1);
 					}
@@ -1527,7 +1520,7 @@ _func_exit_;
 void p2p_ps_wk_hdl(_adapter *padapter, u8 p2p_ps_state)
 {
 	struct pwrctrl_priv		*pwrpriv = &padapter->pwrctrlpriv;
-	struct wifidirect_info *pwdinfo= &(padapter->wdinfo);
+	struct wifidirect_info	*pwdinfo= &(padapter->wdinfo);
 	
 _func_enter_;
 
@@ -1535,7 +1528,6 @@ _func_enter_;
 	switch(p2p_ps_state)
 	{
 		case P2P_PS_ENABLE:
-			//DBG_8192C("P2P_PS_ENABLE \n");
 			if( pwdinfo->ctwindow > 0 )
 			{
 				if(pwrpriv->smart_ps != 0)
@@ -1615,7 +1607,7 @@ _func_enter_;
 
 			init_h2fwcmd_w_parm_no_rsp(ph2c, pdrvextra_cmd_parm, GEN_CMD_CODE(_Set_Drv_Extra));
 
-			rtw_enqueue_cmd_ex(pcmdpriv, ph2c);
+			res = rtw_enqueue_cmd_ex(pcmdpriv, ph2c);
 		}
 		else
 		{

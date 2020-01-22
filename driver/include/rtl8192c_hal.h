@@ -93,8 +93,7 @@
 
 	// The file name "_2T" is for 92CE, "_1T"  is for 88CE. Modified by tynli. 2009.11.24.
 	#define Rtl819XFwTSMCImageArray			Rtl8192CEFwTSMCImgArray
-	#define Rtl819XFwUMCImageArray				Rtl8192CEFwUMCImgArray
-	#define Rtl819XFwUMCACutImageArray			Rtl8192CEFwUMCImgArray
+	#define Rtl819XFwUMCACutImageArray			Rtl8192CEFwUMCACutImgArray
 	#define Rtl819XFwUMCBCutImageArray			Rtl8192CEFwUMCBCutImgArray
 	
 	#define Rtl8723FwUMCImageArray				Rtl8192CEFwUMC8723ImgArray
@@ -185,6 +184,7 @@
 	#define Rtl819XPHY_REG_Array_MP 			Rtl8192CUPHY_REG_Array_MP
 #endif
 
+#define DRVINFO_SZ	4 // unit is 8bytes
 #define PageNum_128(_Len)		(u32)(((_Len)>>7) + ((_Len)&0x7F ? 1:0))
 
 #define FW_8192C_SIZE					16384+32//16k
@@ -194,7 +194,8 @@
 #define MAX_PAGE_SIZE			4096	// @ page : 4k bytes
 
 #define IS_FW_HEADER_EXIST(_pFwHdr)	((le16_to_cpu(_pFwHdr->Signature)&0xFFF0) == 0x92C0 ||\
-									(le16_to_cpu(_pFwHdr->Signature)&0xFFF0) == 0x88C0)
+									(le16_to_cpu(_pFwHdr->Signature)&0xFFF0) == 0x88C0 ||\
+									(le16_to_cpu(_pFwHdr->Signature)&0xFFF0) == 0x2300)
 
 typedef enum _FIRMWARE_SOURCE{
 	FW_SOURCE_IMG_FILE = 0,
@@ -611,14 +612,20 @@ struct hal_data_8192ce
 	u8	CurAntenna;	
 	u8	AntDivCfg;
 
-#ifdef CONFIG_ANTENNA_DIVERSITY
+#ifdef CONFIG_SW_ANTENNA_DIVERSITY
 	//SW Antenna Switch
 	s32				RSSI_sum_A;
 	s32				RSSI_sum_B;
 	s32				RSSI_cnt_A;
 	s32				RSSI_cnt_B;
 	BOOLEAN		RSSI_test;
-	
+#endif
+#ifdef CONFIG_HW_ANTENNA_DIVERSITY
+	//Hybrid Antenna Diversity
+	u32				CCK_Ant1_Cnt;
+	u32				CCK_Ant2_Cnt;
+	u32				OFDM_Ant1_Cnt;
+	u32				OFDM_Ant2_Cnt;
 #endif
 
 	struct dm_priv	dmpriv;
@@ -660,7 +667,6 @@ VOID UpdateInterruptMask8192CE(PADAPTER Adapter, u32 AddMSR, u32 RemoveMSR);
 #endif
 
 #ifdef CONFIG_USB_HCI
-
 struct hal_data_8192cu
 {
 	VERSION_8192C		VersionID;
@@ -781,7 +787,7 @@ struct hal_data_8192cu
 	u8	CurAntenna;	
 	u8	AntDivCfg;
 
-#ifdef CONFIG_ANTENNA_DIVERSITY
+#ifdef CONFIG_SW_ANTENNA_DIVERSITY
 	//SW Antenna Switch
 	s32				RSSI_sum_A;
 	s32				RSSI_sum_B;
@@ -789,6 +795,14 @@ struct hal_data_8192cu
 	s32				RSSI_cnt_B;
 	BOOLEAN		RSSI_test;
 #endif
+#ifdef CONFIG_HW_ANTENNA_DIVERSITY
+	//Hybrid Antenna Diversity
+	u32				CCK_Ant1_Cnt;
+	u32				CCK_Ant2_Cnt;
+	u32				OFDM_Ant1_Cnt;
+	u32				OFDM_Ant2_Cnt;
+#endif
+
 	u8	bDumpRxPkt;//for debug
 	u8	FwRsvdPageStartOffset; //2010.06.23. Added by tynli. Reserve page start offset except beacon in TxQ.
 

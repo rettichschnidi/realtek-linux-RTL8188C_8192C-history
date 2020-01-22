@@ -195,7 +195,7 @@ int proc_get_fwstate(char *page, char **start,
 	
 	int len = 0;
 
-	len += snprintf(page + len, count - len, "fwstate=0x%x\n", pmlmepriv->fw_state);
+	len += snprintf(page + len, count - len, "fwstate=0x%x\n", get_fwstate(pmlmepriv));
 				
 	*eof = 1;
 	return len;

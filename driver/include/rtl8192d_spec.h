@@ -886,6 +886,9 @@ Default: 00b.
 #define EEPROM_CUSTOMER_ID					0xCB
 #define EEPROM_RF_OPT7							0xCC
 
+#define EEPROM_WIDIPAIRING_ADDR				0xF0
+#define EEPROM_WIDIPAIRING_KEY				0xF6
+
 #define EEPROM_DEF_PART_NO					0x3FD  //Byte
 #define EEPROME_CHIP_VERSION_L				0x3FF
 #define EEPROME_CHIP_VERSION_H				0x3FE

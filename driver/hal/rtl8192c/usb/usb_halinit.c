@@ -1242,11 +1242,11 @@ _InitWMACSetting(
 	)
 {
 	//u4Byte			value32;
-	u16			value16;
+	//u16			value16;
 	HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(Adapter);
 
 	//pHalData->ReceiveConfig = AAP | APM | AM | AB | APP_ICV | ADF | AMF | APP_FCS | HTC_LOC_CTRL | APP_MIC | APP_PHYSTS;
-	pHalData->ReceiveConfig = RCR_AAP | RCR_APM | RCR_AM | RCR_AB | RCR_APP_ICV | RCR_AMF | RCR_HTC_LOC_CTRL | RCR_APP_MIC | RCR_APP_PHYSTS;
+	pHalData->ReceiveConfig = RCR_AAP | RCR_APM | RCR_AM | RCR_AB |RCR_CBSSID_DATA| RCR_CBSSID_BCN| RCR_APP_ICV | RCR_AMF | RCR_HTC_LOC_CTRL | RCR_APP_MIC | RCR_APP_PHYSTS;
 #if (0 == RTL8192C_RX_PACKET_NO_INCLUDE_CRC)
 	pHalData->ReceiveConfig |= ACRC32;
 #endif
@@ -1260,18 +1260,18 @@ _InitWMACSetting(
 
 
 	// Accept all data frames
-	value16 = 0xFFFF;
-	rtw_write16(Adapter, REG_RXFLTMAP2, value16);
+	//value16 = 0xFFFF;
+	//rtw_write16(Adapter, REG_RXFLTMAP2, value16);
 
 	// 2010.09.08 hpfan
 	// Since ADF is removed from RCR, ps-poll will not be indicate to driver,
 	// RxFilterMap should mask ps-poll to gurantee AP mode can rx ps-poll.
-	value16 = 0x400;
-	rtw_write16(Adapter, REG_RXFLTMAP1, value16);
+	//value16 = 0x400;
+	//rtw_write16(Adapter, REG_RXFLTMAP1, value16);
 
 	// Accept all management frames
-	value16 = 0xFFFF;
-	rtw_write16(Adapter, REG_RXFLTMAP0, value16);
+	//value16 = 0xFFFF;
+	//rtw_write16(Adapter, REG_RXFLTMAP0, value16);
 
 	//enable RX_SHIFT bits
 	//rtw_write8(Adapter, REG_TRXDMA_CTRL, rtw_read8(Adapter, REG_TRXDMA_CTRL)|BIT(1));	
@@ -1731,8 +1731,8 @@ _InitBeaconParameters(
 
 	// TODO: Remove these magic number
 	rtw_write16(Adapter, REG_TBTT_PROHIBIT,0x6404);// ms
-	rtw_write8(Adapter, REG_DRVERLYINT, DRIVER_EARLY_INT_TIME);//ms
-	rtw_write8(Adapter, REG_BCNDMATIM, BCN_DMA_ATIME_INT_TIME);
+	rtw_write8(Adapter, REG_DRVERLYINT, DRIVER_EARLY_INT_TIME);// 5ms
+	rtw_write8(Adapter, REG_BCNDMATIM, BCN_DMA_ATIME_INT_TIME); // 2ms
 
 	// Suggested by designer timchen. Change beacon AIFS to the largest number
 	// beacause test chip does not contension before sending beacon. by tynli. 2009.11.03
@@ -2063,6 +2063,8 @@ u32 rtl8192cu_hal_init(PADAPTER Adapter)
 	struct btcoexist_priv	*pbtpriv = &(pHalData->bt_coexist);
 #endif
 
+	u32 init_start_time = rtw_get_current_time();
+
 _func_enter_;
 
 #ifdef SUPPORT_HW_RFOFF_DETECTED
@@ -2079,7 +2081,8 @@ _func_enter_;
 		}
 		rtl8192c_dm_CheckTXPowerTracking(Adapter);
 		rtl8192c_PHY_LCCalibrate(Adapter);
-		return status;
+
+		goto exit;
 	}
 #endif
 
@@ -2100,7 +2103,7 @@ _func_enter_;
 	status =  InitLLTTable(Adapter, boundary);
 	if(status == _FAIL){
 		//RT_TRACE(COMP_INIT,DBG_SERIOUS,("Failed to init power on!\n"));
-		return status;
+		goto exit;
 	}		
 	
 	_InitQueueReservedPage(Adapter);
@@ -2108,22 +2111,6 @@ _func_enter_;
 	_InitQueuePriority(Adapter);
 	_InitPageBoundary(Adapter);	
 	_InitTransferPageSize(Adapter);
-
-	// Get Rx PHY status in order to report RSSI and others.
-	_InitDriverInfoSize(Adapter, 4);
-
-	_InitInterrupt(Adapter);
-	_InitID(Adapter);//set mac_address
-	_InitNetworkType(Adapter);//set msr	
-	_InitWMACSetting(Adapter);
-	_InitAdaptiveCtrl(Adapter);
-	_InitEDCA(Adapter);
-	_InitRateFallback(Adapter);
-	_InitRetryFunction(Adapter);
-	InitUsbAggregationSetting(Adapter);
-	_InitOperationMode(Adapter);//todo
-	_InitBeaconParameters(Adapter);
-	_InitBeaconMaxError(Adapter, _TRUE);
 
 
 #if ENABLE_USB_DROP_INCORRECT_OUT
@@ -2187,9 +2174,22 @@ _func_enter_;
 	{
 		goto exit;
 	}
-	//CLEAR ADF , for using RX_FILTER_MAP.
-	rtw_write32(Adapter, REG_RCR, rtw_read32(Adapter, REG_RCR) & ~RCR_ADF);
 #endif
+	// Get Rx PHY status in order to report RSSI and others.
+	_InitDriverInfoSize(Adapter, DRVINFO_SZ);
+
+	_InitInterrupt(Adapter);
+	_InitID(Adapter);//set mac_address
+	_InitNetworkType(Adapter);//set msr	
+	_InitWMACSetting(Adapter);
+	_InitAdaptiveCtrl(Adapter);
+	_InitEDCA(Adapter);
+	_InitRateFallback(Adapter);
+	_InitRetryFunction(Adapter);
+	InitUsbAggregationSetting(Adapter);
+	_InitOperationMode(Adapter);//todo
+	_InitBeaconParameters(Adapter);
+	_InitBeaconMaxError(Adapter, _TRUE);
 
 	//
 	//d. Initialize BB related configurations.
@@ -2381,7 +2381,7 @@ _func_enter_;
 
 
 #ifdef USB_INTERFERENCE_ISSUE
-#ifdef CONFIG_USB_HCI //fixed USB interface interference issue
+ //fixed USB interface interference issue
 	rtw_write8(Adapter, 0xfe40, 0xe0);
 	rtw_write8(Adapter, 0xfe41, 0x8d);
 	rtw_write8(Adapter, 0xfe42, 0x80);
@@ -2411,7 +2411,7 @@ _func_enter_;
 		rtw_write8(Adapter, 0xFE42, 0x80);    
 	
 	}
-#endif
+
 #endif
 #endif //USB_INTERFERENCE_ISSUE
 
@@ -2444,6 +2444,8 @@ _func_enter_;
 	}
 
 exit:
+
+	//DBG_871X("%s in %dms\n", __FUNCTION__, rtw_get_passing_time_ms(init_start_time));
 
 _func_exit_;
 
@@ -2996,7 +2998,10 @@ _ResetDigitalProcedure1(
 		}	
 		
 		rtw_write8(Adapter, REG_SYS_FUNC_EN+1, 0x54);	//Reset MAC and Enable 8051
-	}			
+	}
+
+	// Clear rpwm value for initial toggle bit trigger.
+	rtw_write8(Adapter, REG_USB_HRPWM, 0x00);
 
 	if(bWithoutHWSM){
 	/*****************************
@@ -3664,7 +3669,7 @@ _ReadBoardType(
 	HAL_DATA_TYPE		*pHalData = GET_HAL_DATA(Adapter);
 	BOOLEAN		isNormal = IS_NORMAL_CHIP(pHalData->VersionID);
 	u32			value32;
-	u8			boardType;
+	u8			boardType = BOARD_USB_DONGLE;
 #if 0
 	if(isNormal)
 	{
@@ -3695,6 +3700,7 @@ _ReadBoardType(
 		        pHalData->rf_type = RF_2T2R;
 
 		pHalData->BluetoothCoexist = _FALSE;
+		pHalData->BoardType = boardType;
 		return;
 	}
 
@@ -4210,9 +4216,9 @@ _func_enter_;
 					rtw_write8(Adapter,REG_BCN_CTRL, 0x18);
 				}
 				else if((mode == _HW_STATE_ADHOC_) /*|| (mode == _HW_STATE_AP_)*/)
-				{
+				{					
 					ResumeTxBeacon(Adapter);
-					rtw_write8(Adapter,REG_BCN_CTRL, 0x1a);
+					rtw_write8(Adapter,REG_BCN_CTRL, 0x1a);					
 				}
 				else if(mode == _HW_STATE_AP_)
 				{
@@ -4279,7 +4285,6 @@ _func_enter_;
 				// For 8190, we select only 24M, 12M, 6M, 11M, 5.5M, 2M, and 1M from the Basic rate.
 				// We do not use other rates.
 				rtl8192c_HalSetBrateCfg( Adapter, val, &BrateCfg );
-				DBG_8192C("HW_VAR_BASIC_RATE: BrateCfg(%#x)\n", BrateCfg);
 
 				//2011.03.30 add by Luke Lee
 				//CCK 2M ACK should be disabled for some BCM and Atheros AP IOT
@@ -4289,6 +4294,9 @@ _func_enter_;
 				pHalData->BasicRateSet = BrateCfg = (BrateCfg |0xd) & 0x15d;		
 
 				BrateCfg |= 0x01; // default enable 1M ACK rate
+
+				DBG_8192C("HW_VAR_BASIC_RATE: BrateCfg(%#x)\n", BrateCfg);
+				
 				// Set RRSR rate table.
 				rtw_write8(Adapter, REG_RRSR, BrateCfg&0xff);
 				rtw_write8(Adapter, REG_RRSR+1, (BrateCfg>>8)&0xff);
@@ -4322,7 +4330,8 @@ _func_enter_;
 				struct mlme_ext_priv	*pmlmeext = &Adapter->mlmeextpriv;
 				struct mlme_ext_info	*pmlmeinfo = &(pmlmeext->mlmext_info);
 
-				tsf = pmlmeext->TSFValue - ((u32)pmlmeext->TSFValue % (pmlmeinfo->bcn_interval*1024)) -1024; //us
+				//tsf = pmlmeext->TSFValue - ((u32)pmlmeext->TSFValue % (pmlmeinfo->bcn_interval*1024)) -1024; //us
+				tsf = pmlmeext->TSFValue - rtw_modular64(pmlmeext->TSFValue, (pmlmeinfo->bcn_interval*1024)) -1024; //us
 
 				if(((pmlmeinfo->state&0x03) == WIFI_FW_ADHOC_STATE) || ((pmlmeinfo->state&0x03) == WIFI_FW_AP_STATE))
 				{				
@@ -4383,6 +4392,7 @@ _func_enter_;
 			{
 				//Set RCR to not to receive data frame when NO LINK state
 				//rtw_write32(Adapter, REG_RCR, rtw_read32(padapter, REG_RCR) & ~RCR_ADF);
+				//reject all data frames
 				rtw_write16(Adapter, REG_RXFLTMAP2,0x00);
 
 				//reset TSF
@@ -4409,6 +4419,7 @@ _func_enter_;
 					u32 v = rtw_read32(Adapter, REG_RCR);
 					v &= ~(RCR_CBSSID_DATA | RCR_CBSSID_BCN );//| RCR_ADF
 					rtw_write32(Adapter, REG_RCR, v);
+					//reject all data frame
 					rtw_write16(Adapter, REG_RXFLTMAP2,0x00);
 
 					//disable update TSF
@@ -4475,68 +4486,68 @@ _func_enter_;
 			{
 				u8	RetryLimit = 0x30;
 				u8	type = *((u8 *)val);
+				struct mlme_priv	*pmlmepriv = &Adapter->mlmepriv;
+
 				if(type == 0) // prepare to join
 				{
-					if(IS_NORMAL_CHIP(pHalData->VersionID))
-					{
-						//config RCR to receive different BSSID & not to receive data frame during linking				
-						u32 v = rtw_read32(Adapter, REG_RCR);
-						v &= ~(RCR_CBSSID_DATA | RCR_CBSSID_BCN );//| RCR_ADF
-						rtw_write32(Adapter, REG_RCR, v);
-						rtw_write16(Adapter, REG_RXFLTMAP2,0x00);
-					}	
-					else
-					{
-						//config RCR to receive different BSSID & not to receive data frame during linking	
-						rtw_write32(Adapter, REG_RCR, rtw_read32(Adapter, REG_RCR) & 0xfffff7bf);
-					}
-				}
-				else if(type == 1) //joinbss_event call back
-				{
-					struct mlme_ext_priv	*pmlmeext = &Adapter->mlmeextpriv;
-					struct mlme_ext_info	*pmlmeinfo = &(pmlmeext->mlmext_info);
-
 					//enable to rx data frame.Accept all data frame
 					//rtw_write32(padapter, REG_RCR, rtw_read32(padapter, REG_RCR)|RCR_ADF);
 					rtw_write16(Adapter, REG_RXFLTMAP2,0xFFFF);
 
-					if((pmlmeinfo->state&0x03) == WIFI_FW_STATION_STATE)
+					if(IS_NORMAL_CHIP(pHalData->VersionID))
 					{
-						if(IS_NORMAL_CHIP(pHalData->VersionID))
-						{
-							rtw_write32(Adapter, REG_RCR, rtw_read32(Adapter, REG_RCR)|RCR_CBSSID_DATA|RCR_CBSSID_BCN);
-
-							//enable update TSF
-							rtw_write8(Adapter, REG_BCN_CTRL, rtw_read8(Adapter, REG_BCN_CTRL)&(~BIT(4)));
-						}
-						else
-						{
-							rtw_write32(Adapter, REG_RCR, rtw_read32(Adapter, REG_RCR)|RCR_CBSSID_DATA);
-
-							//enable update TSF
-							rtw_write8(Adapter, REG_BCN_CTRL, rtw_read8(Adapter, REG_BCN_CTRL)&(~(BIT(4)|BIT(5))));
-						}
-
-						RetryLimit = (pHalData->CustomerID == RT_CID_CCX) ? 7 : 48;
+						rtw_write32(Adapter, REG_RCR, rtw_read32(Adapter, REG_RCR)|RCR_CBSSID_DATA|RCR_CBSSID_BCN);
 					}
 					else
+					{
+						rtw_write32(Adapter, REG_RCR, rtw_read32(Adapter, REG_RCR)|RCR_CBSSID_DATA);
+					}
+
+					if(check_fwstate(pmlmepriv, WIFI_STATION_STATE) == _TRUE)
+					{
+						RetryLimit = (pHalData->CustomerID == RT_CID_CCX) ? 7 : 48;
+					}
+					else // Ad-hoc Mode
 					{
 						RetryLimit = 0x7;
 					}
 				}
+				else if(type == 1) //joinbss_event call back when join res < 0
+				{
+					//if(IS_NORMAL_CHIP(pHalData->VersionID))
+					//{
+						//config RCR to receive different BSSID & not to receive data frame during linking				
+					//	u32 v = rtw_read32(Adapter, REG_RCR);
+					//	v &= ~(RCR_CBSSID_DATA | RCR_CBSSID_BCN );//| RCR_ADF
+					//	rtw_write32(Adapter, REG_RCR, v);
+					//}	
+					//else
+					//{
+						//config RCR to receive different BSSID & not to receive data frame during linking	
+					//	rtw_write32(Adapter, REG_RCR, rtw_read32(Adapter, REG_RCR) & 0xfffff7bf);
+					//}
+
+					rtw_write16(Adapter, REG_RXFLTMAP2,0x00);
+				}
 				else if(type == 2) //sta add event call back
 				{
-					rtw_write32(Adapter, REG_RCR, rtw_read32(Adapter, REG_RCR)|RCR_CBSSID_DATA|RCR_CBSSID_BCN);
+					if(IS_NORMAL_CHIP(pHalData->VersionID))
+					{
+						//enable update TSF
+						rtw_write8(Adapter, REG_BCN_CTRL, rtw_read8(Adapter, REG_BCN_CTRL)&(~BIT(4)));
+					}
+					else
+					{
+						//enable update TSF
+						rtw_write8(Adapter, REG_BCN_CTRL, rtw_read8(Adapter, REG_BCN_CTRL)&(~(BIT(4)|BIT(5))));
+					}
 
-					//accept all data frame
-					rtw_write16(Adapter, REG_RXFLTMAP2, 0xFFFF);
-
-					//enable update TSF
-					rtw_write8(Adapter, REG_BCN_CTRL, rtw_read8(Adapter, REG_BCN_CTRL)&(~BIT(4)));
-
-					//fixed beacon issue for 8191su...........
-					rtw_write8(Adapter,0x542 ,0x02);
-					RetryLimit = 0x7;
+					if(check_fwstate(pmlmepriv, WIFI_ADHOC_STATE|WIFI_ADHOC_MASTER_STATE))
+					{
+						//fixed beacon issue for 8191su...........
+						rtw_write8(Adapter,0x542 ,0x02);
+						RetryLimit = 0x7;
+					}
 				}
 
 				rtw_write16(Adapter, REG_RL, RetryLimit << RETRY_LIMIT_SHORT_SHIFT | RetryLimit << RETRY_LIMIT_LONG_SHIFT);
@@ -4611,15 +4622,7 @@ _func_enter_;
 			}
 			else
 			{// restore dm flag
-				DIG_T	*pDigTable = &pdmpriv->DM_DigTable;
-				
 				pdmpriv->DMFlag = pdmpriv->DMFlag_tmp;
-
-				if(pdmpriv->DMFlag&DYNAMIC_FUNC_DIG)
-				{
-					PHY_SetBBReg(Adapter, rOFDM0_XAAGCCore1, 0x7f, pDigTable->CurIGValue);
-					PHY_SetBBReg(Adapter, rOFDM0_XBAGCCore1, 0x7f, pDigTable->CurIGValue);
-				}
 			}
 			break;
 		case HW_VAR_DM_FUNC_SET:
@@ -4812,7 +4815,7 @@ _func_enter_;
 			}
 			break;
 #endif
-#ifdef CONFIG_ANTENNA_DIVERSITY
+#ifdef CONFIG_SW_ANTENNA_DIVERSITY
 
 		case HW_VAR_ANTENNA_DIVERSITY_LINK:
 			SwAntDivRestAfterLink8192C(Adapter);
@@ -4826,7 +4829,7 @@ _func_enter_;
 				{
 					PHY_SetBBReg(Adapter, rFPGA0_XA_RFInterfaceOE, 0x300, Optimum_antenna);
 					pHalData->CurAntenna = Optimum_antenna ;
-					DBG_8192C("==> HW_VAR_ANTENNA_DIVERSITY_SELECT , Ant_(%s)\n",(Optimum_antenna==2)?"A":"B");
+					//DBG_8192C("==> HW_VAR_ANTENNA_DIVERSITY_SELECT , Ant_(%s)\n",(Optimum_antenna==2)?"A":"B");
 				}
 			}
 			break;
@@ -4848,21 +4851,24 @@ _func_enter_;
 				//keep sn
 				Adapter->xmitpriv.nqos_ssn = rtw_read16(Adapter,REG_NQOS_SEQ);
 
-				//RX DMA stop
-				rtw_write32(Adapter,REG_RXPKT_NUM,(rtw_read32(Adapter,REG_RXPKT_NUM)|RW_RELEASE_EN));
-				do{
-					if(!(rtw_read32(Adapter,REG_RXPKT_NUM)&RXDMA_IDLE))
-						break;
-				}while(trycnt--);
-				if(trycnt ==0)				
-					DBG_8192C("Stop RX DMA failed...... \n");
-					
-				//RQPN Load 0
-				rtw_write16(Adapter,REG_RQPN_NPQ,0x0);
-				rtw_write32(Adapter,REG_RQPN,0x80000000);
-				rtw_mdelay_os(10);
-				
-	
+#ifdef CONFIG_IPS_LEVEL_2	
+				if(pwrpriv->bkeepfwalive != _TRUE)
+#endif
+				{
+					//RX DMA stop
+					rtw_write32(Adapter,REG_RXPKT_NUM,(rtw_read32(Adapter,REG_RXPKT_NUM)|RW_RELEASE_EN));
+					do{
+						if(!(rtw_read32(Adapter,REG_RXPKT_NUM)&RXDMA_IDLE))
+							break;
+					}while(trycnt--);
+					if(trycnt ==0)
+						DBG_8192C("Stop RX DMA failed...... \n");
+
+					//RQPN Load 0
+					rtw_write16(Adapter,REG_RQPN_NPQ,0x0);
+					rtw_write32(Adapter,REG_RQPN,0x80000000);
+					rtw_mdelay_os(10);
+				}
 			}
 			break;
 		default:
@@ -4966,6 +4972,15 @@ GetHalDefVar8192CUsb(
 			#ifdef CONFIG_ANTENNA_DIVERSITY
 			*(( u8*)pValue) = pHalData->CurAntenna;			
 			#endif
+			break;
+		case HAL_DEF_DRVINFO_SZ:
+			*(( u32*)pValue) = DRVINFO_SZ;
+			break;
+		case HAL_DEF_MAX_RECVBUF_SZ:
+			*(( u32*)pValue) = MAX_RECVBUF_SZ;
+			break;
+		case HAL_DEF_RX_PACKET_OFFSET:
+			*(( u32*)pValue) = RXDESC_SIZE + DRVINFO_SZ;
 			break;
 		case HAL_DEF_DBG_DUMP_RXPKT:
 			*(( u8*)pValue) = pHalData->bDumpRxPkt;
@@ -5242,7 +5257,7 @@ void SetBeaconRelatedRegisters8192CUsb(PADAPTER padapter)
 
 	//BCN interval
 	rtw_write16(padapter, REG_BCN_INTERVAL, pmlmeinfo->bcn_interval);
-	rtw_write8(padapter, REG_ATIMWND, 0x02);
+	rtw_write8(padapter, REG_ATIMWND, 0x02);// 2ms
 
 	_InitBeaconParameters(padapter);
 
@@ -5349,7 +5364,7 @@ _func_enter_;
 
 	//pHalFunc->Add_RateATid = &rtl8192c_Add_RateATid;
 
-//#ifdef CONFIG_ANTENNA_DIVERSITY
+//#ifdef CONFIG_SW_ANTENNA_DIVERSITY
 	//pHalFunc->SwAntDivBeforeLinkHandler = &SwAntDivBeforeLink8192C;
 	//pHalFunc->SwAntDivCompareHandler = &SwAntDivCompare8192C;
 //#endif

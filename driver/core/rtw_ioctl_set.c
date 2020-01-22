@@ -35,6 +35,7 @@
 #include <sdio_osintf.h>
 #endif
 
+extern void indicate_wx_scan_complete_event(_adapter *padapter);
 
 #define IS_MAC_ADDRESS_BROADCAST(addr) \
 ( \
@@ -79,7 +80,7 @@ u8 rtw_do_join(_adapter * padapter)
 	u8* pibss = NULL;
 	struct	mlme_priv	*pmlmepriv = &(padapter->mlmepriv);
 	_queue	*queue	= &(pmlmepriv->scanned_queue);
-	u8 ret=_TRUE;
+	u8 ret=_SUCCESS;
 	
 	phead = get_list_head(queue);
 	plist = get_next(phead);
@@ -90,7 +91,7 @@ _func_enter_;
 
 	pmlmepriv->cur_network.join_res = -2;
 		
-	pmlmepriv->fw_state |= _FW_UNDER_LINKING;
+	set_fwstate(pmlmepriv, _FW_UNDER_LINKING);
 
 	pmlmepriv->pscanned = plist;
 
@@ -98,39 +99,40 @@ _func_enter_;
 
 	if(_rtw_queue_empty(queue)== _TRUE)
 	{	
-		if(pmlmepriv->fw_state & _FW_UNDER_LINKING)
-	               pmlmepriv->fw_state ^= _FW_UNDER_LINKING;
+		_clr_fwstate_(pmlmepriv, _FW_UNDER_LINKING);
             		
 		//when set_ssid/set_bssid for rtw_do_join(), but scanning queue is empty
 		//we try to issue sitesurvey firstly	
             		
-		if(pmlmepriv->LinkDetectInfo.bBusyTraffic==_FALSE)
+		if(pmlmepriv->LinkDetectInfo.bBusyTraffic==_FALSE
+			#ifdef CONFIG_LAYER2_ROAMING
+			|| pmlmepriv->to_roaming >0
+			#endif
+		)
 		{
-			// submit site_survey_cmd
-			rtw_sitesurvey_cmd(padapter, &pmlmepriv->assoc_ssid);
-
 			RT_TRACE(_module_rtl871x_ioctl_set_c_,_drv_info_,("rtw_do_join(): site survey if scanned_queue is empty\n."));
+			// submit site_survey_cmd
+			if(_SUCCESS!=(ret=rtw_sitesurvey_cmd(padapter, &pmlmepriv->assoc_ssid)) ) {
+				RT_TRACE(_module_rtl871x_ioctl_set_c_,_drv_err_,("rtw_do_join(): site survey return error\n."));
+			}
 		}
-		
-		//ret=_FALSE;
 		
 		goto exit;
 	}	
 	else 	
 	{
-		int ret;
-
-		if((ret=rtw_select_and_join_from_scanned_queue(pmlmepriv))==_SUCCESS)
+		int select_ret;
+		if((select_ret=rtw_select_and_join_from_scanned_queue(pmlmepriv))==_SUCCESS)
 		{
-		     _set_timer(&pmlmepriv->assoc_timer, MAX_JOIN_TIMEOUT);
+			pmlmepriv->to_join = _FALSE;
+			_set_timer(&pmlmepriv->assoc_timer, MAX_JOIN_TIMEOUT);
 		}
 #if 0
 		else if(ret == 2)
 		{
 			DBG_8712("*****UNDER_LINKED WITH SAME NETWORK, RETURN*****\n");
 
-			if(pmlmepriv->fw_state & _FW_UNDER_LINKING)
-	               	pmlmepriv->fw_state ^= _FW_UNDER_LINKING;
+			_clr_fwstate_(pmlmepriv, _FW_UNDER_LINKING);
 			
 		}
 #endif
@@ -168,8 +170,7 @@ _func_enter_;
 			else
 			{ 
 				// can't associate ; reset under-linking			
-				if(pmlmepriv->fw_state & _FW_UNDER_LINKING)
-				    pmlmepriv->fw_state ^= _FW_UNDER_LINKING;
+				_clr_fwstate_(pmlmepriv, _FW_UNDER_LINKING);
 
 #if 0	
 				if((check_fwstate(pmlmepriv, WIFI_STATION_STATE) == _TRUE))
@@ -188,10 +189,16 @@ _func_enter_;
 
 				//when set_ssid/set_bssid for rtw_do_join(), but there are no desired bss in scanning queue
 				//we try to issue sitesurvey firstly			
-				if(pmlmepriv->LinkDetectInfo.bBusyTraffic==_FALSE)
+				if(pmlmepriv->LinkDetectInfo.bBusyTraffic==_FALSE
+					#ifdef CONFIG_LAYER2_ROAMING
+					|| pmlmepriv->to_roaming >0
+					#endif
+				)
 				{
 					//DBG_8192C("rtw_do_join() when   no desired bss in scanning queue \n");
-					rtw_sitesurvey_cmd(padapter, &pmlmepriv->assoc_ssid);
+					if( _SUCCESS!=(ret=rtw_sitesurvey_cmd(padapter, &pmlmepriv->assoc_ssid)) ){
+						RT_TRACE(_module_rtl871x_ioctl_set_c_,_drv_err_,("do_join(): site survey return error\n."));
+					}
 				}				
 
 
@@ -557,14 +564,14 @@ _func_enter_;
 
 	RT_TRACE(_module_rtl871x_ioctl_set_c_,_drv_notice_,
 		 ("+rtw_set_802_11_infrastructure_mode: old=%d new=%d fw_state=0x%08x\n",
-		  *pold_state, networktype, pmlmepriv->fw_state));
+		  *pold_state, networktype, get_fwstate(pmlmepriv)));
 	
 	if(*pold_state != networktype)
 	{
 		_enter_critical_bh(&pmlmepriv->lock, &irqL);
 		
 		RT_TRACE(_module_rtl871x_ioctl_set_c_,_drv_info_,(" change mode!"));
-		//DBG_871X("change mode, old_mode=%d, new_mode=%d, fw_state=0x%x\n", *pold_state, networktype, pmlmepriv->fw_state);
+		//DBG_871X("change mode, old_mode=%d, new_mode=%d, fw_state=0x%x\n", *pold_state, networktype, get_fwstate(pmlmepriv));
 
 		if((check_fwstate(pmlmepriv, _FW_LINKED)== _TRUE) ||(*pold_state==Ndis802_11IBSS))
 			rtw_disassoc_cmd(padapter);
@@ -622,7 +629,7 @@ _func_enter_;
 		//SecClearAllKeys(adapter);
 		
 		//RT_TRACE(COMP_OID_SET, DBG_LOUD, ("set_infrastructure: fw_state:%x after changing mode\n",
-		//									pmlmepriv->fw_state ));
+		//									get_fwstate(pmlmepriv) ));
 
 		_exit_critical_bh(&pmlmepriv->lock, &irqL);
 	}
@@ -666,7 +673,7 @@ u8 rtw_set_802_11_bssid_list_scan(_adapter* padapter)
 	
 _func_enter_;
 
-	RT_TRACE(_module_rtl871x_ioctl_set_c_,_drv_err_,("+rtw_set_802_11_bssid_list_scan(), fw_state=%x\n", pmlmepriv->fw_state));
+	RT_TRACE(_module_rtl871x_ioctl_set_c_,_drv_err_,("+rtw_set_802_11_bssid_list_scan(), fw_state=%x\n", get_fwstate(pmlmepriv)));
 
 	if (padapter == NULL) {
 		res=_FALSE;
@@ -682,7 +689,7 @@ _func_enter_;
 		(pmlmepriv->LinkDetectInfo.bBusyTraffic == _TRUE))
 	{
 		// Scan or linking is in progress, do nothing.
-		RT_TRACE(_module_rtl871x_ioctl_set_c_,_drv_err_,("rtw_set_802_11_bssid_list_scan fail since fw_state = %x\n", pmlmepriv->fw_state));
+		RT_TRACE(_module_rtl871x_ioctl_set_c_,_drv_err_,("rtw_set_802_11_bssid_list_scan fail since fw_state = %x\n", get_fwstate(pmlmepriv)));
 		res = _TRUE;
 
 		if(check_fwstate(pmlmepriv, (_FW_UNDER_SURVEY|_FW_UNDER_LINKING))== _TRUE){
@@ -692,6 +699,14 @@ _func_enter_;
 		}
 	} else {
 		NDIS_802_11_SSID ssid;
+		
+		#ifdef CONFIG_SET_SCAN_DENY_TIMER
+		if(ATOMIC_READ(&pmlmepriv->set_scan_deny)==1){
+			DBG_871X("%s:%d CONFIG_SET_SCAN_DENY_TIMER deny scan\n", __FUNCTION__, __LINE__);
+			indicate_wx_scan_complete_event(padapter);
+			return _SUCCESS;
+		}
+		#endif
 		
 		_enter_critical_bh(&pmlmepriv->lock, &irqL);		
 		
@@ -789,7 +804,7 @@ _func_enter_;
 		psecuritypriv->dot11DefKey[keyid].skey[9],psecuritypriv->dot11DefKey[keyid].skey[10],psecuritypriv->dot11DefKey[keyid].skey[11],
 		psecuritypriv->dot11DefKey[keyid].skey[12]));
 
-	res=rtw_set_key(padapter,psecuritypriv, keyid);
+	res=rtw_set_key(padapter,psecuritypriv, keyid, 1);
 	
 	if(res==_FAIL)
 		ret= _FALSE;
@@ -821,7 +836,7 @@ _func_enter_;
 			
 			_rtw_memset(&psecuritypriv->dot11DefKey[keyindex], 0, 16);
 			
-			res=rtw_set_key(padapter,psecuritypriv,keyindex);
+			res=rtw_set_key(padapter,psecuritypriv,keyindex, 0);
 			
 			psecuritypriv->dot11DefKeylen[keyindex]=0;
 			
@@ -1095,39 +1110,39 @@ _func_enter_;
 			goto exit;
 		}		
 		
-		_rtw_memset(&padapter->securitypriv.dot118021XGrpKey[(u8)((key->KeyIndex-1) & 0x03)], 0, 16);
-		_rtw_memset(&padapter->securitypriv.dot118021XGrptxmickey[(u8)((key->KeyIndex-1) & 0x03)], 0, 16);
-		_rtw_memset(&padapter->securitypriv.dot118021XGrprxmickey[(u8)((key->KeyIndex-1) & 0x03)], 0, 16);
+		_rtw_memset(&padapter->securitypriv.dot118021XGrpKey[(u8)((key->KeyIndex) & 0x03)], 0, 16);
+		_rtw_memset(&padapter->securitypriv.dot118021XGrptxmickey[(u8)((key->KeyIndex) & 0x03)], 0, 16);
+		_rtw_memset(&padapter->securitypriv.dot118021XGrprxmickey[(u8)((key->KeyIndex) & 0x03)], 0, 16);
 		
 		if((key->KeyIndex & 0x10000000))
 		{
-			_rtw_memcpy(&padapter->securitypriv.dot118021XGrptxmickey[(u8)((key->KeyIndex-1) & 0x03)], key->KeyMaterial + 16, 8);
-			_rtw_memcpy(&padapter->securitypriv.dot118021XGrprxmickey[(u8)((key->KeyIndex-1) & 0x03)], key->KeyMaterial + 24, 8);
+			_rtw_memcpy(&padapter->securitypriv.dot118021XGrptxmickey[(u8)((key->KeyIndex) & 0x03)], key->KeyMaterial + 16, 8);
+			_rtw_memcpy(&padapter->securitypriv.dot118021XGrprxmickey[(u8)((key->KeyIndex) & 0x03)], key->KeyMaterial + 24, 8);
 			
 			RT_TRACE(_module_rtl871x_ioctl_set_c_,_drv_err_,("\n rtw_set_802_11_add_key:rx mic :0x%02x:0x%02x:0x%02x:0x%02x:0x%02x:0x%02x:0x%02x:0x%02x\n",
-				padapter->securitypriv.dot118021XGrprxmickey[(u8)((key->KeyIndex-1) & 0x03)].skey[0],padapter->securitypriv.dot118021XGrprxmickey[(u8)((key->KeyIndex-1) & 0x03)].skey[1],
-				padapter->securitypriv.dot118021XGrprxmickey[(u8)((key->KeyIndex-1) & 0x03)].skey[2],padapter->securitypriv.dot118021XGrprxmickey[(u8)((key->KeyIndex-1) & 0x03)].skey[3],
-				padapter->securitypriv.dot118021XGrprxmickey[(u8)((key->KeyIndex-1) & 0x03)].skey[4],padapter->securitypriv.dot118021XGrprxmickey[(u8)((key->KeyIndex-1) & 0x03)].skey[5],
-				padapter->securitypriv.dot118021XGrprxmickey[(u8)((key->KeyIndex-1) & 0x03)].skey[6],padapter->securitypriv.dot118021XGrprxmickey[(u8)((key->KeyIndex-1) & 0x03)].skey[7]));
+				padapter->securitypriv.dot118021XGrprxmickey[(u8)((key->KeyIndex) & 0x03)].skey[0],padapter->securitypriv.dot118021XGrprxmickey[(u8)((key->KeyIndex-1) & 0x03)].skey[1],
+				padapter->securitypriv.dot118021XGrprxmickey[(u8)((key->KeyIndex) & 0x03)].skey[2],padapter->securitypriv.dot118021XGrprxmickey[(u8)((key->KeyIndex-1) & 0x03)].skey[3],
+				padapter->securitypriv.dot118021XGrprxmickey[(u8)((key->KeyIndex) & 0x03)].skey[4],padapter->securitypriv.dot118021XGrprxmickey[(u8)((key->KeyIndex-1) & 0x03)].skey[5],
+				padapter->securitypriv.dot118021XGrprxmickey[(u8)((key->KeyIndex) & 0x03)].skey[6],padapter->securitypriv.dot118021XGrprxmickey[(u8)((key->KeyIndex-1) & 0x03)].skey[7]));
 			RT_TRACE(_module_rtl871x_ioctl_set_c_,_drv_err_,("\n rtw_set_802_11_add_key:set Group mic key!!!!!!!!\n"));
 
 		}
 		else
 		{
-			_rtw_memcpy(&padapter->securitypriv.dot118021XGrptxmickey[(u8)((key->KeyIndex-1) & 0x03)], key->KeyMaterial + 24, 8);
-			_rtw_memcpy(&padapter->securitypriv.dot118021XGrprxmickey[(u8)((key->KeyIndex-1) & 0x03)], key->KeyMaterial + 16, 8);
+			_rtw_memcpy(&padapter->securitypriv.dot118021XGrptxmickey[(u8)((key->KeyIndex) & 0x03)], key->KeyMaterial + 24, 8);
+			_rtw_memcpy(&padapter->securitypriv.dot118021XGrprxmickey[(u8)((key->KeyIndex) & 0x03)], key->KeyMaterial + 16, 8);
 			
 			RT_TRACE(_module_rtl871x_ioctl_set_c_,_drv_err_,("\n rtw_set_802_11_add_key:rx mic :0x%02x:0x%02x:0x%02x:0x%02x:0x%02x:0x%02x:0x%02x:0x%02x\n",
-				padapter->securitypriv.dot118021XGrprxmickey[(u8)((key->KeyIndex-1) & 0x03)].skey[0],padapter->securitypriv.dot118021XGrprxmickey[(u8)((key->KeyIndex-1) & 0x03)].skey[1],
-				padapter->securitypriv.dot118021XGrprxmickey[(u8)((key->KeyIndex-1) & 0x03)].skey[2],padapter->securitypriv.dot118021XGrprxmickey[(u8)((key->KeyIndex-1) & 0x03)].skey[3],
-				padapter->securitypriv.dot118021XGrprxmickey[(u8)((key->KeyIndex-1) & 0x03)].skey[4],padapter->securitypriv.dot118021XGrprxmickey[(u8)((key->KeyIndex-1) & 0x03)].skey[5],
-				padapter->securitypriv.dot118021XGrprxmickey[(u8)((key->KeyIndex-1) & 0x03)].skey[6],padapter->securitypriv.dot118021XGrprxmickey[(u8)((key->KeyIndex-1) & 0x03)].skey[7]));
+				padapter->securitypriv.dot118021XGrprxmickey[(u8)((key->KeyIndex) & 0x03)].skey[0],padapter->securitypriv.dot118021XGrprxmickey[(u8)((key->KeyIndex-1) & 0x03)].skey[1],
+				padapter->securitypriv.dot118021XGrprxmickey[(u8)((key->KeyIndex) & 0x03)].skey[2],padapter->securitypriv.dot118021XGrprxmickey[(u8)((key->KeyIndex-1) & 0x03)].skey[3],
+				padapter->securitypriv.dot118021XGrprxmickey[(u8)((key->KeyIndex) & 0x03)].skey[4],padapter->securitypriv.dot118021XGrprxmickey[(u8)((key->KeyIndex-1) & 0x03)].skey[5],
+				padapter->securitypriv.dot118021XGrprxmickey[(u8)((key->KeyIndex) & 0x03)].skey[6],padapter->securitypriv.dot118021XGrprxmickey[(u8)((key->KeyIndex-1) & 0x03)].skey[7]));
 			RT_TRACE(_module_rtl871x_ioctl_set_c_,_drv_err_,("\n rtw_set_802_11_add_key:set Group mic key!!!!!!!!\n"));
 		
 		}
 
 		//set group key by index
-		_rtw_memcpy(&padapter->securitypriv.dot118021XGrpKey[(u8)((key->KeyIndex-1) & 0x03)], key->KeyMaterial, key->KeyLength);
+		_rtw_memcpy(&padapter->securitypriv.dot118021XGrpKey[(u8)((key->KeyIndex) & 0x03)], key->KeyMaterial, key->KeyLength);
 		
 		key->KeyIndex=key->KeyIndex & 0x03;
 		
@@ -1137,7 +1152,7 @@ _func_enter_;
 		
 		RT_TRACE(_module_rtl871x_ioctl_set_c_,_drv_err_,("reset group key"));
 		
-		res=rtw_set_key(padapter,&padapter->securitypriv, key->KeyIndex);
+		res=rtw_set_key(padapter,&padapter->securitypriv, key->KeyIndex, 1);
 
 		if(res==_FAIL)
 			ret= _FAIL;
@@ -1162,7 +1177,7 @@ _func_enter_;
 			{
 				padapter->securitypriv.busetkipkey=_FALSE;
 				
-				_set_timer(&padapter->securitypriv.tkip_timer, 50);
+				//_set_timer(&padapter->securitypriv.tkip_timer, 50);
 				
 				RT_TRACE(_module_rtl871x_ioctl_set_c_,_drv_err_,("\n ==========_set_timer\n"));
 				
@@ -1231,7 +1246,7 @@ _func_enter_;
 		//NdisZeroMemory(Adapter->MgntInfo.SecurityInfo.KeyBuf[keyIndex], MAX_WEP_KEY_LEN);
 		//Adapter->MgntInfo.SecurityInfo.KeyLen[keyIndex] = 0;
 		
-		_rtw_memset(&padapter->securitypriv.dot118021XGrpKey[keyIndex-1], 0, 16);
+		_rtw_memset(&padapter->securitypriv.dot118021XGrpKey[keyIndex], 0, 16);
 		
 		//! \todo Send a H2C Command to Firmware for removing this Key in CAM Entry.
 	

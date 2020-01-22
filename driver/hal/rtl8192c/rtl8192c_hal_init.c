@@ -399,7 +399,7 @@ rtl8192c_FirmwareSelfReset(
 		
 	if((pHalData->FirmwareVersion > 0x21) ||
 		(pHalData->FirmwareVersion == 0x21 &&
-		pHalData->FirmwareSubVersion >= 0x01))
+		pHalData->FirmwareSubVersion >= 0x01)) // after 88C Fw v33.1
 	{
 		//0x1cf=0x20. Inform 8051 to reset. 2009.12.25. tynli_test
 		rtw_write8(Adapter, REG_HMETFR+3, 0x20);
@@ -453,11 +453,7 @@ int FirmwareDownload92C(
 	u8		*pFirmwareBuf;
 	u32		FirmwareLen;
 
-	#ifdef MEM_ALLOC_REFINE
 	pFirmware = (PRT_FIRMWARE_92C)rtw_zvmalloc(sizeof(RT_FIRMWARE_92C));
-	#else
-	pFirmware = (PRT_FIRMWARE_92C)rtw_zmalloc(sizeof(RT_FIRMWARE_92C));
-	#endif
 	
 	if(!pFirmware)
 	{
@@ -572,11 +568,7 @@ int FirmwareDownload92C(
 Exit:
 
 	if(pFirmware) {
-		#ifdef MEM_ALLOC_REFINE
 		rtw_vmfree((u8*)pFirmware, sizeof(RT_FIRMWARE_92C));
-		#else
-		rtw_mfree((u8*)pFirmware, sizeof(RT_FIRMWARE_92C));
-		#endif
 	}
 
 	//RT_TRACE(COMP_INIT, DBG_LOUD, (" <=== FirmwareDownload91C()\n"));
@@ -999,10 +991,11 @@ void rtl8192c_free_hal_data(_adapter * padapter)
 {
 _func_enter_;
 
-	DBG_8192C("===== rtl8192c_free_hal_data =====\n");
+	DBG_8192C("=====> rtl8192c_free_hal_data =====\n");
 
 	if(padapter->HalData)
 		rtw_mfree(padapter->HalData, sizeof(HAL_DATA_TYPE));
+	DBG_8192C("<===== rtl8192c_free_hal_data =====\n");
 
 _func_exit_;
 }

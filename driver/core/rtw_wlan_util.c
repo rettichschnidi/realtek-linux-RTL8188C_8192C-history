@@ -448,7 +448,7 @@ int is_IBSS_empty(_adapter *padapter)
 	struct mlme_ext_priv	*pmlmeext = &padapter->mlmeextpriv;
 	struct mlme_ext_info	*pmlmeinfo = &(pmlmeext->mlmext_info);
 	
-	for (i = 6; i < NUM_STA; i++)
+	for (i = IBSS_START_MAC_ID; i < NUM_STA; i++)
 	{
 		if (pmlmeinfo->FW_sta_info[i].status == 1)
 		{
@@ -563,23 +563,23 @@ void clear_cam_entry(_adapter *padapter, u8 entry)
 #endif
 }
 
-int allocate_cam_entry(_adapter *padapter)
+int allocate_fw_sta_entry(_adapter *padapter)
 {
-	unsigned int cam_idx;
+	unsigned int mac_id;
 	struct mlme_ext_priv	*pmlmeext = &padapter->mlmeextpriv;
 	struct mlme_ext_info	*pmlmeinfo = &(pmlmeext->mlmext_info);
 	
-	for (cam_idx = 2; cam_idx < NUM_STA; cam_idx++)
+	for (mac_id = IBSS_START_MAC_ID; mac_id < NUM_STA; mac_id++)
 	{
-		if (pmlmeinfo->FW_sta_info[cam_idx].status == 0)
+		if (pmlmeinfo->FW_sta_info[mac_id].status == 0)
 		{
-			pmlmeinfo->FW_sta_info[cam_idx].status = 1;
-			pmlmeinfo->FW_sta_info[cam_idx].retry = 0;
+			pmlmeinfo->FW_sta_info[mac_id].status = 1;
+			pmlmeinfo->FW_sta_info[mac_id].retry = 0;
 			break;
 		}
 	}
 	
-	return cam_idx;
+	return mac_id;
 }
 
 void flush_all_cam_entry(_adapter *padapter)
@@ -1603,7 +1603,13 @@ void process_addba_req(_adapter *padapter, u8 *paddba_req, u8 *addr)
 		
 		preorder_ctrl = &psta->recvreorder_ctrl[tid];
 
+		#ifdef CONFIG_UPDATE_INDICATE_SEQ_WHILE_PROCESS_ADDBA_REQ
 		preorder_ctrl->indicate_seq = start_seq;
+		#ifdef DBG_RX_SEQ
+		DBG_871X("DBG_RX_SEQ %s:%d IndicateSeq: %d, start_seq: %d\n", __FUNCTION__, __LINE__,
+			preorder_ctrl->indicate_seq, start_seq);
+		#endif
+		#endif
 		
 		preorder_ctrl->enable =(pmlmeinfo->bAcceptAddbaReq == _TRUE)? _TRUE :_FALSE;
 	}

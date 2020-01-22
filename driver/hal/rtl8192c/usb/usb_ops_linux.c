@@ -60,11 +60,85 @@ struct zero_bulkout_context{
 #define usb_read_interrupt_complete(purb, regs)	usb_read_interrupt_complete(purb)
 #endif
 
+#ifdef CONFIG_USB_VENDOR_REQ_PREALLOC
+static int usbctrl_vendorreq(struct dvobj_priv  *pdvobjpriv, u8 request, u16 value, u16 index, void *pdata, u16 len, u8 requesttype)
+{
+	unsigned int pipe;
+	int status = 0;
+	u32 tmp_buflen=0;
+	u8 reqtype;
+	u8 *pIo_buf;
+	_adapter		*padapter = pdvobjpriv->padapter ; 
+	struct usb_device *udev=pdvobjpriv->pusbdev;
 
+	if((padapter->bSurpriseRemoved) ||(padapter->pwrctrlpriv.pnp_bstop_trx))
+	{
+		RT_TRACE(_module_hci_ops_os_c_,_drv_err_,("usbctrl_vendorreq:( padapter->bDriverStopped ||padapter->bSurpriseRemoved ||adapter->pwrctrlpriv.pnp_bstop_trx)!!!\n"));
+		return _FAIL;
+	}	
 
-#define ALIGNMENT_UNIT				16
-#define MAX_VENDOR_REQ_CMD_SIZE	254		//8188cu SIE Support
-#define MAX_USB_IO_CTL_SIZE		(MAX_VENDOR_REQ_CMD_SIZE +ALIGNMENT_UNIT)
+	if(len>MAX_VENDOR_REQ_CMD_SIZE)
+	{
+		DBG_8192C( "[%s] Buffer len error ,vendor request failed\n", __FUNCTION__ );
+		return(-1);
+	}	
+
+	if ( pdvobjpriv->usb_vendor_req_buf== NULL)
+	{
+		DBG_8192C( "[%s] usb_vendor_req_buf == NULL \n", __FUNCTION__ );
+		return(-1);
+	}
+	
+	_enter_critical_mutex(&pdvobjpriv->usb_vendor_req_mutex, NULL);
+	
+	pIo_buf = pdvobjpriv->usb_vendor_req_buf;
+	_rtw_memset(pIo_buf, 0, MAX_VENDOR_REQ_CMD_SIZE);		
+		
+	if (requesttype == 0x01)
+	{
+		pipe = usb_rcvctrlpipe(udev, 0);//read_in
+		reqtype =  REALTEK_USB_VENQT_READ;		
+	} 
+	else 
+	{
+		pipe = usb_sndctrlpipe(udev, 0);//write_out
+		reqtype =  REALTEK_USB_VENQT_WRITE;		
+		_rtw_memcpy( pIo_buf, pdata, len);
+	}		
+	
+	status = usb_control_msg(udev, pipe, request, reqtype, value, index, pIo_buf, len, USB_CONTROL_MSG_TIMEOUT);
+	
+	if (status < 0)
+	{
+		if(status == (-ESHUTDOWN)	|| status == -ENODEV	)
+		{			
+			DBG_8192C("reg 0x%x, usb %s  fail ,status:%d value=0x%x\n", value,(requesttype == 0x01)?"read":"write" , status, *(u32*)pdata);					
+			padapter->bDriverStopped=_TRUE;					
+		}
+		else{
+			DBG_8192C("reg 0x%x, usb %s  fail ,status:%d value=0x%x\n", value,(requesttype == 0x01)?"read":"write" , status, *(u32*)pdata);		
+#ifdef SILENT_RESET_FOR_SPECIFIC_PLATFOM
+			{
+				_adapter *padapter =  pdvobjpriv->padapter;
+				HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(padapter);
+				pHalData->srestpriv.Wifi_Error_Status = USB_VEN_REQ_CMD_FAIL;
+			}
+#endif
+			RT_TRACE(_module_hci_ops_os_c_,_drv_err_,("reg 0x%x, usb %s  fail ,status:%d value=0x%x\n", value, status, *(u32*)pdata));
+		}
+	}
+	else if ( status > 0 )   // Success this control transfer.
+	{
+               if ( requesttype == 0x01 )
+               {   // For Control read transfer, we have to copy the read data from pIo_buf to pdata.
+                       _rtw_memcpy( pdata, pIo_buf,  status );
+               }
+	}
+	_exit_critical_mutex(&pdvobjpriv->usb_vendor_req_mutex, NULL);
+	return status;
+
+}
+#else
 
 static int usbctrl_vendorreq(struct dvobj_priv  *pdvobjpriv, u8 request, u16 value, u16 index, void *pdata, u16 len, u8 requesttype)
 {
@@ -92,6 +166,14 @@ static int usbctrl_vendorreq(struct dvobj_priv  *pdvobjpriv, u8 request, u16 val
 	// Trying to fix it here.
 
 	u8 *palloc_buf, *pIo_buf;
+
+	_adapter		*padapter = pdvobjpriv->padapter ; 
+	if((padapter->bSurpriseRemoved) ||(padapter->pwrctrlpriv.pnp_bstop_trx))
+	{
+		RT_TRACE(_module_hci_ops_os_c_,_drv_err_,("usbctrl_vendorreq:( padapter->bDriverStopped ||padapter->bSurpriseRemoved ||adapter->pwrctrlpriv.pnp_bstop_trx)!!!\n"));
+		return _FAIL;
+	}
+	
 
 	if(len>MAX_VENDOR_REQ_CMD_SIZE)
 	{
@@ -153,17 +235,26 @@ static int usbctrl_vendorreq(struct dvobj_priv  *pdvobjpriv, u8 request, u16 val
 	status = usb_control_msg(udev, pipe, request, reqtype, value, index, pIo_buf, len, USB_CONTROL_MSG_TIMEOUT);
 	
 	if (status < 0)
-       {
-		DBG_8192C("reg 0x%x, usb %s  fail ,status:%d value=0x%x\n", value,(requesttype == 0x01)?"read":"write" , status, *(u32*)pdata);		
-#ifdef SILENT_RESET_FOR_SPECIFIC_PLATFOM
+	{
+		if(status == (-ESHUTDOWN)
+			|| status == -ENODEV	)
 		{
-			_adapter *padapter =  pdvobjpriv->padapter;
-			HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(padapter);
-			pHalData->srestpriv.Wifi_Error_Status = USB_VEN_REQ_CMD_FAIL;
+			RT_TRACE(_module_hci_ops_os_c_,_drv_err_,("usb_write_port_complete: ESHUTDOWN\n"));
+			DBG_8192C("reg 0x%x, usb %s  fail ,status:%d value=0x%x\n", value,(requesttype == 0x01)?"read":"write" , status, *(u32*)pdata);					
+			padapter->bDriverStopped=_TRUE;		
 		}
+		else{
+			DBG_8192C("reg 0x%x, usb %s  fail ,status:%d value=0x%x\n", value,(requesttype == 0x01)?"read":"write" , status, *(u32*)pdata);		
+#ifdef SILENT_RESET_FOR_SPECIFIC_PLATFOM
+			{
+				_adapter *padapter =  pdvobjpriv->padapter;
+				HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(padapter);
+				pHalData->srestpriv.Wifi_Error_Status = USB_VEN_REQ_CMD_FAIL;
+			}
 #endif
-		RT_TRACE(_module_hci_ops_os_c_,_drv_err_,("reg 0x%x, usb_read8 TimeOut! status:0x%x value=0x%x\n", value, status, *(u32*)pdata));
-       }
+			RT_TRACE(_module_hci_ops_os_c_,_drv_err_,("reg 0x%x, usb %s  fail ,status:%d value=0x%x\n", value, status, *(u32*)pdata));
+		}
+	}
 	else if ( status > 0 )   // Success this control transfer.
 	{
                if ( requesttype == 0x01 )
@@ -191,134 +282,7 @@ static int usbctrl_vendorreq(struct dvobj_priv  *pdvobjpriv, u8 request, u16 val
 	return status;
 
 }
-
-static void _usbctrl_vendorreq_async_callback(struct urb *urb, struct pt_regs *regs)
-{
-	if(urb){
-		if(urb->context){
-			kfree(urb->context);
-		}
-		usb_free_urb(urb);
-	}
-}
-
-static int _usbctrl_vendorreq_async_write(struct usb_device *udev, u8 request, u16 value, u16 index, void *pdata, u16 len, u8 requesttype)
-{
-
-#if 0
-	int rc;
-	unsigned int pipe;	
-	u8 reqtype;
-	struct usb_ctrlrequest *dr;
-	struct urb *urb;
-	struct rtl819x_async_write_data {
-		u8 data[REALTEK_USB_VENQT_MAX_BUF_SIZE];
-		struct usb_ctrlrequest dr;
-	} *buf;
-	
-				
-	if (requesttype == VENDOR_READ){
-		pipe = usb_rcvctrlpipe(udev, 0);//read_in
-		reqtype =  REALTEK_USB_VENQT_READ;		
-	} 
-	else {
-		pipe = usb_sndctrlpipe(udev, 0);//write_out
-		reqtype =  REALTEK_USB_VENQT_WRITE;		
-	}		
-	
-	//buf = kmalloc(sizeof(*buf), GFP_ATOMIC);
-	buf = (struct rtl819x_async_write_data *)rtw_malloc(sizeof(*buf));
-	if (!buf)
-		return -ENOMEM;
-
-	urb = usb_alloc_urb(0, GFP_ATOMIC);
-	if (!urb) {
-		kfree(buf);
-		return -ENOMEM;
-	}
-
-	dr = &buf->dr;
-
-	dr->bRequestType = reqtype;
-	dr->bRequest = request;
-	dr->wValue = cpu_to_le16(value);
-	dr->wIndex = cpu_to_le16(index);
-	dr->wLength = cpu_to_le16(len);
-
-	memcpy(buf, pdata, len);
-
-	usb_fill_control_urb(urb, udev, pipe,
-			     (unsigned char *)dr, buf, len,
-			     _usbctrl_vendorreq_async_callback, buf);
-
-	rc = usb_submit_urb(urb, GFP_ATOMIC);
-	if (rc < 0) {
-		kfree(buf);
-	}
-	
-	//usb_free_urb(urb);
-
-	return rc;
-#else
-        int rc;	
-	unsigned int pipe;
-	struct urb *urb;	
-	u8 data[REALTEK_USB_VENQT_MAX_BUF_SIZE];	
-	struct usb_ctrlrequest dr;			
-
-	if (requesttype == VENDOR_READ)
-	{		
-		pipe = usb_rcvctrlpipe(udev, 0);//read_in		reqtype =  REALTEK_USB_VENQT_READ;			
-	} 	
-	else 
-	{		
-		pipe = usb_sndctrlpipe(udev, 0);//write_out		reqtype =  REALTEK_USB_VENQT_WRITE;			
-	}				
-	urb = usb_alloc_urb(0, GFP_ATOMIC);	
-	if (!urb) 
-	{			
-		return -ENOMEM;	
-	}	
-
-	dr.bRequestType = requesttype;	
-	dr.bRequest = request;	
-	dr.wValue = cpu_to_le16(value);	
-	dr.wIndex = cpu_to_le16(index);	
-	dr.wLength = cpu_to_le16(len);		
-
-	_rtw_memset(data, 0, REALTEK_USB_VENQT_MAX_BUF_SIZE);		
-	_rtw_memcpy(data, pdata, len);	
-
-	usb_fill_control_urb(urb, udev, pipe,
-		(unsigned char *)&dr, data, len,	
-		_usbctrl_vendorreq_async_callback, data);
-	
-	rc = usb_submit_urb(urb, GFP_ATOMIC);	
-	if (rc < 0) {		}	
-
-	return rc;
 #endif
-}
-
-static void usb_write_async(struct usb_device *udev, u32 addr, u32 val, u16 len)
-{
-	u8 request;
-	u8 requesttype;
-	u16 wvalue;
-	u16 index;
-	u32 data;
-	
-	requesttype = VENDOR_WRITE;//write_out	
-	request = REALTEK_USB_VENQT_CMD_REQ;
-	index = REALTEK_USB_VENQT_CMD_IDX;//n/a
-
-	wvalue = (u16)(addr&0x0000ffff);
-	data = val & (0xffffffff >> ((4 - len) * 8));
-	data = cpu_to_le32(data);
-	
-	_usbctrl_vendorreq_async_write(udev, request, wvalue, index, &data, len, requesttype);
-}
-
 static u8 usb_read8(struct intf_hdl *pintfhdl, u32 addr)
 {
 	u8 request;
@@ -508,6 +472,91 @@ void usb_writeN(struct intf_hdl *pintfhdl, u32 addr, u32 length, u8 *pdata)
 	
 }
 
+#ifdef CONFIG_USB_SUPPORT_ASYNC_VDN_REQ
+static void _usbctrl_vendorreq_async_callback(struct urb *urb, struct pt_regs *regs)
+{
+	if(urb){
+		if(urb->context){
+			kfree(urb->context);
+		}
+		usb_free_urb(urb);
+	}
+}
+
+static int _usbctrl_vendorreq_async_write(struct usb_device *udev, u8 request, u16 value, u16 index, void *pdata, u16 len, u8 requesttype)
+{
+
+	int rc;
+	unsigned int pipe;	
+	u8 reqtype;
+	struct usb_ctrlrequest *dr;
+	struct urb *urb;
+	struct rtl819x_async_write_data {
+		u8 data[REALTEK_USB_VENQT_MAX_BUF_SIZE];
+		struct usb_ctrlrequest dr;
+	} *buf;	
+				
+	if (requesttype == VENDOR_READ){
+		pipe = usb_rcvctrlpipe(udev, 0);//read_in
+		reqtype =  REALTEK_USB_VENQT_READ;		
+	} 
+	else {
+		pipe = usb_sndctrlpipe(udev, 0);//write_out
+		reqtype =  REALTEK_USB_VENQT_WRITE;		
+	}		
+	
+	//buf = kmalloc(sizeof(*buf), GFP_ATOMIC);
+	buf = (struct rtl819x_async_write_data *)rtw_zmalloc(sizeof(*buf));
+	if (!buf)
+		return -ENOMEM;
+
+	urb = usb_alloc_urb(0, GFP_ATOMIC);
+	if (!urb) {
+		rtw_mfree((u8*)buf,sizeof(*buf));
+		return -ENOMEM;
+	}
+
+	dr = &buf->dr;
+
+	dr->bRequestType = reqtype;
+	dr->bRequest = request;
+	dr->wValue = cpu_to_le16(value);
+	dr->wIndex = cpu_to_le16(index);
+	dr->wLength = cpu_to_le16(len);
+
+	_rtw_memcpy(buf, pdata, len);
+
+	usb_fill_control_urb(urb, udev, pipe,
+			     (unsigned char *)dr, buf, len,
+			     _usbctrl_vendorreq_async_callback, buf);
+
+	rc = usb_submit_urb(urb, GFP_ATOMIC);
+	if (rc < 0) {
+		rtw_mfree((u8*)buf,sizeof(*buf));
+		usb_free_urb(urb);
+	}
+	return rc;
+
+}
+
+static void usb_write_async(struct usb_device *udev, u32 addr, u32 val, u16 len)
+{
+	u8 request;
+	u8 requesttype;
+	u16 wvalue;
+	u16 index;
+	u32 data;
+	
+	requesttype = VENDOR_WRITE;//write_out	
+	request = REALTEK_USB_VENQT_CMD_REQ;
+	index = REALTEK_USB_VENQT_CMD_IDX;//n/a
+
+	wvalue = (u16)(addr&0x0000ffff);
+	data = val & (0xffffffff >> ((4 - len) * 8));
+	data = cpu_to_le32(data);
+	
+	_usbctrl_vendorreq_async_write(udev, request, wvalue, index, &data, len, requesttype);
+}
 static void usb_async_write8(struct intf_hdl *pintfhdl, u32 addr, u8 val)
 {	
 	u32 data;
@@ -542,7 +591,7 @@ static void usb_async_write32(struct intf_hdl *pintfhdl, u32 addr, u32 val)
 	usb_write_async(udev, addr, val, 4);
 	_func_exit_;	
 }
-
+#endif
 
 static int ffaddr2pipehdl(struct dvobj_priv *pdvobj, u32 addr)
 {
@@ -829,7 +878,7 @@ static int recvbuf2recvframe(_adapter *padapter, struct recv_buf *precvbuf)
 #endif		
 
 		if(pkt_copy)
-		{					
+		{
 			tmpaddr = (u32)pkt_copy->data;	
 			alignment = tmpaddr & (7);			
 			skb_reserve(pkt_copy, (8 - alignment));//force pkt_copy->data at 8-byte alignment address
@@ -844,7 +893,7 @@ static int recvbuf2recvframe(_adapter *padapter, struct recv_buf *precvbuf)
 			precvframe->u.hdr.rx_end = pkt_copy->data + (pkt_offset>1612?pkt_offset:1612);
 		}
 		else
-		{	
+		{
 			DBG_8192C("recvbuf2recvframe:can not allocate memory for skb copy\n");				
 			//precvframe->u.hdr.pkt = skb_clone(pskb, GFP_ATOMIC);	
 			//precvframe->u.hdr.rx_head = precvframe->u.hdr.rx_data = precvframe->u.hdr.rx_tail = pbuf;
@@ -951,6 +1000,8 @@ static void usb_read_port_complete(struct urb *purb, struct pt_regs *regs)
 		}
 		else 
 		{			
+			ATOMIC_SET(&padapter->dvobjpriv.continual_urb_error, 0);
+			
 			precvbuf->transfer_len = purb->actual_length;	
 
 			//rtw_enqueue_rx_transfer_buffer(precvpriv, rx_transfer_buf);			
@@ -977,6 +1028,10 @@ static void usb_read_port_complete(struct urb *purb, struct pt_regs *regs)
 				RT_TRACE(_module_hci_ops_os_c_,_drv_err_,("usb_read_port_complete:bDriverStopped=TRUE\n"));
 				break;
 			case -EPROTO:				
+				if(ATOMIC_INC_RETURN(&padapter->dvobjpriv.continual_urb_error) > MAX_CONTINUAL_URB_ERR) {
+					DBG_871X("continual_urb_error > %d\n", MAX_CONTINUAL_URB_ERR);
+					break;
+				}
 				rtw_read_port(padapter, precvpriv->ff_hwaddr, 0, (unsigned char *)precvbuf);			
 				break;
 			case -EINPROGRESS:
@@ -1081,7 +1136,7 @@ static int recvbuf2recvframe(_adapter *padapter, _pkt *pskb)
 		return _FAIL;
 	}
 #endif
-	
+
 	do{		
 		RT_TRACE(_module_rtl871x_recv_c_, _drv_info_,
 			 ("recvbuf2recvframe: rxdesc=offsset 0:0x%08x, 4:0x%08x, 8:0x%08x, C:0x%08x\n",
@@ -1093,8 +1148,8 @@ static int recvbuf2recvframe(_adapter *padapter, _pkt *pskb)
 		mf = (le32_to_cpu(prxstat->rxdw1) >> 27) & 0x1;//more fragment bit
 		frag = (le32_to_cpu(prxstat->rxdw2) >> 12) & 0xf;//fragmentation number
 
-		drvinfo_sz = (le32_to_cpu(prxstat->rxdw0) & 0x000f0000) >> 16;//uint 2^3 = 8 bytes
-		drvinfo_sz = drvinfo_sz << 3;
+		drvinfo_sz = (le32_to_cpu(prxstat->rxdw0) & 0x000f0000) >> 16;
+		drvinfo_sz = drvinfo_sz << 3;//uint (2^3) = 8 bytes; REG_RX_DRVINFO_SZ
 		RT_TRACE(_module_rtl871x_recv_c_,_drv_info_,("recvbuf2recvframe: DRV_INFO_SIZE=%d\n", drvinfo_sz));
 
 		pkt_offset = pkt_len + drvinfo_sz + RXDESC_SIZE;
@@ -1130,8 +1185,13 @@ static int recvbuf2recvframe(_adapter *padapter, _pkt *pskb)
 		skb_len = pkt_offset;
 
 		// for first fragment packet, driver need allocate 1536+drvinfo_sz+RXDESC_SIZE to defrag packet.
+		// modify alloc_sz for recvive crc error packet by thomas 2011-06-02
 		if((mf ==1)&&(frag == 0)){
-			alloc_sz = 1664;	//1664 is 128 alignment.
+			//alloc_sz = 1664;	//1664 is 128 alignment.
+			if(skb_len <= 1650)
+				alloc_sz = 1664;
+			else
+				alloc_sz = skb_len + 14;
 		}
 		else {
 			alloc_sz = skb_len;
@@ -1157,11 +1217,18 @@ static int recvbuf2recvframe(_adapter *padapter, _pkt *pskb)
 			precvframe->u.hdr.rx_end = pkt_copy->data + alloc_sz;
 		}
 		else
-		{	
-			//DBG_8192C("recvbuf2recvframe:can not allocate memory for skb copy\n");				
-			precvframe->u.hdr.pkt = skb_clone(pskb, GFP_ATOMIC);	
-			precvframe->u.hdr.rx_head = precvframe->u.hdr.rx_data = precvframe->u.hdr.rx_tail = pbuf;
-			precvframe->u.hdr.rx_end = pbuf + alloc_sz;
+		{
+			precvframe->u.hdr.pkt = skb_clone(pskb, GFP_ATOMIC);
+			if(pkt_copy)
+			{
+				precvframe->u.hdr.rx_head = precvframe->u.hdr.rx_data = precvframe->u.hdr.rx_tail = pbuf;
+				precvframe->u.hdr.rx_end = pbuf + alloc_sz;
+			}
+			else
+			{
+				DBG_8192C("recvbuf2recvframe: skb_clone fail\n");
+				goto _exit_recvbuf2recvframe;
+			}
 		}
 
 		recvframe_put(precvframe, skb_len);
@@ -1185,7 +1252,7 @@ static int recvbuf2recvframe(_adapter *padapter, _pkt *pskb)
 
 		//because the endian issue, driver avoid reference to the rxstat after calling update_recvframe_attrib_from_recvstat();
 		rtl8192cu_update_recvframe_attrib_from_recvstat(precvframe, prxstat);		
-		
+
 		if(rtw_recv_entry(precvframe) != _SUCCESS)
 		{
 			RT_TRACE(_module_rtl871x_recv_c_,_drv_err_,("recvbuf2recvframe: rtw_recv_entry(precvframe) != _SUCCESS\n"));
@@ -1293,6 +1360,8 @@ static void usb_read_port_complete(struct urb *purb, struct pt_regs *regs)
 		}
 		else 
 		{	
+			ATOMIC_SET(&padapter->dvobjpriv.continual_urb_error, 0);
+			
 			precvbuf->transfer_len = purb->actual_length;			
 
 			skb_put(precvbuf->pskb, purb->actual_length);	
@@ -1330,6 +1399,11 @@ static void usb_read_port_complete(struct urb *purb, struct pt_regs *regs)
 					pHalData->srestpriv.Wifi_Error_Status = USB_READ_PORT_FAIL;			
 				}
 				#endif
+				
+				if(ATOMIC_INC_RETURN(&padapter->dvobjpriv.continual_urb_error) > MAX_CONTINUAL_URB_ERR) {
+					DBG_871X("continual_urb_error > %d\n", MAX_CONTINUAL_URB_ERR);
+					break;
+				}
 				
 				precvbuf->reuse = _TRUE;
 				rtw_read_port(padapter, precvpriv->ff_hwaddr, 0, (unsigned char *)precvbuf);			
@@ -1706,10 +1780,7 @@ _func_enter_;
 		,padapter->bDriverStopped, padapter->bSurpriseRemoved, padapter->pwrctrlpriv.pnp_bstop_trx );
 		#endif
 		
-		if(pxmitbuf->ext_tag)
-			rtw_free_xmitbuf(pxmitpriv, pxmitbuf);
-		else
-			rtw_free_xmitbuf_ext(pxmitpriv, pxmitbuf);
+		rtw_free_xmitbuf(pxmitpriv, pxmitbuf);
 		
 		RT_TRACE(_module_hci_ops_os_c_,_drv_err_,("usb_write_port:( padapter->bDriverStopped ||padapter->bSurpriseRemoved ||adapter->pwrctrlpriv.pnp_bstop_trx)!!!\n"));
 		return _FAIL;
@@ -1907,10 +1978,11 @@ void rtl8192cu_set_intf_ops(struct _io_ops	*pops)
 	pops->_write32 = &usb_write32;
 	pops->_writeN = &usb_writeN;
 	
+#ifdef CONFIG_USB_SUPPORT_ASYNC_VDN_REQ	
 	pops->_write8_async= &usb_async_write8;
 	pops->_write16_async = &usb_async_write16;
 	pops->_write32_async = &usb_async_write32;
-	
+#endif	
 	pops->_write_mem = &usb_write_mem;
 	pops->_write_port = &usb_write_port;
 

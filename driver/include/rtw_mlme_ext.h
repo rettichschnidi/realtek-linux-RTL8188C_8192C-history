@@ -33,9 +33,9 @@
 //	So, this driver tried to extend the dwell time for each scanning channel.
 //	This will increase the chance to receive the probe response from SoftAP.
 
-#define SURVEY_TO			(100)
-#define REAUTH_TO			(50)
-#define REASSOC_TO		(50)
+#define SURVEY_TO		(100)
+#define REAUTH_TO		(300) //(50)
+#define REASSOC_TO		(300) //(50)
 //#define DISCONNECT_TO	(3000)
 #define ADDBA_TO			(2000)
 
@@ -302,11 +302,7 @@ struct mlme_ext_priv
 {
 	_adapter	*padapter;
 	u8	mlmeext_init;
-	#ifdef USE_ATOMIC_EVENT_SEQ
 	ATOMIC_T		event_seq;
-	#else
-	u8	event_seq;
-	#endif
 	u16	mgnt_seq;
 	
 	//struct fw_priv 	fwpriv;
@@ -345,6 +341,7 @@ struct mlme_ext_priv
 };
 
 int init_mlme_ext_priv(_adapter* padapter);
+int init_hw_mlme_ext(_adapter *padapter);
 void free_mlme_ext_priv (struct mlme_ext_priv *pmlmeext);
 extern void init_mlme_ext_timer(_adapter *padapter);
 extern void init_addba_retry_timer(_adapter *padapter, struct sta_info *psta);
@@ -377,7 +374,7 @@ void invalidate_cam_all(_adapter *padapter);
 void CAM_empty_entry(PADAPTER Adapter, u8 ucIndex);
 
 
-int allocate_cam_entry(_adapter *padapter);
+int allocate_fw_sta_entry(_adapter *padapter);
 void flush_all_cam_entry(_adapter *padapter);
 
 BOOLEAN IsLegal5GChannel(PADAPTER Adapter, u8 channel);
@@ -419,7 +416,7 @@ unsigned int update_MSC_rate(struct HT_caps_element *pHT_caps);
 void Update_RA_Entry(_adapter *padapter, u32 mac_id);
 void set_sta_rate(_adapter *padapter, struct sta_info *psta);
 
-unsigned int receive_disconnect(_adapter *padapter, unsigned char *MacAddr);
+unsigned int receive_disconnect(_adapter *padapter, unsigned char *MacAddr, unsigned short reason);
 
 unsigned char get_highest_rate_idx(u32 mask);
 int support_short_GI(_adapter *padapter, struct HT_caps_element *pHT_caps);
@@ -429,7 +426,7 @@ unsigned int is_ap_in_tkip(_adapter *padapter);
 void report_join_res(_adapter *padapter, int res);
 void report_survey_event(_adapter *padapter, union recv_frame *precv_frame);
 void report_surveydone_event(_adapter *padapter);
-void report_del_sta_event(_adapter *padapter, unsigned char* MacAddr);
+void report_del_sta_event(_adapter *padapter, unsigned char* MacAddr, unsigned short reason);
 void report_add_sta_event(_adapter *padapter, unsigned char* MacAddr, int cam_idx);
 
 void beacon_timing_control(_adapter *padapter);
@@ -510,7 +507,7 @@ unsigned int OnAction_wmm(_adapter *padapter, union recv_frame *precv_frame);
 unsigned int OnAction_p2p(_adapter *padapter, union recv_frame *precv_frame);
 
 
-void mlmeext_joinbss_event_callback(_adapter *padapter);
+void mlmeext_joinbss_event_callback(_adapter *padapter, int join_res);
 void mlmeext_sta_del_event_callback(_adapter *padapter);
 void mlmeext_sta_add_event_callback(_adapter *padapter, struct sta_info *psta);
 
@@ -522,6 +519,11 @@ void addba_timer_hdl(struct sta_info *psta);
 //void reauth_timer_hdl(_adapter *padapter);
 //void reassoc_timer_hdl(_adapter *padapter);
 
+#define set_link_timer(mlmeext, ms) \
+	do { \
+		/*DBG_871X("%s set_link_timer(%p, %d)\n", __FUNCTION__, (mlmeext), (ms));*/ \
+		_set_timer(&(mlmeext)->link_timer, (ms)); \
+	} while(0)
 
 extern int cckrates_included(unsigned char *rate, int ratelen);
 extern int cckratesonly_included(unsigned char *rate, int ratelen);
@@ -578,6 +580,8 @@ u8 add_ba_hdl(_adapter *padapter, unsigned char *pbuf);
 u8 mlme_evt_hdl(_adapter *padapter, unsigned char *pbuf);
 u8 h2c_msg_hdl(_adapter *padapter, unsigned char *pbuf);
 u8 tx_beacon_hdl(_adapter *padapter, unsigned char *pbuf);
+u8 set_chplan_hdl(_adapter *padapter, unsigned char *pbuf);
+u8 rereg_nd_name_hdl(_adapter *padapter, unsigned char *pbuf);
 
 #define GEN_DRV_CMD_HANDLER(size, cmd)	{size, &cmd ## _hdl},
 #define GEN_MLME_EXT_HANDLER(size, cmd)	{size, cmd},
@@ -647,6 +651,8 @@ struct cmd_hdl wlancmds[] =
 	GEN_MLME_EXT_HANDLER(0, rtw_drvextra_cmd_hdl) /*57*/
 
 	GEN_MLME_EXT_HANDLER(0, h2c_msg_hdl) /*58*/
+	GEN_MLME_EXT_HANDLER(sizeof(struct SetChannelPlan_param), set_chplan_hdl) /*59*/
+	GEN_MLME_EXT_HANDLER(sizeof(struct rereg_nd_name_param), rereg_nd_name_hdl) /*60*/
 
 };
 

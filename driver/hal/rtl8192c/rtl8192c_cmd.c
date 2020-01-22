@@ -783,7 +783,7 @@ CheckFwRsvdPageContent(
 //			      TRUE: At the second time, we should send the first packet (default:beacon)
 //						to Hw again and set the lengh in descriptor to the real beacon lengh.
 // 2009.10.15 by tynli.
-void SetFwRsvdPagePkt(PADAPTER Adapter, BOOLEAN bDLFinished)
+static void SetFwRsvdPagePkt(PADAPTER Adapter, BOOLEAN bDLFinished)
 {
 	HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(Adapter);	
 	struct xmit_frame	*pmgntframe;
@@ -930,7 +930,7 @@ void rtl8192c_set_FwJoinBssReport_cmd(_adapter* padapter, u8 mstatus)
 	
 _func_enter_;
 
-	DBG_871X("%s\n", __FUNCTION__);
+	DBG_871X("%s mstatus(%x)\n", __FUNCTION__,mstatus);
 
 	if(mstatus == 1)
 	{
@@ -1017,7 +1017,7 @@ void rtl8192c_set_p2p_ps_offload_cmd(_adapter* padapter, u8 p2p_ps_state)
 	struct P2P_PS_Offload_t	*p2p_ps_offload = &pHalData->p2p_ps_offload;
 	u8	i;
 	u16	ctwindow;
-	u32	start_time;
+	u32	start_time, tsf_low;
 
 _func_enter_;
 
@@ -1034,8 +1034,14 @@ _func_enter_;
 			{
 				p2p_ps_offload->CTWindow_En = 1;
 				ctwindow = pwdinfo->ctwindow;
-				rtl8192c_set_p2p_ctw_period_cmd(padapter, ctwindow);
-				//rtw_write16(padapter, REG_ATIMWND, ctwindow);
+				if(IS_HARDWARE_TYPE_8723(padapter))
+				{
+					//rtw_write16(padapter, REG_ATIMWND, ctwindow);
+				}
+				else
+				{
+					rtl8192c_set_p2p_ctw_period_cmd(padapter, ctwindow);
+				}
 			}
 
 			// hw only support 2 set of NoA
@@ -1053,10 +1059,13 @@ _func_enter_;
 
 				rtw_write32(padapter, 0x5E4, pwdinfo->noa_interval[i]);
 
+				//Get Current TSF value
+				tsf_low = rtw_read32(padapter, REG_TSFTR);
+
 				start_time = pwdinfo->noa_start_time[i];
 				if(pwdinfo->noa_count[i] != 1)
 				{
-					while( start_time <= (pwdinfo->tsf_low+(50*1024) ) )
+					while( start_time <= (tsf_low+(50*1024) ) )
 					{
 						start_time += pwdinfo->noa_interval[i];
 						if(pwdinfo->noa_count[i] != 255)
@@ -1096,6 +1105,7 @@ _func_enter_;
 		case P2P_PS_SCAN_DONE:
 			DBG_8192C("P2P_PS_SCAN_DONE \n");
 			p2p_ps_offload->discovery = 0;
+			pwdinfo->p2p_ps = P2P_PS_ENABLE;
 			break;
 		default:
 			break;

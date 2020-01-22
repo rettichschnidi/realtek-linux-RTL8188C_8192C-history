@@ -143,18 +143,19 @@
 
 #endif
 
+#define DRVINFO_SZ	4 // unit is 8bytes
 #define PageNum_128(_Len)		(u32)(((_Len)>>7) + ((_Len)&0x7F ? 1:0))
 
 //
 // Check if FW header exists. We do not consider the lower 4 bits in this case. 
 // By tynli. 2009.12.04.
 //
-#define IS_FW_HEADER_EXIST(_pFwHdr)	((_pFwHdr->Signature&0xFFF0) == 0x92C0 ||\
-									(_pFwHdr->Signature&0xFFF0) == 0x88C0 ||\
-									(_pFwHdr->Signature&0xFFFF) == 0x92D0 ||\
-									(_pFwHdr->Signature&0xFFFF) == 0x92D1 ||\
-									(_pFwHdr->Signature&0xFFFF) == 0x92D2 ||\
-									(_pFwHdr->Signature&0xFFFF) == 0x92D3 )
+#define IS_FW_HEADER_EXIST(_pFwHdr)	((le16_to_cpu(_pFwHdr->Signature)&0xFFF0) == 0x92C0 ||\
+									(le16_to_cpu(_pFwHdr->Signature)&0xFFF0) == 0x88C0 ||\
+									(le16_to_cpu(_pFwHdr->Signature)&0xFFFF) == 0x92D0 ||\
+									(le16_to_cpu(_pFwHdr->Signature)&0xFFFF) == 0x92D1 ||\
+									(le16_to_cpu(_pFwHdr->Signature)&0xFFFF) == 0x92D2 ||\
+									(le16_to_cpu(_pFwHdr->Signature)&0xFFFF) == 0x92D3 )
 
 #define FW_8192D_SIZE				0x8000
 #define FW_8192D_START_ADDRESS	0x1000
@@ -602,6 +603,9 @@ struct hal_data_8192de
 
 	u16	EfuseUsedBytes;
 	u8	RTSInitRate;	 // 2010.11.24.by tynli.
+#ifdef CONFIG_P2P
+	struct P2P_PS_Offload_t	p2p_ps_offload;
+#endif
 };
 
 typedef struct hal_data_8192de HAL_DATA_TYPE, *PHAL_DATA_TYPE;
@@ -821,6 +825,9 @@ struct hal_data_8192du
 
 	u16	EfuseUsedBytes;
 	u8	RTSInitRate;	 // 2010.11.24.by tynli.
+#ifdef CONFIG_P2P
+	struct P2P_PS_Offload_t	p2p_ps_offload;
+#endif
 };
 
 typedef struct hal_data_8192du HAL_DATA_TYPE, *PHAL_DATA_TYPE;

@@ -107,6 +107,7 @@ static void	dm_DIGInit(
 	pDigTable->ForbiddenIGI = DM_DIG_MIN;
 	pDigTable->LargeFAHit = 0;
 	pDigTable->Recover_cnt = 0;
+	pdmpriv->DIG_Dynamic_MIN  = 0x25; //for FUNAI_TV
 }
 
 
@@ -133,6 +134,10 @@ static u8 dm_initial_gain_MinPWDB(
 		Rssi_val_min = pdmpriv->UndecoratedSmoothedPWDB;
 	else if(pDigTable->CurMultiSTAConnectState == DIG_MultiSTA_CONNECT)
 		Rssi_val_min = pdmpriv->EntryMinUndecoratedSmoothedPWDB;
+
+	//printk("%s CurMultiSTAConnectState(0x%02x) UndecoratedSmoothedPWDB(%d),EntryMinUndecoratedSmoothedPWDB(%d)\n"
+	//,__FUNCTION__,pDigTable->CurSTAConnectState,
+	//pdmpriv->UndecoratedSmoothedPWDB,pdmpriv->EntryMinUndecoratedSmoothedPWDB);
 
 	return (u8)Rssi_val_min;
 }
@@ -221,6 +226,7 @@ DM_Write_DIG(
 		// Set initial gain.
 		//PHY_SetBBReg(pAdapter, rOFDM0_XAAGCCore1, bMaskByte0, pDigTable->CurIGValue);
 		//PHY_SetBBReg(pAdapter, rOFDM0_XBAGCCore1, bMaskByte0, pDigTable->CurIGValue);
+		//printk("%s DIG(0x%02x)\n",__FUNCTION__,pDigTable->CurIGValue);
 		PHY_SetBBReg(pAdapter, rOFDM0_XAAGCCore1, 0x7f, pDigTable->CurIGValue);
 		PHY_SetBBReg(pAdapter, rOFDM0_XBAGCCore1, 0x7f, pDigTable->CurIGValue);
 		pDigTable->PreIGValue = pDigTable->CurIGValue;
@@ -263,11 +269,140 @@ dm_CtrlInitGainByFA(
 	
 }
 
+#ifdef CONFIG_SPECIAL_SETTING_FOR_FUNAI
+VOID dm_CtrlInitGainByRssi( IN PADAPTER pAdapter) 
+{ 
 
-static VOID 
-dm_CtrlInitGainByRssi(
-	IN	PADAPTER	pAdapter
-)	
+	u32 isBT;
+	HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(pAdapter);
+	struct dm_priv	*pdmpriv = &pHalData->dmpriv;
+	DIG_T	*pDigTable = &pdmpriv->DM_DigTable;
+	PFALSE_ALARM_STATISTICS FalseAlmCnt = &(pdmpriv->FalseAlmCnt);	
+
+	 //modify DIG upper bound
+	if((pDigTable->Rssi_val_min + 20) > DM_DIG_MAX )
+		pDigTable->rx_gain_range_max = DM_DIG_MAX;
+ 	else
+  		pDigTable->rx_gain_range_max = pDigTable->Rssi_val_min + 20;
+
+	//modify DIG lower bound	
+	if((FalseAlmCnt->Cnt_all > 500)&&(pdmpriv->DIG_Dynamic_MIN < 0x25))
+  		pdmpriv->DIG_Dynamic_MIN++;
+ 	if((FalseAlmCnt->Cnt_all < 500)&&(pdmpriv->DIG_Dynamic_MIN > DM_DIG_MIN))
+  		pdmpriv->DIG_Dynamic_MIN--;
+	if((pDigTable->Rssi_val_min < 8) && (pdmpriv->DIG_Dynamic_MIN > DM_DIG_MIN))
+		pdmpriv->DIG_Dynamic_MIN--;
+	
+ 	//modify DIG lower bound, deal with abnorally large false alarm
+ 	if(FalseAlmCnt->Cnt_all > 10000)
+ 	{
+ 		//RT_TRACE(COMP_DIG, DBG_LOUD, ("dm_DIG(): Abnornally false alarm case. \n"));
+  		pDigTable->LargeFAHit++;
+ 		 if(pDigTable->ForbiddenIGI < pDigTable->CurIGValue)
+  		{
+   			pDigTable->ForbiddenIGI = pDigTable->CurIGValue;
+	  		pDigTable->LargeFAHit = 1;
+	  	}
+	  	if(pDigTable->LargeFAHit >= 3)
+	  	{
+			if((pDigTable->ForbiddenIGI+1) >pDigTable->rx_gain_range_max)
+		    		pDigTable->rx_gain_range_min = pDigTable->rx_gain_range_max;
+		   	else
+		    		pDigTable->rx_gain_range_min = (pDigTable->ForbiddenIGI + 1);
+		   	pDigTable->Recover_cnt = 3600; //3600=2hr
+		  }
+	 }
+	 else
+	 {
+	  //Recovery mechanism for IGI lower bound
+	  	if(pDigTable->Recover_cnt != 0){
+	   		pDigTable->Recover_cnt --;
+	  	}
+	  	else
+	 	{
+			if(pDigTable->LargeFAHit == 0 )
+	   		{
+	   			if((pDigTable->ForbiddenIGI -1) < pdmpriv->DIG_Dynamic_MIN) //DM_DIG_MIN)
+			    	{
+			     		pDigTable->ForbiddenIGI = pdmpriv->DIG_Dynamic_MIN; //DM_DIG_MIN;
+			     		pDigTable->rx_gain_range_min = pdmpriv->DIG_Dynamic_MIN; //DM_DIG_MIN;
+			    	}
+			    	else
+			    	{
+			     		pDigTable->ForbiddenIGI --;
+			     		pDigTable->rx_gain_range_min = (pDigTable->ForbiddenIGI + 1);
+			    	}
+	   		}
+	   		else if(pDigTable->LargeFAHit == 3 )
+	   		{
+	    			pDigTable->LargeFAHit = 0;
+	   		}
+	  	}
+	 }
+ #ifdef CONFIG_USB_HCI
+	if(FalseAlmCnt->Cnt_all < 250)
+	{
+#endif
+		//DBG_8192C("===> dm_CtrlInitGainByRssi, Enter DIG by SS mode\n");
+		
+		isBT = rtw_read8(pAdapter, 0x4fd) & 0x01;
+
+		if(!isBT){
+
+			if(FalseAlmCnt->Cnt_all > pDigTable->FAHighThresh)
+			{
+				if((pDigTable->BackoffVal -2) < pDigTable->BackoffVal_range_min)
+					pDigTable->BackoffVal = pDigTable->BackoffVal_range_min;
+				else
+					pDigTable->BackoffVal -= 2; 
+			}	
+			else if(FalseAlmCnt->Cnt_all < pDigTable->FALowThresh)
+			{
+				if((pDigTable->BackoffVal+2) > pDigTable->BackoffVal_range_max)
+					pDigTable->BackoffVal = pDigTable->BackoffVal_range_max;
+				else
+					pDigTable->BackoffVal +=2;
+			}	
+		}
+		else
+			pDigTable->BackoffVal = DM_DIG_BACKOFF_DEFAULT;
+
+		pDigTable->CurIGValue = pDigTable->Rssi_val_min+10-pDigTable->BackoffVal;	
+
+		//DBG_8192C("Rssi_val_min = %x BackoffVal %x\n",pDigTable->Rssi_val_min, pDigTable->BackoffVal);
+#ifdef CONFIG_USB_HCI
+	}
+	else
+	{		
+		//DBG_8192C("===> dm_CtrlInitGainByRssi, Enter DIG by FA mode\n");
+		//DBG_8192C("RSSI = 0x%x", pDigTable->Rssi_val_min);
+
+		//Adjust initial gain by false alarm		
+		if(FalseAlmCnt->Cnt_all > 1000)
+			pDigTable->CurIGValue = pDigTable ->PreIGValue+2;
+		else if (FalseAlmCnt->Cnt_all > 750)
+			pDigTable->CurIGValue = pDigTable->PreIGValue+1;
+		else if(FalseAlmCnt->Cnt_all < 500)
+			pDigTable->CurIGValue = pDigTable->PreIGValue-1;	
+	}
+#endif
+
+	//Check initial gain by upper/lower bound
+	if(pDigTable->CurIGValue >pDigTable->rx_gain_range_max)
+		pDigTable->CurIGValue = pDigTable->rx_gain_range_max;
+
+	if(pDigTable->CurIGValue < pDigTable->rx_gain_range_min)
+		pDigTable->CurIGValue = pDigTable->rx_gain_range_min;
+
+	//printk("%s => rx_gain_range_max(0x%02x) rx_gain_range_min(0x%02x)\n",__FUNCTION__,
+	//	pDigTable->rx_gain_range_max,pDigTable->rx_gain_range_min);
+	//printk("%s CurIGValue(0x%02x)  <====\n",__FUNCTION__,pDigTable->CurIGValue );		
+
+	DM_Write_DIG(pAdapter);
+
+}
+#else
+static VOID dm_CtrlInitGainByRssi(IN	PADAPTER	pAdapter)	
 {
 	u32 isBT;
 	HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(pAdapter);
@@ -275,26 +410,12 @@ dm_CtrlInitGainByRssi(
 	DIG_T	*pDigTable = &pdmpriv->DM_DigTable;
 	PFALSE_ALARM_STATISTICS FalseAlmCnt = &(pdmpriv->FalseAlmCnt);
 
-#if 0
-	//Test Program
-	u1Byte	value_IGI = DM_DigTable.CurIGValue;
-	DM_DigTable.Rssi_val_min = 0x20;
-	RT_TRACE(COMP_DIG, DBG_LOUD, ("dm_DIG()=>\n"));
-	if(DM_DigTable.CurIGValue <= 0x24)
-		pAdapter->FalseAlmCnt.Cnt_all = 12000;
-	else if(DM_DigTable.CurIGValue <= 0x28)
-		pAdapter->FalseAlmCnt.Cnt_all = 20;
-	else if(DM_DigTable.CurIGValue <= 0x30)
-		pAdapter->FalseAlmCnt.Cnt_all = 0;
-	else
-		pAdapter->FalseAlmCnt.Cnt_all = 0;
-#endif
-
 	//modify DIG upper bound
 	if((pDigTable->Rssi_val_min + 20) > DM_DIG_MAX )
 		pDigTable->rx_gain_range_max = DM_DIG_MAX;
 	else
 		pDigTable->rx_gain_range_max = pDigTable->Rssi_val_min + 20;
+	//printk("%s Rssi_val_min(0x%02x),rx_gain_range_max(0x%02x)\n",__FUNCTION__,pDigTable->Rssi_val_min,pDigTable->rx_gain_range_max);
 
 	//modify DIG lower bound, deal with abnorally large false alarm
 	if(FalseAlmCnt->Cnt_all > 10000)
@@ -347,24 +468,6 @@ dm_CtrlInitGainByRssi(
 	//RT_TRACE(COMP_DIG, DBG_LOUD, ("DM_DigTable.ForbiddenIGI = 0x%x, DM_DigTable.LargeFAHit = 0x%x\n",pDigTable->ForbiddenIGI, pDigTable->LargeFAHit));
 	//RT_TRACE(COMP_DIG, DBG_LOUD, ("DM_DigTable.rx_gain_range_max = 0x%x, DM_DigTable.rx_gain_range_min = 0x%x\n",pDigTable->rx_gain_range_max, pDigTable->rx_gain_range_min));
 
-#if 0	
-	if(pAdapter->FalseAlmCnt.Cnt_all < DM_DIG_FA_TH0)	
-		value_IGI --;
-	else if(pAdapter->FalseAlmCnt.Cnt_all < DM_DIG_FA_TH1)	
-		value_IGI += 0;
-	else if(pAdapter->FalseAlmCnt.Cnt_all < DM_DIG_FA_TH2)	
-		value_IGI ++;
-	else if(pAdapter->FalseAlmCnt.Cnt_all >= DM_DIG_FA_TH2)	
-		value_IGI +=2;
-	//Check initial gain by upper/lower bound
-	if(value_IGI > DM_DigTable.rx_gain_range_max)
-		value_IGI = DM_DigTable.rx_gain_range_max;
-	else if(value_IGI < DM_DigTable.rx_gain_range_min)
-		value_IGI = DM_DigTable.rx_gain_range_min;
-
-	DM_DigTable.CurIGValue = value_IGI;
-#endif
-
 #ifdef CONFIG_USB_HCI
 	if(FalseAlmCnt->Cnt_all < 250)
 	{
@@ -393,12 +496,7 @@ dm_CtrlInitGainByRssi(
 		else
 			pDigTable->BackoffVal = DM_DIG_BACKOFF_DEFAULT;
 
-		if((pDigTable->Rssi_val_min+10-pDigTable->BackoffVal) > pDigTable->rx_gain_range_max)
-			pDigTable->CurIGValue = pDigTable->rx_gain_range_max;
-		else if((pDigTable->Rssi_val_min+10-pDigTable->BackoffVal) < pDigTable->rx_gain_range_min)
-			pDigTable->CurIGValue = pDigTable->rx_gain_range_min;
-		else
-			pDigTable->CurIGValue = pDigTable->Rssi_val_min+10-pDigTable->BackoffVal;
+		pDigTable->CurIGValue = pDigTable->Rssi_val_min+10-pDigTable->BackoffVal;	
 
 		//DBG_8192C("Rssi_val_min = %x BackoffVal %x\n",pDigTable->Rssi_val_min, pDigTable->BackoffVal);
 #ifdef CONFIG_USB_HCI
@@ -415,19 +513,24 @@ dm_CtrlInitGainByRssi(
 			pDigTable->CurIGValue = pDigTable->PreIGValue+1;
 		else if(FalseAlmCnt->Cnt_all < 500)
 			pDigTable->CurIGValue = pDigTable->PreIGValue-1;	
-
-		//Check initial gain by upper/lower bound
-		if(pDigTable->CurIGValue >pDigTable->rx_gain_range_max)
-			pDigTable->CurIGValue = pDigTable->rx_gain_range_max;
-		else if(pDigTable->CurIGValue < pDigTable->rx_gain_range_min)
-			pDigTable->CurIGValue = pDigTable->rx_gain_range_min;
 	}
 #endif
+
+	//Check initial gain by upper/lower bound
+	if(pDigTable->CurIGValue >pDigTable->rx_gain_range_max)
+		pDigTable->CurIGValue = pDigTable->rx_gain_range_max;
+
+	if(pDigTable->CurIGValue < pDigTable->rx_gain_range_min)
+		pDigTable->CurIGValue = pDigTable->rx_gain_range_min;
+
+	//printk("%s => rx_gain_range_max(0x%02x) rx_gain_range_min(0x%02x)\n",__FUNCTION__,
+	//	pDigTable->rx_gain_range_max,pDigTable->rx_gain_range_min);
+	//printk("%s CurIGValue(0x%02x)  <====\n",__FUNCTION__,pDigTable->CurIGValue );		
 
 	DM_Write_DIG(pAdapter);
 
 }
-
+#endif
 
 static VOID
 dm_initial_gain_Multi_STA(
@@ -605,7 +708,7 @@ dm_CtrlInitGainByTwoPort(
 	if (check_fwstate(pmlmepriv, _FW_UNDER_LINKING) == _TRUE)
 	{
 		pDigTable->CurSTAConnectState = DIG_STA_BEFORE_CONNECT;
-	}	
+	}
 	else if(check_fwstate(pmlmepriv, _FW_LINKED) == _TRUE) 
 	{
 		pDigTable->CurSTAConnectState = DIG_STA_CONNECT;
@@ -1125,8 +1228,12 @@ dm_TXPowerTrackingCallback_ThermalMeter_92C(
 	s8			OFDM_index[2], CCK_index, OFDM_index_old[2], CCK_index_old, delta_APK;
 	int			i = 0, CCKSwingNeedUpdate = 0;
 	BOOLEAN		is2T = IS_92C_SERIAL(pHalData->VersionID);
-	//PMPT_CONTEXT	pMptCtx = &(Adapter->MptCtx);	
-	//u8	*TxPwrLevel = pMptCtx->TxPwrLevel;//???
+#if 0	
+//#ifdef CONFIG_MP_INCLUDED
+	PMPT_CONTEXT	pMptCtx = &(Adapter->MptCtx);	
+	pu1Byte			TxPwrLevel = pMptCtx->TxPwrLevel;
+#endif
+
 	u8			OFDM_min_index = 6, rf; //OFDM BB Swing should be less than +3.0dB, which is required by Arthur
 	u32			DPK_delta_mapping[2][DPK_DELTA_MAPPING_NUM] = {
 					{0x1c, 0x1c, 0x1d, 0x1d, 0x1e, 
@@ -1365,7 +1472,8 @@ dm_TXPowerTrackingCallback_ThermalMeter_92C(
 						OFDM_index[i] = pdmpriv->OFDM_index[i];
 					CCK_index = pdmpriv->CCK_index;						
 				}
-#if 0 //todo:
+#if 0
+//#ifdef CONFIG_MP_INCLUDED
 				for(i = 0; i < rf; i++)
 				{
 					if(TxPwrLevel[i] >=0 && TxPwrLevel[i] <=26)
@@ -3116,8 +3224,13 @@ dm_CheckStatistics(
 
 static void dm_CheckPbcGPIO(_adapter *padapter)
 {	
-	u8 tmp1byte;
+	u8	tmp1byte;
+	u8	bPbcPressed = _FALSE;
 
+	if(!padapter->registrypriv.hw_wps_pbc)
+		return;
+
+#ifdef CONFIG_USB_HCI
 	tmp1byte = rtw_read8(padapter, GPIO_IO_SEL);
 	tmp1byte |= (HAL_8192C_HW_GPIO_WPS_BIT);
 	rtw_write8(padapter, GPIO_IO_SEL, tmp1byte);	//enable GPIO[2] as output mode
@@ -3136,36 +3249,45 @@ static void dm_CheckPbcGPIO(_adapter *padapter)
 
 	if (tmp1byte&HAL_8192C_HW_GPIO_WPS_BIT)
 	{
-		
+		bPbcPressed = _TRUE;
+	}
+#else
+	tmp1byte = rtw_read8(padapter, GPIO_IN);
+	//RT_TRACE(COMP_IO, DBG_TRACE, ("dm_CheckPbcGPIO - %x\n", tmp1byte));
+
+	if (tmp1byte == 0xff || padapter->init_adpt_in_progress)
+		return ;
+
+	if((tmp1byte&HAL_8192C_HW_GPIO_WPS_BIT)==0)
+	{
+		bPbcPressed = _TRUE;
+	}
+#endif
+
+	if( _TRUE == bPbcPressed)
+	{
 		// Here we only set bPbcPressed to true
 		// After trigger PBC, the variable will be set to false		
-		DBG_8192C("CheckPbcGPIO - PBC is pressed (%x)\n",tmp1byte);
+		DBG_8192C("CheckPbcGPIO - PBC is pressed\n");
                 
 #ifdef RTK_DMP_PLATFORM
+#if (LINUX_VERSION_CODE > KERNEL_VERSION(2,6,12))
+		kobject_uevent(&padapter->pnetdev->dev.kobj, KOBJ_NET_PBC);
+#else
 		kobject_hotplug(&padapter->pnetdev->class_dev.kobj, KOBJ_NET_PBC);
-		//kobject_hotplug(&dev->class_dev.kobj, KOBJ_NET_PBC);
+#endif
 #else
 
-		if ( padapter->pid == 0 )
+		if ( padapter->pid[0] == 0 )
 		{	//	0 is the default value and it means the application monitors the HW PBC doesn't privde its pid to driver.
 			return;
 		}
 
 #ifdef PLATFORM_LINUX
-
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,27))
-		kill_pid(find_vpid(padapter->pid), SIGUSR1, 1);
+		rtw_signal_process(padapter->pid[0], SIGUSR1);
 #endif
-
-#if (LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,26))
-		kill_proc(padapter->pid, SIGUSR1, 1);
-#endif
-
-#endif
-
 #endif
 	}
-
 }
 
 #ifdef CONFIG_PCI_HCI
@@ -3487,13 +3609,21 @@ rtl8192c_dm_RF_Saving(
 			 
 			if(pPSTable->PreRFState == RF_Normal)
 			{
+			#ifdef CONFIG_SPECIAL_SETTING_FOR_FUNAI
+				if(pPSTable->Rssi_val_min >= 50)
+			#else
 				if(pPSTable->Rssi_val_min >= 30)
+			#endif
 					pPSTable->CurRFState = RF_Save;
 				else
 					pPSTable->CurRFState = RF_Normal;
 			}
 			else{
+			#ifdef CONFIG_SPECIAL_SETTING_FOR_FUNAI
+				if(pPSTable->Rssi_val_min <= 45)
+			#else
 				if(pPSTable->Rssi_val_min <= 25)
+			#endif
 					pPSTable->CurRFState = RF_Normal;
 				else
 					pPSTable->CurRFState = RF_Save;
@@ -3583,8 +3713,7 @@ IN	PADAPTER	pAdapter
 	//1 3.Power Saving for 88C
 	else
 	{
-		//Temporaly marked
-		//rtl8192c_dm_RF_Saving(pAdapter, _FALSE);
+		rtl8192c_dm_RF_Saving(pAdapter, _FALSE);
 	}
 }
 
@@ -3630,7 +3759,7 @@ u8 SwAntDivBeforeLink8192C(IN PADAPTER Adapter)
 	// Condition that does not need to use antenna diversity.
 	if(IS_92C_SERIAL(pHalData->VersionID) ||(pHalData->AntDivCfg==0))
 	{
-		DBG_8192C("SwAntDivBeforeLink8192C(): No AntDiv Mechanism.\n");
+		//DBG_8192C("SwAntDivBeforeLink8192C(): No AntDiv Mechanism.\n");
 		return _FALSE;
 	}
 
@@ -3663,7 +3792,7 @@ u8 SwAntDivBeforeLink8192C(IN PADAPTER Adapter)
 
 		//PHY_SetBBReg(Adapter, rFPGA0_XA_RFInterfaceOE, 0x300, pDM_SWAT_Table->CurAntenna);
 		rtw_antenna_select_cmd(Adapter, pDM_SWAT_Table->CurAntenna, _FALSE);
-		DBG_8192C("%s change antenna to ANT_( %s ).....\n",__FUNCTION__, (pDM_SWAT_Table->CurAntenna==Antenna_A)?"A":"B");
+		//DBG_8192C("%s change antenna to ANT_( %s ).....\n",__FUNCTION__, (pDM_SWAT_Table->CurAntenna==Antenna_A)?"A":"B");
 		return _TRUE;
 	}
 	else
@@ -3675,7 +3804,8 @@ u8 SwAntDivBeforeLink8192C(IN PADAPTER Adapter)
 
 
 }
-
+#endif
+#ifdef CONFIG_SW_ANTENNA_DIVERSITY
 //
 // 20100514 Luke/Joseph:
 // Add new function to reset antenna diversity state after link.
@@ -3692,7 +3822,7 @@ SwAntDivRestAfterLink8192C(
 	if(IS_92C_SERIAL(pHalData->VersionID) ||(pHalData->AntDivCfg==0))	
 		return;
 
-	DBG_8192C("======>   SwAntDivRestAfterLink <========== \n");
+	//DBG_8192C("======>   SwAntDivRestAfterLink <========== \n");
 	pHalData->RSSI_cnt_A= 0;
 	pHalData->RSSI_cnt_B= 0;
 	pHalData->RSSI_test = _FALSE;
@@ -3935,7 +4065,7 @@ dm_SW_AntennaSwitch(
 
 			if(pDM_SWAT_Table->TestMode == TP_MODE)
 			{
-				DBG_8192C("SWAS: TestMode = TP_MODE\n");
+				//DBG_8192C("SWAS: TestMode = TP_MODE\n");
 				//DBG_8192C("TRY:CurByteCnt = %lld\n", CurByteCnt);
 				//DBG_8192C("TRY:PreByteCnt = %lld\n",PreByteCnt);		
 				if(CurByteCnt < PreByteCnt)
@@ -3976,21 +4106,21 @@ dm_SW_AntennaSwitch(
 
 				if(nextAntenna != pDM_SWAT_Table->CurAntenna)
 				{
-					DBG_8192C("SWAS: Switch back to another antenna\n");
+					//DBG_8192C("SWAS: Switch back to another antenna\n");
 				}
 				else
 				{
-					DBG_8192C("SWAS: current anntena is good\n");
+					//DBG_8192C("SWAS: current anntena is good\n");
 				}	
 			}
 
 			if(pDM_SWAT_Table->TestMode == RSSI_MODE)
 			{	
-				DBG_8192C("SWAS: TestMode = RSSI_MODE\n");
+				//DBG_8192C("SWAS: TestMode = RSSI_MODE\n");
 				pDM_SWAT_Table->SelectAntennaMap=0xAA;
 				if(curRSSI < pDM_SWAT_Table->PreRSSI) //Current antenna is worse than previous antenna
 				{
-					DBG_8192C("SWAS: Switch back to another antenna\n");
+					//DBG_8192C("SWAS: Switch back to another antenna\n");
 					nextAntenna = (pDM_SWAT_Table->CurAntenna == Antenna_A)? Antenna_B : Antenna_A;
 				}
 				else // current anntena is good
@@ -4061,7 +4191,7 @@ dm_SW_AntennaSwitch(
 	//1 4.Change TRX antenna
 	if(nextAntenna != pDM_SWAT_Table->CurAntenna)
 	{
-		DBG_8192C("@@@@@@@@ SWAS: Change TX Antenna!\n ");		
+		//DBG_8192C("@@@@@@@@ SWAS: Change TX Antenna!\n ");		
 		rtw_antenna_select_cmd(Adapter, nextAntenna, 1);
 	}
 
@@ -4220,7 +4350,9 @@ static void dm_RSSIMonitorCheck(
 		pdmpriv->RSSI_Select = RSSI_OFDM;
 
 	pdmpriv->OFDM_Pkt_Cnt = 0;	
-	DBG_8192C("RSSI_Select=%s\n",(pdmpriv->RSSI_Select == RSSI_OFDM)?"RSSI_OFDM":"RSSI_CCK");
+	//DBG_8192C("RSSI_Select=%s OFDM_Pkt_Cnt(%d)\n",
+		//(pdmpriv->RSSI_Select == RSSI_OFDM)?"RSSI_OFDM":"RSSI_CCK",
+		//pdmpriv->OFDM_Pkt_Cnt);
 }
 
 //============================================================
@@ -4233,7 +4365,7 @@ void rtl8192c_init_dm_priv(IN PADAPTER Adapter)
 
 	_rtw_memset(pdmpriv, 0, sizeof(struct dm_priv));
 
-#ifdef CONFIG_ANTENNA_DIVERSITY
+#ifdef CONFIG_SW_ANTENNA_DIVERSITY
 	_init_timer(&(pdmpriv->SwAntennaSwitchTimer),  Adapter->pnetdev , dm_SW_AntennaSwitchCallback, Adapter);
 #endif
 }
@@ -4243,10 +4375,105 @@ void rtl8192c_deinit_dm_priv(IN PADAPTER Adapter)
 	PHAL_DATA_TYPE	pHalData = GET_HAL_DATA(Adapter);
 	struct dm_priv	*pdmpriv = &pHalData->dmpriv;
 
-#ifdef CONFIG_ANTENNA_DIVERSITY
+#ifdef CONFIG_SW_ANTENNA_DIVERSITY
 	_cancel_timer_ex(&pdmpriv->SwAntennaSwitchTimer);
 #endif
 }
+#ifdef CONFIG_HW_ANTENNA_DIVERSITY
+void dm_InitHybridAntDiv(IN PADAPTER Adapter)
+{
+	HAL_DATA_TYPE		*pHalData = GET_HAL_DATA(Adapter);
+
+	if(IS_92C_SERIAL(pHalData->VersionID) ||pHalData->AntDivCfg==0)
+		return;
+	
+	//Set OFDM HW RX Antenna Diversity
+	PHY_SetBBReg(Adapter,0xc50, BIT7, 1); //Enable Hardware antenna switch
+	PHY_SetBBReg(Adapter,0x870, BIT9|BIT8, 0); //Enable hardware control of "ANT_SEL" & "ANT_SELB"
+	PHY_SetBBReg(Adapter,0xCA4, BIT11, 0); //Switch to another antenna by checking pwdb threshold
+	PHY_SetBBReg(Adapter,0xCA4, 0x7FF, 0x080); //Pwdb threshold=8dB
+	PHY_SetBBReg(Adapter,0xC54, BIT23, 1); //Decide final antenna by comparing 2 antennas' pwdb
+	PHY_SetBBReg(Adapter,0x874, BIT23, 0); //No update ANTSEL during GNT_BT=1
+	PHY_SetBBReg(Adapter,0x80C, BIT21, 1); //TX atenna selection from tx_info
+	//Set CCK HW RX Antenna Diversity
+	PHY_SetBBReg(Adapter,0xA00, BIT15, 1);//Enable antenna diversity
+	PHY_SetBBReg(Adapter,0xA0C, BIT4, 0); //Antenna diversity decision period = 32 sample
+	PHY_SetBBReg(Adapter,0xA0C, 0xf, 0xf); //Threshold for antenna diversity. Check another antenna power if input power < ANT_lim*4
+	PHY_SetBBReg(Adapter,0xA10, BIT13, 1); //polarity ana_A=1 and ana_B=0
+	PHY_SetBBReg(Adapter,0xA14, 0x1f, 0x8); //default antenna power = inpwr*(0.5 + r_ant_step/16)
+	
+	pHalData->CCK_Ant1_Cnt = 0;
+	pHalData->CCK_Ant2_Cnt = 0;
+	pHalData->OFDM_Ant1_Cnt = 0;
+	pHalData->OFDM_Ant2_Cnt = 0;
+}
+
+
+#define 	RxDefaultAnt1		0x65a9
+#define	RxDefaultAnt2		0x569a
+
+void dm_SelectRXDefault(IN	PADAPTER	Adapter)
+{
+	HAL_DATA_TYPE		*pHalData = GET_HAL_DATA(Adapter);
+	
+	if(IS_92C_SERIAL(pHalData->VersionID) ||pHalData->AntDivCfg==0)
+		return;
+	
+	//DbgPrint(" Ant1_Cnt=%d, Ant2_Cnt=%d\n", pHalData->Ant1_Cnt, pHalData->Ant2_Cnt);
+	//DBG_8192C(" CCK_Ant1_Cnt = %d,  CCK_Ant2_Cnt = %d\n", pHalData->CCK_Ant1_Cnt, pHalData->CCK_Ant2_Cnt);
+	//DBG_8192C(" OFDM_Ant1_Cnt = %d,  OFDM_Ant2_Cnt = %d\n", pHalData->OFDM_Ant1_Cnt, pHalData->OFDM_Ant2_Cnt);
+	if((pHalData->OFDM_Ant1_Cnt == 0) && (pHalData->OFDM_Ant2_Cnt == 0)) 
+	{
+		if((pHalData->CCK_Ant1_Cnt + pHalData->CCK_Ant2_Cnt) >=10 )
+		{
+			if(pHalData->CCK_Ant1_Cnt > (5*pHalData->CCK_Ant2_Cnt))
+			{
+				DBG_8192C(" RX Default = Ant1\n");
+				PHY_SetBBReg(Adapter, 0x858, 0xFFFF, RxDefaultAnt1);
+			}
+			else if(pHalData->CCK_Ant2_Cnt > (5*pHalData->CCK_Ant1_Cnt))
+			{
+				DBG_8192C(" RX Default = Ant2\n");
+				PHY_SetBBReg(Adapter, 0x858, 0xFFFF, RxDefaultAnt2);
+			}
+			else if(pHalData->CCK_Ant1_Cnt > pHalData->CCK_Ant2_Cnt)
+			{
+				DBG_8192C(" RX Default = Ant2\n");
+				PHY_SetBBReg(Adapter, 0x858, 0xFFFF, RxDefaultAnt2);
+			}
+			else
+			{
+				DBG_8192C(" RX Default = Ant1\n");
+				PHY_SetBBReg(Adapter, 0x858, 0xFFFF, RxDefaultAnt1);
+			}
+			pHalData->CCK_Ant1_Cnt = 0;
+			pHalData->CCK_Ant2_Cnt = 0;
+			pHalData->OFDM_Ant1_Cnt = 0;
+			pHalData->OFDM_Ant2_Cnt = 0;
+		}
+	}
+	else
+	{
+		if(pHalData->OFDM_Ant1_Cnt > pHalData->OFDM_Ant2_Cnt)
+		{
+			DBG_8192C(" RX Default = Ant1\n");
+			PHY_SetBBReg(Adapter, 0x858, 0xFFFF, RxDefaultAnt1);
+		}
+		else
+		{
+			DBG_8192C(" RX Default = Ant2\n");
+			PHY_SetBBReg(Adapter, 0x858, 0xFFFF, RxDefaultAnt2);
+		}
+		pHalData->CCK_Ant1_Cnt = 0;
+		pHalData->CCK_Ant2_Cnt = 0;
+		pHalData->OFDM_Ant1_Cnt = 0;
+		pHalData->OFDM_Ant2_Cnt = 0;
+	}
+
+
+}
+
+#endif
 
 void
 rtl8192c_InitHalDm(
@@ -4291,9 +4518,14 @@ rtl8192c_InitHalDm(
 
 	dm_InitDynamicBBPowerSaving(Adapter);
 
-#ifdef CONFIG_ANTENNA_DIVERSITY
+#ifdef CONFIG_SW_ANTENNA_DIVERSITY
 	pdmpriv->DMFlag |= DYNAMIC_FUNC_ANT_DIV;
 	dm_SW_AntennaSwitchInit(Adapter);
+#endif
+
+#ifdef CONFIG_HW_ANTENNA_DIVERSITY
+	pdmpriv->DMFlag |= DYNAMIC_FUNC_ANT_DIV;
+	dm_InitHybridAntDiv(Adapter);
 #endif
 
 	dm_RSSIMonitorInit(Adapter);
@@ -4323,6 +4555,13 @@ rtl8192c_HalDmWatchDog(
 	Adapter->HalFunc.GetHwRegHandler(Adapter, HW_VAR_FWLPS_RF_ON, (u8 *)(&bFwPSAwake));
 #endif
 
+#ifdef CONFIG_P2P
+	// Fw is under p2p powersaving mode, driver should stop dynamic mechanism.
+	// modifed by thomas. 2011.06.11.
+	if(Adapter->wdinfo.p2p_ps_enable)
+		bFwPSAwake = _FALSE;
+#endif
+
 	// Stop dynamic mechanism when:
 	// 1. RF is OFF. (No need to do DM.)
 	// 2. Fw is under power saving mode for FwLPS. (Prevent from SW/FW I/O racing.)
@@ -4349,8 +4588,11 @@ rtl8192c_HalDmWatchDog(
 		//
 		// Dynamic Initial Gain mechanism.
 		//
-		dm_DIG(Adapter);
+#ifdef CONFIG_SPECIAL_SETTING_FOR_FUNAI
+		dm_RSSIMonitorCheck(Adapter);
+#endif
 		dm_FalseAlarmCounterStatistics(Adapter);
+		dm_DIG(Adapter);
 
 		//
 		//Dynamic BB Power Saving Mechanism
@@ -4387,11 +4629,16 @@ rtl8192c_HalDmWatchDog(
 		//
 		//dm_CheckProtection(Adapter);
 
-#ifdef CONFIG_ANTENNA_DIVERSITY
+#ifdef CONFIG_SW_ANTENNA_DIVERSITY
 		//
 		// Software Antenna diversity
 		//
 		dm_SW_AntennaSwitch(Adapter, SWAW_STEP_PEAK);
+#endif
+
+#ifdef CONFIG_HW_ANTENNA_DIVERSITY
+		//Hybrid Antenna Diversity
+		dm_SelectRXDefault(Adapter);
 #endif
 
 #ifdef CONFIG_PCI_HCI

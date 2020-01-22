@@ -156,7 +156,7 @@ SwLedOn(
 				break;
 
 			case LED_PIN_LED0:
-#ifdef CONFIG_ANTENNA_DIVERSITY
+#ifdef CONFIG_SW_ANTENNA_DIVERSITY
 				if(pHalData->AntDivCfg)
 				{
 					LedCfg = rtw_read8(padapter, REG_LEDCFG2);
@@ -254,7 +254,7 @@ SwLedOff(
 				break;
 
 			case LED_PIN_LED0:
-#ifdef CONFIG_ANTENNA_DIVERSITY
+#ifdef CONFIG_SW_ANTENNA_DIVERSITY
 				if(pHalData->AntDivCfg)
 				{
 					LedCfg = rtw_read8(padapter, REG_LEDCFG2);
@@ -332,12 +332,12 @@ SwLedBlink(
 		break;
 		
 	case LED_BLINK_StartToBlink:
-		if( (check_fwstate(pmlmepriv, _FW_LINKED)== _TRUE)&&(pmlmepriv->fw_state & WIFI_STATION_STATE) )
+		if( check_fwstate(pmlmepriv, _FW_LINKED) && check_fwstate(pmlmepriv, WIFI_STATION_STATE) )
 		{
 			bStopBlinking = _TRUE;
 		}
-		if( (check_fwstate(pmlmepriv, _FW_LINKED)== _TRUE)&&
-			((pmlmepriv->fw_state & WIFI_ADHOC_STATE) || (pmlmepriv->fw_state & WIFI_ADHOC_MASTER_STATE)) )
+		if( check_fwstate(pmlmepriv, _FW_LINKED) &&
+			(check_fwstate(pmlmepriv, WIFI_ADHOC_STATE) || check_fwstate(pmlmepriv, WIFI_ADHOC_MASTER_STATE)) )
 		{
 			bStopBlinking = _TRUE;
 		}

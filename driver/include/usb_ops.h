@@ -35,7 +35,9 @@ enum{
 	VENDOR_WRITE = 0x00,
 	VENDOR_READ = 0x01,
 };
-
+#define ALIGNMENT_UNIT				16
+#define MAX_VENDOR_REQ_CMD_SIZE	254		//8188cu SIE Support
+#define MAX_USB_IO_CTL_SIZE		(MAX_VENDOR_REQ_CMD_SIZE +ALIGNMENT_UNIT)
 
 #ifdef CONFIG_RTL8192C
 void rtl8192cu_set_intf_ops(struct _io_ops *pops);

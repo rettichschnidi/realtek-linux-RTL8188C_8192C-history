@@ -232,40 +232,39 @@ extern void rtl871x_cedbg(const char *fmt, ...);
 #endif
 
 
-#ifndef CONFIG_DEBUG_RTL8192C
-	#ifdef PLATFORM_LINUX
-	#define printk(x, ...) {} 
-	#endif
-#endif	//CONFIG_DEBUG_RTL8192C
-
+#ifdef CONFIG_DEBUG_RTL819X
 	#ifdef PLATFORM_WINDOWS
-	#define _dbgdump	DbgPrint
 
+		#ifdef PLATFORM_OS_XP
+		#define _dbgdump	DbgPrint
+		
+		#elif defined PLATFORM_OS_CE
+		#define _dbgdump	rtl871x_cedbg
+
+		#endif
+
+	#elif defined PLATFORM_LINUX
+		#define _dbgdump	printk
+	#endif
+#endif
+
+#ifdef PLATFORM_WINDOWS
 	#define DBG_871X {}
-
 	#define MSG_8192C {}
-
 	#define DBG_8192C {}
-
 	#define WRN_8192C {}
-
 	#define ERR_8192C {}
-	#endif
+#endif
 
-	#ifdef PLATFORM_LINUX
-	#define _dbgdump	printk
-
+#ifdef PLATFORM_LINUX
 	#define DBG_871X(x, ...) {}
-
 	#define MSG_8192C(x, ...) {}
-
 	#define DBG_8192C(x,...)  {}
-
 	#define WRN_8192C(x,...)  {}
-
 	#define ERR_8192C(x,...)  {}
-	#endif
+#endif
 
+#if	defined (_dbgdump)
 	#undef DBG_871X
 	#define DBG_871X _dbgdump
 
@@ -280,6 +279,7 @@ extern void rtl871x_cedbg(const char *fmt, ...);
 
 	#undef ERR_8192C
 	#define ERR_8192C _dbgdump
+#endif
 
 
 
@@ -358,33 +358,6 @@ extern void rtl871x_cedbg(const char *fmt, ...);
 #endif
 
 #endif //CONFIG_PROC_DEBUG
-
-//#define DBG_SHOW_USETKIPKEY
-
-//#define DBG_POWER_SAVING
-//#define DBG_RF_STATE
-
-//#define DBG_TX
-//#define DBG_XMIT_BUF
-//#define DBG_XMIT_FRAME
-//#define DBG_TX_SHOW_802_1X
-
-//#define DBG_RX
-//#define DBG_RECV_BUF
-//#define DBG_RECV_FRAME
-//#define DBG_RX_DECRYPTOR 		// 3.0qc
-//#define DBG_RX_DROP_FRAME
-//#define DBG_RX_DATA_TOGGLE
-//#define DBG_RX_SHOW_802_1X
-
-//#define DBG_SETTING_RCR
-//#define DBG_SET_NETYPE0_MSR
-
-//#define DBG_CMD
-//#define DBG_EVENT
-
-//#define DBG_IOCTL
-//#define DBG_HAL_INIT_PROFILING
 
 #endif	//__RTW_DEBUG_H__
 

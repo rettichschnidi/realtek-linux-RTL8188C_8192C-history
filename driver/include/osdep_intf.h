@@ -107,8 +107,8 @@ void rtw_cancel_all_timer(_adapter *padapter);
 #ifdef PLATFORM_LINUX
 int rtw_ioctl(struct net_device *dev, struct ifreq *rq, int cmd);
 
-int rtw_init_netdev_name(struct net_device *pnetdev);
-struct net_device *rtw_init_netdev(void);
+int rtw_init_netdev_name(struct net_device *pnetdev, const char *ifname);
+struct net_device *rtw_init_netdev(_adapter *padapter);
 
 #ifdef CONFIG_PROC_DEBUG
 void rtw_proc_init_one(struct net_device *dev);

@@ -62,8 +62,11 @@ static void _restore_security_setting(_adapter *padapter)
 	{
 
 		for(EntryId=0; EntryId<4; EntryId++)
-		{				
-			rtw_set_key(padapter,&padapter->securitypriv, EntryId);				
+		{
+			if(EntryId == psecuritypriv->dot11PrivacyKeyIndex)
+				rtw_set_key(padapter,&padapter->securitypriv, EntryId, 1);
+			else
+				rtw_set_key(padapter,&padapter->securitypriv, EntryId, 0);
 		}	
 
 	}
@@ -79,7 +82,7 @@ static void _restore_security_setting(_adapter *padapter)
 			//pairwise key
 			rtw_setstakey_cmd(padapter, (unsigned char *)psta, _TRUE);
 			//group key			
-			rtw_set_key(padapter,&padapter->securitypriv,padapter->securitypriv.dot118021XGrpKeyid);
+			rtw_set_key(padapter,&padapter->securitypriv,padapter->securitypriv.dot118021XGrpKeyid, 0);
 		}
 	}
 	
@@ -92,6 +95,7 @@ static void _restore_network_status(_adapter *padapter)
 	struct mlme_ext_info	*pmlmeinfo = &(pmlmeext->mlmext_info);
 	WLAN_BSSID_EX	*pnetwork = (WLAN_BSSID_EX*)(&(pmlmeinfo->network));
 	unsigned short	caps;
+	u8	join_type;
 #if 1
 
 	//=======================================================
@@ -136,7 +140,14 @@ static void _restore_network_status(_adapter *padapter)
 	//disable dynamic functions, such as high power, DIG
 	//Switch_DM_Func(padapter, DYNAMIC_FUNC_DISABLE, _FALSE);	
 #endif
-	mlmeext_joinbss_event_callback(padapter);
+
+	padapter->HalFunc.SetHwRegHandler(padapter, HW_VAR_BSSID, pmlmeinfo->network.MacAddress);
+	join_type = 0;
+	padapter->HalFunc.SetHwRegHandler(padapter, HW_VAR_MLME_JOIN, (u8 *)(&join_type));
+
+	Set_NETYPE0_MSR(padapter, (pmlmeinfo->state & 0x3));
+
+	mlmeext_joinbss_event_callback(padapter, 1);
 	//restore Sequence No.
 	rtw_write8(padapter,0x4dc,padapter->xmitpriv.nqos_ssn);	
 }
@@ -169,12 +180,7 @@ void rtl8192c_silentreset_for_specific_platform(_adapter *padapter)
 		_restore_security_setting(padapter);	
 	}
 	
-	if(pmlmepriv->fw_state & _FW_UNDER_SURVEY)			
-		pmlmepriv->fw_state ^= _FW_UNDER_SURVEY;
-	
-	if(pmlmepriv->fw_state & _FW_UNDER_LINKING) 		
-		pmlmepriv->fw_state ^= _FW_UNDER_LINKING;
-	
+	_clr_fwstate_(pmlmepriv, _FW_UNDER_SURVEY | _FW_UNDER_LINKING);
 	
 	psrtpriv->silent_reset_inprogress = _FALSE;
 	_exit_critical_mutex(&psrtpriv->silentreset_mutex, &irqL);

@@ -546,10 +546,13 @@ struct 	dm_priv
 	u32	rf_saving_RegC70;
 	u32	rf_saving_Reg85C;
 	u32	rf_saving_RegA74;
-	
+
+	//for Antenna diversity
 #ifdef CONFIG_ANTENNA_DIVERSITY
-	_timer SwAntennaSwitchTimer;
 	SWAT_T DM_SWAT_Table;
+#endif	
+#ifdef CONFIG_SW_ANTENNA_DIVERSITY
+	_timer SwAntennaSwitchTimer;
 	
 	u64	lastTxOkCnt;
 	u64	lastRxOkCnt;
@@ -563,6 +566,7 @@ struct 	dm_priv
 
 	s32	OFDM_Pkt_Cnt;
 	u8	RSSI_Select;
+	u8 	DIG_Dynamic_MIN ;
 
 	// Add for Reading Initial Data Rate SEL Register 0x484 during watchdog. Using for fill tx desc. 2011.3.21 by Thomas
 	u8	INIDATA_RATE[32];
@@ -592,9 +596,11 @@ void rtl8192c_set_dm_bt_coexist(_adapter *padapter, u8 bStart);
 void rtl8192c_issue_delete_ba(_adapter *padapter, u8 dir);
 #endif
 
-#ifdef CONFIG_ANTENNA_DIVERSITY
+#ifdef CONFIG_SW_ANTENNA_DIVERSITY
 void SwAntDivRSSICheck8192C(_adapter *padapter ,u32 RxPWDBAll); 
 void SwAntDivRestAfterLink8192C(IN	PADAPTER Adapter);
+#endif
+#ifdef CONFIG_ANTENNA_DIVERSITY
 void	SwAntDivCompare8192C(PADAPTER Adapter, WLAN_BSSID_EX *dst, WLAN_BSSID_EX *src);
 u8 SwAntDivBeforeLink8192C(IN PADAPTER Adapter);
 #endif

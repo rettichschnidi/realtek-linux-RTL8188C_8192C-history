@@ -54,14 +54,22 @@
 #ifdef PLATFORM_OS_CE
 #define MAX_RECVBUF_SZ (8192+1024) // 8K+1k
 #else
-//#define MAX_RECVBUF_SZ (32768) // 32k
-//#define MAX_RECVBUF_SZ (16384) //16K
-//#define MAX_RECVBUF_SZ (10240) //10K
-#define MAX_RECVBUF_SZ (15360) // 15k < 16k
+	#ifndef CONFIG_MINIMAL_MEMORY_USAGE
+		//#define MAX_RECVBUF_SZ (32768) // 32k
+		//#define MAX_RECVBUF_SZ (16384) //16K
+		//#define MAX_RECVBUF_SZ (10240) //10K
+		#define MAX_RECVBUF_SZ (15360) // 15k < 16k
+	#else
+		#define MAX_RECVBUF_SZ (4000) // about 4K
+	#endif
 #endif
 
 #elif defined(CONFIG_PCI_HCI)
-#define MAX_RECVBUF_SZ (9100)
+#ifndef CONFIG_MINIMAL_MEMORY_USAGE
+	#define MAX_RECVBUF_SZ (9100)
+#else
+	#define MAX_RECVBUF_SZ (4000) // about 4K
+#endif
 
 #define RX_MPDU_QUEUE				0
 #define RX_CMD_QUEUE				1
@@ -107,13 +115,21 @@ typedef struct _Phy_OFDM_Rx_Status_Report_8192cd
 	unsigned char	sigevm;
 	unsigned char	max_ex_pwr;
 //#ifdef RTL8192SE
-#ifdef	_LITTLE_ENDIAN_
+#ifdef CONFIG_LITTLE_ENDIAN
 	unsigned char ex_intf_flg:1;
 	unsigned char sgi_en:1;
 	unsigned char rxsc:2;
-	unsigned char rsvd:4;
+	//unsigned char rsvd:4;
+	unsigned char idle_long:1;
+	unsigned char r_ant_train_en:1;
+	unsigned char ANTSELB:1;
+	unsigned char ANTSEL:1;	
 #else	// _BIG_ENDIAN_
-	unsigned char rsvd:4;
+	//unsigned char rsvd:4;
+	unsigned char ANTSEL:1;	
+	unsigned char ANTSELB:1;
+	unsigned char r_ant_train_en:1;
+	unsigned char idle_long:1;
 	unsigned char rxsc:2;
 	unsigned char sgi_en:1;
 	unsigned char ex_intf_flg:1;
@@ -122,7 +138,7 @@ typedef struct _Phy_OFDM_Rx_Status_Report_8192cd
 //	unsigned char	sgi_en;
 //	unsigned char	rxsc_sgien_exflg;
 //#endif
-} PHY_STS_OFDM_8192CD_T;
+}__attribute__ ((packed)) PHY_STS_OFDM_8192CD_T,PHY_RX_DRIVER_INFO_8192CD;
 
 typedef struct _Phy_CCK_Rx_Status_Report_8192cd
 {

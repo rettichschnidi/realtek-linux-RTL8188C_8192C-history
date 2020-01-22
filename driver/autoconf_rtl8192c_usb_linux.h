@@ -55,14 +55,22 @@
 #ifdef CONFIG_IPS
 //#define CONFIG_IPS_LEVEL_2	1
 #endif
+#define SUPPORT_HW_RFOFF_DETECTED	1
+
 #define CONFIG_LPS	1
 #define CONFIG_BT_COEXIST	1
-#define CONFIG_ANTENNA_DIVERSITY	1
-#define SUPPORT_HW_RFOFF_DETECTED	1
+//befor link
+#define CONFIG_ANTENNA_DIVERSITY	 	
+//after link
+#ifdef CONFIG_ANTENNA_DIVERSITY
+#define CONFIG_SW_ANTENNA_DIVERSITY	 
+//#define CONFIG_HW_ANTENNA_DIVERSITY	
+#endif
+
 #else
 #define CONFIG_MP_IWPRIV_SUPPORT	1
 #endif
-	
+
 #define CONFIG_AP_MODE	1
 #define CONFIG_NATIVEAP_MLME	1
 
@@ -81,19 +89,15 @@
 
 #define CONFIG_SKB_COPY	1//for amsdu
 
-#define MEM_ALLOC_REFINE // general, now applied on 8192c only
-#define MEM_ALLOC_REFINE_ADAPTOR //
-#define INDICATE_SCAN_COMPLETE_EVENT// general
 #define USB_INTERFERENCE_ISSUE // this should be checked in all usb interface
-#define WPA_SET_ENCRYPTION_REFINE // general
-#define STADEL_EVENT_REMOVE_SCANNED_ENTRY // general
-#define USE_ATOMIC_EVENT_SEQ // general
-#define HANDLE_JOINBSS_ON_ASSOC_RSP // general
+#define CONFIG_GLOBAL_UI_PID
 
-#define CONFIG_SIGNAL_PID_WHILE_DRV_INIT
-
+#define CONFIG_LAYER2_ROAMING
+#define CONFIG_LAYER2_ROAMING_RESUME
 //#define CONFIG_ADAPTOR_INFO_CACHING_FILE // now just applied on 8192cu only, should make it general...
 
+//#define CONFIG_RESUME_IN_WORKQUEUE
+//#define CONFIG_SET_SCAN_DENY_TIMER
 
 /*
  * Interface  Related Config
@@ -107,20 +111,22 @@
 
 #define CONFIG_PREALLOC_RECV_SKB	1
 #define CONFIG_REDUCE_USB_TX_INT	1
-#define CONFIG_EASY_REPLACEMENT	1
+//#define CONFIG_EASY_REPLACEMENT	1
 #ifndef CONFIG_WISTRON_PLATFORM
 #define CONFIG_DYNAMIC_ALLOCIATE_VENDOR_CMD	1
 #endif
 
-//#define CONFIG_USE_USB_BUFFER_ALLOC 1
+#ifdef CONFIG_PLATFORM_TI_DM365
+#define CONFIG_SPECIFIC_URB_NUM
+#endif
 
+//#define CONFIG_USE_USB_BUFFER_ALLOC 1
+#define CONFIG_USB_VENDOR_REQ_PREALLOC
+//#define CONFIG_USB_SUPPORT_ASYNC_VDN_REQ
 
 /*
  * HAL  Related Config
  */
-#define DBG	0
-
-#define CONFIG_DEBUG_RTL8192C		1
 
 #define RTL8192C_RX_PACKET_NO_INCLUDE_CRC	1
 
@@ -156,14 +162,35 @@
 
 
 /*
+ * Platform  Related Config
+ */
+#ifdef CONFIG_PLATFORM_MN10300
+#define CONFIG_SPECIAL_SETTING_FOR_FUNAI
+
+#if	defined (CONFIG_SW_ANTENNA_DIVERSITY)
+	#undef CONFIG_SW_ANTENNA_DIVERSITY
+	#define CONFIG_HW_ANTENNA_DIVERSITY
+#endif
+
+#endif
+
+
+
+/*
  * Debug  Related Config
  */
 //#define CONFIG_DEBUG_RTL871X
+
+#define DBG	0
+#define CONFIG_DEBUG_RTL819X
 
 #define CONFIG_PROC_DEBUG	1
 
 //#define DBG_TX
 //#define DBG_XMIT_BUF
+//#define DBG_TX_DROP_FRAME
 
 //#define DBG_MEM_ALLOC
+//#define DBG_RX_DROP_FRAME
+//#define DBG_RX_SEQ
 

@@ -62,6 +62,12 @@ void	rtw_led_init(_adapter *padapter)
 		padapter->HalFunc.InitSwLeds(padapter);
 }
 
+void rtw_led_deinit(_adapter *padapter)
+{
+	if(padapter->HalFunc.DeInitSwLeds)
+		padapter->HalFunc.DeInitSwLeds(padapter);
+}
+
 uint	 rtw_hal_init(_adapter *padapter) 
 {
 	uint	status = _SUCCESS;

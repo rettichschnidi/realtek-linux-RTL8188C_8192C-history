@@ -106,12 +106,12 @@ struct security_priv
 	u32	  dot11PrivacyAlgrthm;	// This specify the privacy for shared auth. algorithm.
 
 	/* WEP */
-	u32	  dot11PrivacyKeyIndex;	// this is only valid for legendary wep, 0~3 for key id.
+	u32	  dot11PrivacyKeyIndex;	// this is only valid for legendary wep, 0~3 for key id. (tx key index)
 	union Keytype dot11DefKey[4];			// this is only valid for def. key	
 	u32 	dot11DefKeylen[4];
 
 	u32 dot118021XGrpPrivacy;	// This specify the privacy algthm. used for Grp key 
-	u32	dot118021XGrpKeyid;		// key id used for Grp Key
+	u32	dot118021XGrpKeyid;		// key id used for Grp Key ( tx key index)
 	union Keytype	dot118021XGrpKey[4];	// 802.1x Group Key, for inx0 and inx1	
 	union Keytype	dot118021XGrptxmickey[4];
 	union Keytype	dot118021XGrprxmickey[4];

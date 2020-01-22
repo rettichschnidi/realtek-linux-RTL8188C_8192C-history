@@ -102,6 +102,9 @@ typedef enum _HAL_DEF_VARIABLE{
 	HAL_DEF_UNDERCORATEDSMOOTHEDPWDB,
 	HAL_DEF_IS_SUPPORT_ANT_DIV,
 	HAL_DEF_CURRENT_ANTENNA,
+	HAL_DEF_DRVINFO_SZ,
+	HAL_DEF_MAX_RECVBUF_SZ,
+	HAL_DEF_RX_PACKET_OFFSET,
 	HAL_DEF_DBG_DUMP_RXPKT,//for dbg
 	HAL_DEF_DBG_DM_FUNC,//for dbg
 	
@@ -247,14 +250,15 @@ typedef struct eeprom_priv EEPROM_EFUSE_PRIV, *PEEPROM_EFUSE_PRIV;
 
 void	rtw_dm_init(_adapter *padapter);
 void	rtw_led_init(_adapter *padapter);
+void	rtw_led_deinit(_adapter *padapter);
 
-uint rtw_hal_init(_adapter *padapter);
-uint rtw_hal_deinit(_adapter *padapter);
-void rtw_hal_stop(_adapter *padapter);
+uint	rtw_hal_init(_adapter *padapter);
+uint	rtw_hal_deinit(_adapter *padapter);
+void	rtw_hal_stop(_adapter *padapter);
 
-void intf_chip_configure(_adapter *padapter);
-void intf_read_chip_info(_adapter *padapter);
-void intf_read_chip_version(_adapter *padapter);
+void	intf_chip_configure(_adapter *padapter);
+void	intf_read_chip_info(_adapter *padapter);
+void	intf_read_chip_version(_adapter *padapter);
 #ifdef SILENT_RESET_FOR_SPECIFIC_PLATFOM
 void	rtw_sreset_init(_adapter *padapter);
 #endif

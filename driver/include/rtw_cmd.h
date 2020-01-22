@@ -69,6 +69,7 @@
 		u32	cmd_issued_cnt;
 		u32	cmd_done_cnt;
 		u32	rsp_cnt;
+		u8 cmdthd_running;
 		_adapter *padapter;
 	};
 
@@ -95,11 +96,7 @@
 		u8	lbkevt_num;
 		u8	*cmdevt_parm;		
 #endif
-		#ifdef USE_ATOMIC_EVENT_SEQ
 		ATOMIC_T event_seq;
-		#else
-		u8	event_seq;
-		#endif
 		u8	*evt_buf;	//shall be non-paged, and 4 bytes aligned		
 		u8	*evt_allocated_buf;
 		u32	evt_done_cnt;
@@ -303,6 +300,7 @@ struct setkey_parm {
 	u8	algorithm;	// encryption algorithm, could be none, wep40, TKIP, CCMP, wep104
 	u8	keyid;		
 	u8 	grpkey;		// 1: this is the grpkey for 802.1x. 0: this is the unicast key for 802.1x
+	u8 	set_tx;		// 1: main tx key for wep. 0: other key.
 	u8	key[16];	// this could be 40 or 104
 };
 
@@ -854,6 +852,19 @@ struct SwitchBandwidth_parm
 
 #endif	/* MP_FIRMWARE_OFFLOAD */
 
+/*H2C Handler index: 59 */ 
+struct SetChannelPlan_param
+{
+	u8 channel_plan;
+};
+
+/*H2C Handler index: 60 */ 
+struct rereg_nd_name_param
+{
+	void *pnetdev;
+	//char ifname[IFNAMSIZ];
+};
+
 #define GEN_CMD_CODE(cmd)	cmd ## _CMD_
 
 
@@ -914,6 +925,9 @@ extern  u8 rtw_antenna_select_cmd(_adapter*padapter, u8 antenna,u8 enqueue);
 #endif
 
 extern u8 rtw_ps_cmd(_adapter*padapter);
+
+extern u8 rtw_set_chplan_cmd(_adapter*padapter, u8 chplan);
+extern u8 rtw_rereg_nd_name_cmd(_adapter*padapter, void *old_pnetdev);
 
 u8 rtw_drvextra_cmd_hdl(_adapter *padapter, unsigned char *pbuf);
 
@@ -1002,6 +1016,9 @@ enum rtw_h2c_cmd
 	GEN_CMD_CODE(_Set_Drv_Extra), /*57*/
 	GEN_CMD_CODE(_Set_H2C_MSG), /*58*/
 	
+	GEN_CMD_CODE(_SetChannelPlan), /*59*/
+	GEN_CMD_CODE(_ReRegNdName), /*60*/
+	
 	MAX_H2CCMD
 };
 
@@ -1078,6 +1095,8 @@ struct _cmd_callback 	rtw_cmd_callback[] =
 	{GEN_CMD_CODE(_Set_MLME_EVT), NULL},/*56*/
 	{GEN_CMD_CODE(_Set_Drv_Extra), NULL},/*57*/
 	{GEN_CMD_CODE(_Set_H2C_MSG), NULL},/*58*/
+	{GEN_CMD_CODE(_SetChannelPlan), NULL},/*59*/
+	{GEN_CMD_CODE(_ReRegNdName), NULL},/*60*/
 };
 #endif
 

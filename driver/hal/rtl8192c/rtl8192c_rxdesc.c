@@ -209,9 +209,14 @@ void rtl8192c_query_rx_phy_status(union recv_frame *prframe, struct phy_stat *pp
 	_adapter				*padapter = prframe->u.hdr.adapter;
 	struct rx_pkt_attrib	*pattrib = &prframe->u.hdr.attrib;
 	HAL_DATA_TYPE		*pHalData = GET_HAL_DATA(padapter);
+	struct dm_priv		*pdmpriv = &pHalData->dmpriv;
 	u8	tmp_rxsnr;
 	s8	rx_snrX;
 
+#ifdef CONFIG_HW_ANTENNA_DIVERSITY
+	PHY_RX_DRIVER_INFO_8192CD *pDrvInfo = ((PHY_RX_DRIVER_INFO_8192CD *)pphy_stat);
+	u8 	bant1_sel = (pDrvInfo->ANTSEL == 1)?_TRUE:_FALSE;	
+#endif
 
 	// Record it for next packet processing
 	bcck_rate=(pattrib->mcs_rate<=3? 1:0);
@@ -219,6 +224,12 @@ void rtl8192c_query_rx_phy_status(union recv_frame *prframe, struct phy_stat *pp
 	if(bcck_rate) //CCK
 	{
 		u8 report;
+#ifdef CONFIG_HW_ANTENNA_DIVERSITY		
+		if(bant1_sel == _TRUE)
+			pHalData->CCK_Ant1_Cnt++;
+		else
+			pHalData->CCK_Ant2_Cnt++;
+#endif		
 
 		// CCK Driver info Structure is not the same as OFDM packet.
 		pCck_buf = (PHY_STS_CCK_8192CD_T *)pphy_stat;
@@ -351,6 +362,14 @@ void rtl8192c_query_rx_phy_status(union recv_frame *prframe, struct phy_stat *pp
 	}
 	else //OFDM/HT
 	{
+#ifdef CONFIG_HW_ANTENNA_DIVERSITY	
+		if(bant1_sel == _TRUE)
+			pHalData->OFDM_Ant1_Cnt++;
+		else
+			pHalData->OFDM_Ant2_Cnt++;
+#endif
+		pdmpriv->OFDM_Pkt_Cnt++;
+
 		pOfdm_buf = (PHY_STS_OFDM_8192CD_T *)pphy_stat;
 	
 		//
@@ -663,7 +682,7 @@ void rtl8192c_process_phy_info(_adapter *padapter, void *prframe)
 {
 	union recv_frame *precvframe = (union recv_frame *)prframe;
 
-#ifdef CONFIG_ANTENNA_DIVERSITY
+#ifdef CONFIG_SW_ANTENNA_DIVERSITY
 	// If we switch to the antenna for testing, the signal strength 
 	// of the packets in this time shall not be counted into total receiving power. 
 	// This prevents error counting Rx signal strength and affecting other dynamic mechanism.

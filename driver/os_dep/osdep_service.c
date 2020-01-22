@@ -27,6 +27,11 @@
 #include <recv_osdep.h>
 #include <linux/vmalloc.h>
 
+#ifdef RTK_DMP_PLATFORM
+#if (LINUX_VERSION_CODE > KERNEL_VERSION(2,6,12))
+#include <linux/pageremap.h>
+#endif
+#endif
 
 #define RT_TAG	'1178'
 
@@ -43,7 +48,7 @@ inline u8* _rtw_vmalloc(u32 sz)
 {
 	u8 	*pbuf;
 #ifdef PLATFORM_LINUX	
-	pbuf = vmalloc(sz);	
+	pbuf = vmalloc(sz);
 #endif	
 	
 #ifdef PLATFORM_WINDOWS
@@ -596,6 +601,26 @@ void	_rtw_mutex_init(_mutex *pmutex)
 }
 
 
+void	_rtw_mutex_free(_mutex *pmutex)
+{
+#ifdef PLATFORM_LINUX
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37))
+	mutex_destroy(pmutex);
+#else	
+#endif
+
+#endif
+
+#ifdef PLATFORM_OS_XP
+
+#endif
+
+#ifdef PLATFORM_OS_CE
+
+#endif
+}
+
 void	_rtw_spinlock_init(_lock *plock)
 {
 
@@ -837,6 +862,42 @@ void rtw_usleep_os(int us)
 
 }
 
+
+#ifdef DBG_DELAY_OS
+void _rtw_mdelay_os(int ms, const char *func, const int line)
+{
+
+	DBG_871X("%s:%d %s(%d)\n", func, line, __FUNCTION__, ms);
+
+#if defined(PLATFORM_LINUX)
+
+   	mdelay((unsigned long)ms); 
+
+#elif defined(PLATFORM_WINDOWS)
+
+	NdisStallExecution(ms*1000); //(us)*1000=(ms)
+
+#endif
+
+
+}
+void _rtw_udelay_os(int us, const char *func, const int line)
+{
+
+	DBG_871X("%s:%d %s(%d)\n", func, line, __FUNCTION__, us);
+	
+#if defined(PLATFORM_LINUX)
+
+      udelay((unsigned long)us); 
+
+#elif defined(PLATFORM_WINDOWS)
+
+	NdisStallExecution(us); //(us)
+
+#endif
+
+}
+#else
 void rtw_mdelay_os(int ms)
 {
 
@@ -870,6 +931,7 @@ void rtw_udelay_os(int us)
 #endif
 
 }
+#endif
 
 #define RTW_SUSPEND_LOCK_NAME "rtw_wifi"
 
@@ -1105,8 +1167,25 @@ int writeFile(struct file *fp,char *buf,int len)
 }
 #endif
 
-#ifdef MEM_ALLOC_REFINE_ADAPTOR
+#if 1 //#ifdef MEM_ALLOC_REFINE_ADAPTOR
 #ifdef PLATFORM_LINUX
+struct net_device *rtw_alloc_etherdev_with_old_priv(int sizeof_priv, void *old_priv)
+{
+	struct net_device *pnetdev;
+	struct rtw_netdev_priv_indicator *pnpi;
+	
+	pnetdev = alloc_etherdev(sizeof(struct rtw_netdev_priv_indicator));
+	if (!pnetdev)
+		goto RETURN;
+	
+	pnpi = netdev_priv(pnetdev);
+	pnpi->priv=old_priv;
+	pnpi->sizeof_priv=sizeof_priv;
+
+RETURN:
+	return pnetdev;
+}
+
 struct net_device *rtw_alloc_etherdev(int sizeof_priv)
 {
 	struct net_device *pnetdev;
@@ -1148,6 +1227,98 @@ void rtw_free_netdev(struct net_device * netdev)
 RETURN:
 	return;
 }
+
+/*
+* Jeff: this function should be called under ioctl (rtnl_lock is accquired) while 
+* LINUX_VERSION_CODE < KERNEL_VERSION(2,6,26)
+*/
+int rtw_change_ifname(_adapter *padapter, const char *ifname)
+{
+	struct net_device *pnetdev;
+	struct net_device *old_pnetdev = padapter->pnetdev;
+	int ret;
+
+	if(!padapter)
+		goto error;
+	
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,26))
+	if(!rtnl_is_locked())
+		unregister_netdev(old_pnetdev);
+	else
+#endif
+		unregister_netdevice(old_pnetdev);
+
+	rtw_proc_remove_one(old_pnetdev);
+
+	pnetdev = rtw_init_netdev(padapter);
+	if (!pnetdev)  {
+		ret = -1;
+		goto error;
+	}
+
+#ifdef CONFIG_USB_HCI
+
+	SET_NETDEV_DEV(pnetdev, &padapter->dvobjpriv.pusbintf->dev);
+
+	usb_set_intfdata(padapter->dvobjpriv.pusbintf, pnetdev);
+
+#elif defined(CONFIG_PCI_HCI)
+
+#if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,0)
+	SET_NETDEV_DEV(pnetdev, &padapter->dvobjpriv.ppcidev->dev);
+#endif
+
+	pci_set_drvdata(padapter->dvobjpriv.ppcidev, pnetdev);
+
+#endif
+
+	rtw_init_netdev_name(pnetdev, ifname);
+
+	_rtw_memcpy(pnetdev->dev_addr, padapter->eeprompriv.mac_addr, ETH_ALEN);
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,26))
+	if(!rtnl_is_locked())
+		ret = register_netdev(pnetdev);
+	else
+#endif
+		ret = register_netdevice(pnetdev);
+
+	if ( ret != 0) {
+		RT_TRACE(_module_hci_intfs_c_,_drv_err_,("register_netdev() failed\n"));
+		goto error;
+	}
+
+	rtw_proc_init_one(pnetdev);
+
+
+	//do free_netdev outside	
+		
+	return 0;
+
+error:
+	
+	return -1;
+	
+}
 #endif
 #endif //MEM_ALLOC_REFINE_ADAPTOR
+
+u64 rtw_modular64(u64 x, u64 y)
+{
+#ifdef PLATFORM_LINUX
+	return do_div(x, y);
+#elif defined(PLATFORM_WINDOWS)
+	return (x % y);
+#endif
+}
+
+u64 rtw_division64(u64 x, u64 y)
+{
+#ifdef PLATFORM_LINUX
+	do_div(x, y);
+	return x;
+#elif defined(PLATFORM_WINDOWS)
+	return (x / y);
+#endif
+}
 

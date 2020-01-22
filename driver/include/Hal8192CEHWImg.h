@@ -22,14 +22,13 @@
 
 #include <basic_types.h>
 
-/*Created on  2011/ 1/13, 17: 3*/
+/*Created on  2011/ 6/15,  5:45*/
 
-#define TSMCImgArrayLength 16226
+#define TSMCImgArrayLength 14964 //v75 2011-06-15
 extern u8 Rtl8192CEFwTSMCImgArray[TSMCImgArrayLength];
-#define UMCImgArrayLength 16226
-#define UMCACutImgArrayLength UMCImgArrayLength
-extern u8 Rtl8192CEFwUMCImgArray[UMCImgArrayLength];
-#define UMCBCutImgArrayLength 16206
+#define UMCACutImgArrayLength 14964 //v75 2011-06-15
+extern u8 Rtl8192CEFwUMCACutImgArray[UMCACutImgArrayLength];
+#define UMCBCutImgArrayLength 14946 //v75 2011-06-15
 extern u8 Rtl8192CEFwUMCBCutImgArray[UMCBCutImgArrayLength];
 #define PHY_REG_2TArrayLength 374
 extern u32 Rtl8192CEPHY_REG_2TArray[PHY_REG_2TArrayLength];

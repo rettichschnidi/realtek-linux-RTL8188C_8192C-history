@@ -93,11 +93,7 @@ _func_enter_;
 #endif		
 	
 	//allocate DMA-able/Non-Page memory for cmd_buf and rsp_buf
-	#ifdef USE_ATOMIC_EVENT_SEQ
 	ATOMIC_SET(&pevtpriv->event_seq, 0);
-	#else
-	pevtpriv->event_seq = 0;
-	#endif
 	pevtpriv->evt_done_cnt = 0;
 
 #ifdef CONFIG_EVENT_THREAD_MODE
@@ -327,23 +323,26 @@ _func_exit_;
 
 u32 rtw_enqueue_cmd(struct cmd_priv *pcmdpriv, struct cmd_obj *obj)
 {
-	int	res;
+	int	res = _FAIL;
 	
 _func_enter_;	
 
-	if (obj == NULL)
-		return _FAIL;
+	if (obj == NULL) {
+		goto exit;
+	}
 
-	if(pcmdpriv->padapter->hw_init_completed==_FALSE)		
+	if(pcmdpriv->padapter->hw_init_completed==_FALSE
+		|| pcmdpriv->cmdthd_running== _FALSE
+	)		
 	{
 		rtw_free_cmd_obj(obj);
-		return _FAIL;
+		goto exit;
 	}	
 		
 	res = _rtw_enqueue_cmd_ex(&pcmdpriv->cmd_queue, obj);
 
 	_rtw_up_sema(&pcmdpriv->cmd_queue_sema);
-	
+exit:
 _func_exit_;	
 
 	return res;	
@@ -457,6 +456,7 @@ _func_enter_;
 	pcmdbuf = pcmdpriv->cmd_buf;
 	prspbuf = pcmdpriv->rsp_buf;
 
+	pcmdpriv->cmdthd_running=_TRUE;
 	RT_TRACE(_module_rtl871x_cmd_c_,_drv_info_,("start r871x rtw_cmd_thread !!!!\n"));
 
 	while(1)
@@ -523,6 +523,8 @@ _next:
 		goto _next;
 
 	}
+	pcmdpriv->cmdthd_running=_FALSE;
+
 
 	// free all cmd_obj resources
 	do{
@@ -649,7 +651,7 @@ _func_enter_;
 
 	init_h2fwcmd_w_parm_no_rsp(ph2c, psetusbsuspend, GEN_CMD_CODE(_SetUsbSuspend));
 
-	rtw_enqueue_cmd(pcmdpriv, ph2c);	
+	ret = rtw_enqueue_cmd(pcmdpriv, ph2c);	
 	
 exit:	
 	
@@ -665,6 +667,7 @@ rtw_sitesurvey_cmd(~)
 */
 u8 rtw_sitesurvey_cmd(_adapter  *padapter, NDIS_802_11_SSID *pssid)
 {
+	u8 res = _FAIL;
 	struct cmd_obj		*ph2c;
 	struct sitesurvey_parm	*psurveyPara;
 	struct cmd_priv 	*pcmdpriv = &padapter->cmdpriv;
@@ -723,17 +726,24 @@ _func_enter_;
 
 	set_fwstate(pmlmepriv, _FW_UNDER_SURVEY);
 
-	rtw_enqueue_cmd(pcmdpriv, ph2c);
+	res = rtw_enqueue_cmd(pcmdpriv, ph2c);
 
-	_set_timer(&pmlmepriv->scan_to_timer, SCANNING_TIMEOUT);
+	if(res == _SUCCESS) {
 
-	padapter->ledpriv.LedControlHandler(padapter, LED_CTL_SITE_SURVEY);
+		pmlmepriv->scan_start_time = rtw_get_current_time();
 
-	pmlmepriv->scan_interval = SCAN_INTERVAL;// 30*2 sec = 60sec
+		_set_timer(&pmlmepriv->scan_to_timer, SCANNING_TIMEOUT);
+
+		padapter->ledpriv.LedControlHandler(padapter, LED_CTL_SITE_SURVEY);
+
+		pmlmepriv->scan_interval = SCAN_INTERVAL;// 30*2 sec = 60sec
+	} else {
+		_clr_fwstate_(pmlmepriv, _FW_UNDER_SURVEY);
+	}
 
 _func_exit_;		
 
-	return _SUCCESS;
+	return res;
 }
 
 u8 rtw_setdatarate_cmd(_adapter *padapter, u8 *rateset)
@@ -766,7 +776,7 @@ _func_enter_;
 	pbsetdataratepara->mac_id = 5;
 	_rtw_memcpy(pbsetdataratepara->datarates, rateset, NumRates);
 #endif
-	rtw_enqueue_cmd(pcmdpriv, ph2c);
+	res = rtw_enqueue_cmd(pcmdpriv, ph2c);
 exit:
 
 _func_exit_;
@@ -800,7 +810,7 @@ _func_enter_;
 
 	_rtw_memcpy(pssetbasicratepara->basicrates, rateset, NumRates);	   
 
-	rtw_enqueue_cmd(pcmdpriv, ph2c);	
+	res = rtw_enqueue_cmd(pcmdpriv, ph2c);	
 exit:	
 
 _func_exit_;		
@@ -847,7 +857,7 @@ _func_enter_;
 	psetphypara->modem = modem;
 	psetphypara->rfchannel = ch;
 
-	rtw_enqueue_cmd(pcmdpriv, ph2c);	
+	res = rtw_enqueue_cmd(pcmdpriv, ph2c);	
 exit:	
 _func_exit_;		
 	return res;
@@ -878,7 +888,7 @@ _func_enter_;
 	pwritebbparm->offset = offset;
 	pwritebbparm->value = val;
 
-	rtw_enqueue_cmd(pcmdpriv, ph2c);	
+	res = rtw_enqueue_cmd(pcmdpriv, ph2c);	
 exit:	
 _func_exit_;	
 	return res;
@@ -913,7 +923,7 @@ _func_enter_;
 	
 	prdbbparm ->offset = offset;
 	
-	rtw_enqueue_cmd(pcmdpriv, ph2c);	
+	res = rtw_enqueue_cmd(pcmdpriv, ph2c);	
 exit:
 _func_exit_;	
 	return res;
@@ -944,7 +954,7 @@ _func_enter_;
 	pwriterfparm->offset = offset;
 	pwriterfparm->value = val;
 
-	rtw_enqueue_cmd(pcmdpriv, ph2c);	
+	res = rtw_enqueue_cmd(pcmdpriv, ph2c);	
 exit:
 _func_exit_;	
 	return res;
@@ -981,7 +991,7 @@ _func_enter_;
 	
 	prdrfparm ->offset = offset;
 	
-	rtw_enqueue_cmd(pcmdpriv, ph2c);	
+	res = rtw_enqueue_cmd(pcmdpriv, ph2c);	
 
 exit:
 
@@ -1058,7 +1068,7 @@ _func_enter_;
 	pdev_network->Ssid.SsidLength = cpu_to_le32(pdev_network->Ssid.SsidLength);
 #endif
 
-	rtw_enqueue_cmd(pcmdpriv, pcmd);	
+	res = rtw_enqueue_cmd(pcmdpriv, pcmd);	
 
 exit:
 
@@ -1088,7 +1098,7 @@ _func_enter_;
 	pcmd->rsp = NULL;
 	pcmd->rspsz = 0;
 
-	rtw_enqueue_cmd(pcmdpriv, pcmd);
+	res = rtw_enqueue_cmd(pcmdpriv, pcmd);
 
 exit:
 	
@@ -1137,28 +1147,28 @@ _func_enter_;
 	*/
 	//for IEs is fix buf size
 	t_len = sizeof(WLAN_BSSID_EX);
-			
-	
+
+
 	//for hidden ap to set fw_state here
 	if (check_fwstate(pmlmepriv, WIFI_STATION_STATE|WIFI_ADHOC_STATE) != _TRUE)
 	{
 		switch(ndis_network_mode)
 		{
 			case Ndis802_11IBSS:
-				pmlmepriv->fw_state |=WIFI_ADHOC_STATE;
+				set_fwstate(pmlmepriv, WIFI_ADHOC_STATE);
 				break;
-				
+
 			case Ndis802_11Infrastructure:
-				pmlmepriv->fw_state |= WIFI_STATION_STATE;
+				set_fwstate(pmlmepriv, WIFI_STATION_STATE);
 				break;
-				
-			case Ndis802_11APMode:	
+
+			case Ndis802_11APMode:
 			case Ndis802_11AutoUnknown:
 			case Ndis802_11InfrastructureMax:
 				break;
-                        				
+
 		}
-	}	
+	}
 
 	psecnetwork=(WLAN_BSSID_EX *)&psecuritypriv->sec_bss;
 	if(psecnetwork==NULL)
@@ -1187,15 +1197,15 @@ _func_enter_;
 	}
 	  
 	psecnetwork->IELength = 0;
-        // Added by Albert 2009/02/18
-        // If the the driver wants to use the bssid to create the connection.
-        // If not,  we have to copy the connecting AP's MAC address to it so that
-        // the driver just has the bssid information for PMKIDList searching.
+	// Added by Albert 2009/02/18
+	// If the the driver wants to use the bssid to create the connection.
+	// If not,  we have to copy the connecting AP's MAC address to it so that
+	// the driver just has the bssid information for PMKIDList searching.
         
-        if ( pmlmepriv->assoc_by_bssid == _FALSE )
-        {
-            _rtw_memcpy( &pmlmepriv->assoc_bssid[ 0 ], &pnetwork->network.MacAddress[ 0 ], ETH_ALEN );
-        }
+	if ( pmlmepriv->assoc_by_bssid == _FALSE )
+	{
+		_rtw_memcpy( &pmlmepriv->assoc_bssid[ 0 ], &pnetwork->network.MacAddress[ 0 ], ETH_ALEN );
+	}
 
 	psecnetwork->IELength = rtw_restruct_sec_ie(padapter, &pnetwork->network.IEs[0], &psecnetwork->IEs[0], pnetwork->network.IELength);
 
@@ -1276,7 +1286,7 @@ _func_enter_;
 	pcmd->rsp = NULL;
 	pcmd->rspsz = 0;
 
-	rtw_enqueue_cmd(pcmdpriv, pcmd);
+	res = rtw_enqueue_cmd(pcmdpriv, pcmd);
 
 exit:
 	
@@ -1314,7 +1324,7 @@ _func_enter_;
 		}
 		
 		init_h2fwcmd_w_parm_no_rsp(pdisconnect_cmd, pdisconnect, _DisConnect_CMD_);
-		rtw_enqueue_cmd(pcmdpriv, pdisconnect_cmd);
+		res = rtw_enqueue_cmd(pcmdpriv, pdisconnect_cmd);
 	//}
 	
 exit:
@@ -1350,7 +1360,7 @@ _func_enter_;
 	init_h2fwcmd_w_parm_no_rsp(ph2c, psetop, _SetOpMode_CMD_);
 	psetop->mode = (u8)networktype;
 
-	rtw_enqueue_cmd(pcmdpriv, ph2c);
+	res = rtw_enqueue_cmd(pcmdpriv, ph2c);
 
 exit:
 
@@ -1419,10 +1429,13 @@ _func_enter_;
 #endif
 			_rtw_memcpy(&psetstakey_para->key, &sta->dot118021x_UncstKey, 16);
         } else {
-		_rtw_memcpy(&psetstakey_para->key, &psecuritypriv->dot118021XGrpKey[psecuritypriv->dot118021XGrpKeyid-1].skey, 16);
+		_rtw_memcpy(&psetstakey_para->key, &psecuritypriv->dot118021XGrpKey[psecuritypriv->dot118021XGrpKeyid].skey, 16);
         }
 
-	rtw_enqueue_cmd(pcmdpriv, ph2c);	
+	//jeff: set this becasue at least sw key is ready
+	padapter->securitypriv.busetkipkey=_TRUE;
+
+	res = rtw_enqueue_cmd(pcmdpriv, ph2c);	
 
 exit:
 
@@ -1456,7 +1469,7 @@ _func_enter_;
 
 	_rtw_memcpy(psetrttblparm,prate_table,sizeof(struct setratable_parm));
 
-	rtw_enqueue_cmd(pcmdpriv, ph2c);	
+	res = rtw_enqueue_cmd(pcmdpriv, ph2c);	
 exit:
 _func_exit_;	
 	return res;
@@ -1495,7 +1508,7 @@ _func_enter_;
 	
 	pgetrttblparm ->rsvd = 0x0;
 	
-	rtw_enqueue_cmd(pcmdpriv, ph2c);	
+	res = rtw_enqueue_cmd(pcmdpriv, ph2c);	
 exit:
 _func_exit_;	
 	return res;
@@ -1539,7 +1552,7 @@ _func_enter_;
 
 	_rtw_memcpy(psetassocsta_para->addr, mac_addr,ETH_ALEN);
 	
-	rtw_enqueue_cmd(pcmdpriv, ph2c);	
+	res = rtw_enqueue_cmd(pcmdpriv, ph2c);	
 
 exit:
 
@@ -1579,7 +1592,7 @@ _func_enter_;
 	//DBG_8192C("rtw_addbareq_cmd, tid=%d\n", tid);
 
 	//rtw_enqueue_cmd(pcmdpriv, ph2c);	
-	rtw_enqueue_cmd_ex(pcmdpriv, ph2c);
+	res = rtw_enqueue_cmd_ex(pcmdpriv, ph2c);
 	
 exit:
 	
@@ -1618,7 +1631,7 @@ _func_enter_;
 
 	
 	//rtw_enqueue_cmd(pcmdpriv, ph2c);	
-	rtw_enqueue_cmd_ex(pcmdpriv, ph2c);
+	res = rtw_enqueue_cmd_ex(pcmdpriv, ph2c);
 	
 exit:
 	
@@ -1626,6 +1639,82 @@ _func_exit_;
 
 	return res;
 
+}
+
+u8 rtw_set_chplan_cmd(_adapter*padapter, u8 chplan)
+{
+	struct	cmd_obj*	pcmdobj;
+	struct	SetChannelPlan_param *setChannelPlan_param;
+	struct 	mlme_priv *pmlmepriv = &padapter->mlmepriv;
+	struct	cmd_priv   *pcmdpriv = &padapter->cmdpriv;
+
+	u8	res=_SUCCESS;
+
+_func_enter_;
+
+	RT_TRACE(_module_rtl871x_cmd_c_, _drv_notice_, ("+rtw_set_chplan_cmd\n"));
+	
+	pcmdobj = (struct	cmd_obj*)rtw_zmalloc(sizeof(struct	cmd_obj));
+	if(pcmdobj == NULL){
+		res=_FAIL;
+		goto exit;
+	}
+
+	setChannelPlan_param = (struct	SetChannelPlan_param *)rtw_zmalloc(sizeof(struct	SetChannelPlan_param));
+	if(setChannelPlan_param == NULL) {
+		rtw_mfree((u8 *)pcmdobj, sizeof(struct cmd_obj));
+		res= _FAIL;
+		goto exit;
+	}
+
+	setChannelPlan_param->channel_plan=chplan;
+	
+	init_h2fwcmd_w_parm_no_rsp(pcmdobj, setChannelPlan_param, GEN_CMD_CODE(_SetChannelPlan));
+	res = rtw_enqueue_cmd(pcmdpriv, pcmdobj);
+	
+exit:
+
+_func_exit_;	
+
+	return res;
+}
+
+u8 rtw_rereg_nd_name_cmd(_adapter*padapter, void *old_pnetdev)
+{
+	struct	cmd_obj*	pcmdobj;
+	struct	rereg_nd_name_param* prereg_nd_name_param;
+	struct 	mlme_priv *pmlmepriv = &padapter->mlmepriv;
+	struct	cmd_priv   *pcmdpriv = &padapter->cmdpriv;
+
+	u8	res=_SUCCESS;
+
+_func_enter_;
+
+	RT_TRACE(_module_rtl871x_cmd_c_, _drv_notice_, ("+rtw_rereg_nd_name_cmd\n"));
+	
+	pcmdobj = (struct	cmd_obj*)rtw_zmalloc(sizeof(struct	cmd_obj));
+	if(pcmdobj == NULL){
+		res=_FAIL;
+		goto exit;
+	}
+
+	prereg_nd_name_param = (struct rereg_nd_name_param *)rtw_zmalloc(sizeof(struct rereg_nd_name_param));
+	if(prereg_nd_name_param == NULL) {
+		rtw_mfree((u8 *)pcmdobj, sizeof(struct cmd_obj));
+		res= _FAIL;
+		goto exit;
+	}
+
+	prereg_nd_name_param->pnetdev=old_pnetdev;
+	
+	init_h2fwcmd_w_parm_no_rsp(pcmdobj, prereg_nd_name_param, GEN_CMD_CODE(_ReRegNdName));
+	res = rtw_enqueue_cmd(pcmdpriv, pcmdobj);
+	
+exit:
+
+_func_exit_;	
+
+	return res;
 }
 
 static void traffic_status_watchdog(_adapter *padapter)
@@ -1821,7 +1910,7 @@ _func_enter_;
 
 		init_h2fwcmd_w_parm_no_rsp(ph2c, pdrvextra_cmd_parm, GEN_CMD_CODE(_Set_Drv_Extra));
 
-		rtw_enqueue_cmd_ex(pcmdpriv, ph2c);
+		res = rtw_enqueue_cmd_ex(pcmdpriv, ph2c);
 	}
 	else
 	{
@@ -1876,7 +1965,7 @@ _func_enter_;
 		pdrvextra_cmd_parm->pbuf = NULL;
 		init_h2fwcmd_w_parm_no_rsp(ph2c, pdrvextra_cmd_parm, GEN_CMD_CODE(_Set_Drv_Extra));
 
-		rtw_enqueue_cmd_ex(pcmdpriv, ph2c);
+		res = rtw_enqueue_cmd_ex(pcmdpriv, ph2c);
 	}
 	else{
 		antenna_select_wk_hdl(padapter,antenna );
@@ -1922,7 +2011,7 @@ _func_enter_;
 	DBG_8192C("==> %s  , enqueue CMD \n",__FUNCTION__);	
 	init_h2fwcmd_w_parm_no_rsp(ppscmd, pdrvextra_cmd_parm, GEN_CMD_CODE(_Set_Drv_Extra));
 
-	rtw_enqueue_cmd_ex(pcmdpriv, ppscmd);
+	res = rtw_enqueue_cmd_ex(pcmdpriv, ppscmd);
 	
 exit:
 	
@@ -2083,7 +2172,7 @@ _func_enter_;
 	_enter_critical_bh(&pmlmepriv->lock, &irqL);
 	
 	
-	if((pmlmepriv->fw_state) & WIFI_AP_STATE)
+	if(check_fwstate(pmlmepriv, WIFI_AP_STATE) )
 	{
 		psta = rtw_get_stainfo(&padapter->stapriv, pnetwork->MacAddress);
 		if(!psta)
@@ -2128,10 +2217,8 @@ _func_enter_;
 
 		// reset DSConfig
 		//tgt_network->network.Configuration.DSConfig = (u32)rtw_ch2freq(pnetwork->Configuration.DSConfig);
-		
 
-		if(pmlmepriv->fw_state & _FW_UNDER_LINKING)
-		    pmlmepriv->fw_state ^= _FW_UNDER_LINKING;
+		_clr_fwstate_(pmlmepriv, _FW_UNDER_LINKING);
 
 #if 0		
 		if((pmlmepriv->fw_state) & WIFI_AP_STATE)
@@ -2212,8 +2299,8 @@ _func_enter_;
 
 	_enter_critical_bh(&pmlmepriv->lock, &irqL);
 
-       if ((check_fwstate(pmlmepriv, WIFI_MP_STATE) == _TRUE) && (check_fwstate(pmlmepriv, _FW_UNDER_LINKING) == _TRUE))           	
-     	   pmlmepriv->fw_state ^= _FW_UNDER_LINKING;         
+	if ((check_fwstate(pmlmepriv, WIFI_MP_STATE) == _TRUE) && (check_fwstate(pmlmepriv, _FW_UNDER_LINKING) == _TRUE))           	
+		_clr_fwstate_(pmlmepriv, _FW_UNDER_LINKING);
 
        set_fwstate(pmlmepriv, _FW_LINKED);       	   
 	_exit_critical_bh(&pmlmepriv->lock, &irqL);

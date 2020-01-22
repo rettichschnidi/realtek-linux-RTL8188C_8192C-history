@@ -92,11 +92,7 @@ u32	_rtw_init_sta_priv(struct	sta_priv *pstapriv)
 	
 _func_enter_;	
 
-	#ifdef MEM_ALLOC_REFINE
 	pstapriv->pallocated_stainfo_buf = rtw_zvmalloc (sizeof(struct sta_info) * NUM_STA+ 4);
-	#else
-	pstapriv->pallocated_stainfo_buf = rtw_zmalloc (sizeof(struct sta_info) * NUM_STA+ 4);
-	#endif
 	
 	if(!pstapriv->pallocated_stainfo_buf)
 		return _FAIL;
@@ -235,11 +231,7 @@ _func_enter_;
 		rtw_mfree_sta_priv_lock(pstapriv);
 
 		if(pstapriv->pallocated_stainfo_buf) {
-			#ifdef MEM_ALLOC_REFINE
 			rtw_vmfree(pstapriv->pallocated_stainfo_buf, sizeof(struct sta_info)*NUM_STA+4);
-			#else
-			rtw_mfree(pstapriv->pallocated_stainfo_buf, sizeof(struct sta_info)*NUM_STA+4);
-			#endif
 		}
 	}
 	
@@ -338,6 +330,10 @@ _func_enter_;
 			preorder_ctrl->enable = _FALSE;
 		
 			preorder_ctrl->indicate_seq = 0xffff;
+			#ifdef DBG_RX_SEQ
+			DBG_871X("DBG_RX_SEQ %s:%d IndicateSeq: %d\n", __FUNCTION__, __LINE__,
+				preorder_ctrl->indicate_seq);
+			#endif
 			preorder_ctrl->wend_b= 0xffff;       
 			//preorder_ctrl->wsize_b = (NR_RECVBUFF-2);
 			preorder_ctrl->wsize_b = 64;//64;

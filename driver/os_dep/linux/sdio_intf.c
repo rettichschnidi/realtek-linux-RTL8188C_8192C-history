@@ -36,7 +36,7 @@ extern void rtw_stop_drv_threads (_adapter *padapter);
 extern u8 rtw_init_drv_sw(_adapter *padapter);
 extern u8 rtw_free_drv_sw(_adapter *padapter);
 extern void rtw_cancel_all_timer(_adapter *padapter);
-extern struct net_device *rtw_init_netdev(void);
+extern struct net_device *rtw_init_netdev(_adapter *old_padapter);
 extern void update_recvframe_attrib_from_recvstat(struct rx_pkt_attrib
 *pattrib, struct recv_stat *prxstat);
 static const struct sdio_device_id sdio_ids[] = {
@@ -689,7 +689,7 @@ static int r871xs_drv_init(struct sdio_func *func, const struct sdio_device_id *
 	RT_TRACE(_module_hci_intfs_c_,_drv_alert_,("+871x - drv_init:id=0x%p func->vendor=0x%x func->device=0x%x\n",id,func->vendor,func->device));
 
 	//step 1.
-	pnetdev = rtw_init_netdev();
+	pnetdev = rtw_init_netdev(NULL);
 	if (!pnetdev)
 		goto error;	
 
@@ -832,12 +832,7 @@ void r871x_dev_unload(_adapter *padapter)
 		}
 		RT_TRACE(_module_hci_intfs_c_,_drv_err_,("@ r871x_dev_unload:complelt s5!\n"));
 
-		//s6.
-		if (padapter->dvobj_deinit) {
-			padapter->dvobj_deinit(padapter); // call sd_dvobj_deinit()
-		} else {
-			RT_TRACE(_module_hci_intfs_c_,_drv_err_,("Initialize hcipriv.hci_priv_init error!!!\n"));
-		}
+
 		RT_TRACE(_module_hci_intfs_c_,_drv_err_,("@ r871x_dev_unload:complete s6!\n"));
 
 		padapter->bup = _FALSE;
@@ -868,9 +863,16 @@ _func_exit_;
 		rtw_cancel_all_timer(padapter);
 		
 		r871x_dev_unload(padapter);
+		//s6.
+		if (padapter->dvobj_deinit) {
+			padapter->dvobj_deinit(padapter); // call sd_dvobj_deinit()
+		} else {
+			RT_TRACE(_module_hci_intfs_c_,_drv_err_,("Initialize hcipriv.hci_priv_init error!!!\n"));
+		}
 
 		rtw_free_drv_sw(padapter);
-
+		//after rtw_free_drv_sw(), padapter has beed freed, don't refer to it.
+		
 		sdio_claim_host(func);
 		RT_TRACE(_module_hci_intfs_c_,_drv_err_,(" in dev_remove():sdio_claim_host !\n"));
 		sdio_release_irq(func);

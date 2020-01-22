@@ -159,7 +159,7 @@ struct wifidirect_info{
 	_adapter*				padapter;
 	u8 						device_addr[ETH_ALEN];	//	The device address should be the mac address of this device.
 	u8 interface_addr[ETH_ALEN];
-	u8						social_chan[3];
+	u8						social_chan[4];
 	u8						listen_channel;
 	u8 	operating_channel;
 	u8						listen_dwell;		//	This value should be between 1 and 3
@@ -209,8 +209,6 @@ struct wifidirect_info{
 	u32						noa_duration[P2P_MAX_NOA_NUM]; // Max duration for owner, preferred or min acceptable duration for client.
 	u32						noa_interval[P2P_MAX_NOA_NUM]; // Length of interval for owner, preferred or max acceptable interval of client.
 	u32						noa_start_time[P2P_MAX_NOA_NUM]; // schedule expressed in terms of the lower 4 bytes of the TSF timer.
-	u32						tsf_low;
-	u32						tsf_high;
 };
 
 
@@ -220,6 +218,10 @@ struct mlme_priv {
 	sint	fw_state;	//shall we protect this variable? maybe not necessarily...
 
 	u8	to_join; //flag
+	#ifdef CONFIG_LAYER2_ROAMING
+	u8 to_roaming; // roaming trying times
+	#endif
+
 	u8	*nic_hdl;
 
 	_list		*pscanned;
@@ -243,6 +245,12 @@ struct mlme_priv {
 	uint assoc_by_rssi;
 
 	_timer scan_to_timer; // driver itself handles scan_timeout status.
+	u32 scan_start_time; // used to evaluate the time spent in scanning
+
+	#ifdef CONFIG_SET_SCAN_DENY_TIMER
+	_timer set_scan_deny_timer;
+	ATOMIC_T set_scan_deny; //0: allowed, 1: deny
+	#endif
 
 	struct qos_priv qospriv;
 
@@ -380,7 +388,7 @@ extern void rtw_free_mlme_priv (struct mlme_priv *pmlmepriv);
 
 
 extern sint rtw_select_and_join_from_scanned_queue(struct mlme_priv *pmlmepriv);
-extern sint rtw_set_key(_adapter *adapter,struct security_priv *psecuritypriv,sint keyid);
+extern sint rtw_set_key(_adapter *adapter,struct security_priv *psecuritypriv,sint keyid, u8 set_tx);
 extern sint rtw_set_auth(_adapter *adapter,struct security_priv *psecuritypriv);
 
 __inline static u8 *get_bssid(struct mlme_priv *pmlmepriv)
@@ -492,6 +500,10 @@ extern void _rtw_join_timeout_handler(_adapter *adapter);
 extern void rtw_scan_timeout_handler(_adapter *adapter);
 
 extern void rtw_dynamic_check_timer_handlder(_adapter *adapter);
+#ifdef CONFIG_SET_SCAN_DENY_TIMER
+extern void rtw_set_scan_deny_timer_hdl(_adapter *adapter);
+void rtw_set_scan_deny(struct mlme_priv *mlmepriv, u32 ms);
+#endif
 
 
 extern int _rtw_init_mlme_priv(_adapter *padapter);
@@ -529,8 +541,12 @@ void rtw_update_ht_cap(_adapter *padapter, u8 *pie, uint ie_len);
 void rtw_issue_addbareq_cmd(_adapter *padapter, struct xmit_frame *pxmitframe);
 #endif
 
-
 int rtw_is_same_ibss(_adapter *adapter, struct wlan_network *pnetwork);
+
+#ifdef CONFIG_LAYER2_ROAMING
+void rtw_roaming(_adapter *padapter, struct wlan_network *tgt_network);
+void _rtw_roaming(_adapter *padapter, struct wlan_network *tgt_network);
+#endif
 
 #endif //__RTL871X_MLME_H_
 

@@ -254,10 +254,12 @@ _func_enter_;
 	if((prxattrib->encrypt==_WEP40_)||(prxattrib->encrypt==_WEP104_))
 	{
 		iv=pframe+prxattrib->hdrlen;
-		keyindex=(iv[3]&0x3);
+		//keyindex=(iv[3]&0x3);
+		keyindex = prxattrib->key_index;
 		keylength=psecuritypriv->dot11DefKeylen[keyindex];
 		_rtw_memcpy(&wepkey[0], iv, 3);
-		_rtw_memcpy(&wepkey[3], &psecuritypriv->dot11DefKey[psecuritypriv->dot11PrivacyKeyIndex].skey[0],keylength);	
+		//_rtw_memcpy(&wepkey[3], &psecuritypriv->dot11DefKey[psecuritypriv->dot11PrivacyKeyIndex].skey[0],keylength);
+		_rtw_memcpy(&wepkey[3], &psecuritypriv->dot11DefKey[keyindex].skey[0],keylength);
 		length= ((union recv_frame *)precvframe)->u.hdr.len-prxattrib->hdrlen-prxattrib->iv_len;
 
 		payload=pframe+prxattrib->iv_len+prxattrib->hdrlen;
@@ -655,7 +657,7 @@ u32	rtw_tkip_encrypt(_adapter *padapter, u8 *pxmitframe)
 	union pn48 dot11txpn;
 	struct	sta_info		*stainfo;
 	struct	pkt_attrib	 *pattrib = &((struct xmit_frame *)pxmitframe)->attrib;
-	//struct 	security_priv	*psecuritypriv=&padapter->securitypriv;
+	struct 	security_priv	*psecuritypriv=&padapter->securitypriv;
 	struct	xmit_priv		*pxmitpriv=&padapter->xmitpriv;
 	u32	res=_SUCCESS;
 _func_enter_;
@@ -684,7 +686,16 @@ _func_enter_;
 		
 		if (stainfo!=NULL){
 			RT_TRACE(_module_rtl871x_security_c_,_drv_err_,("rtw_tkip_encrypt: stainfo!=NULL!!!\n"));
-			prwskey=&stainfo->dot118021x_UncstKey.skey[0];
+
+			if(IS_MCAST(pattrib->ra))
+			{
+				prwskey=psecuritypriv->dot118021XGrpKey[psecuritypriv->dot118021XGrpKeyid].skey;
+			}
+			else
+			{
+				prwskey=&stainfo->dot118021x_UncstKey.skey[0];
+			}
+
 			prwskeylen=16;
 
 			for(curfragnum=0;curfragnum<pattrib->nr_frags;curfragnum++){
@@ -770,7 +781,8 @@ _func_enter_;
 			if(IS_MCAST(prxattrib->ra))
 			{
 				DBG_871X("rx bc/mc packets, to perform sw rtw_tkip_decrypt\n");
-				prwskey = psecuritypriv->dot118021XGrpKey[psecuritypriv->dot118021XGrpKeyid-1].skey;
+				//prwskey = psecuritypriv->dot118021XGrpKey[psecuritypriv->dot118021XGrpKeyid].skey;
+				prwskey = psecuritypriv->dot118021XGrpKey[prxattrib->key_index].skey;
 				prwskeylen=16;
 			}
 			else
@@ -1488,7 +1500,7 @@ u32	rtw_aes_encrypt(_adapter *padapter, u8 *pxmitframe)
 	u8	*pframe,*prwskey;	//, *payload,*iv
 	struct	sta_info		*stainfo;
 	struct	pkt_attrib	 *pattrib = &((struct xmit_frame *)pxmitframe)->attrib;
-//	struct 	security_priv	*psecuritypriv=&padapter->securitypriv;
+	struct 	security_priv	*psecuritypriv=&padapter->securitypriv;
 	struct	xmit_priv		*pxmitpriv=&padapter->xmitpriv;
 
 //	uint	offset = 0;
@@ -1519,7 +1531,16 @@ _func_enter_;
 		
 		if (stainfo!=NULL){
 			RT_TRACE(_module_rtl871x_security_c_,_drv_err_,("rtw_aes_encrypt: stainfo!=NULL!!!\n"));
-			prwskey=&stainfo->dot118021x_UncstKey.skey[0];
+
+			if(IS_MCAST(pattrib->ra))
+			{
+				prwskey=psecuritypriv->dot118021XGrpKey[psecuritypriv->dot118021XGrpKeyid].skey;
+			}
+			else
+			{
+				prwskey=&stainfo->dot118021x_UncstKey.skey[0];
+			}
+
 			prwskeylen=16;
 	
 			for(curfragnum=0;curfragnum<pattrib->nr_frags;curfragnum++){
@@ -1847,7 +1868,8 @@ _func_enter_;
 			if(IS_MCAST(prxattrib->ra))
 			{
 				DBG_871X("rx bc/mc packets, to perform sw rtw_aes_decrypt\n");
-				prwskey = psecuritypriv->dot118021XGrpKey[psecuritypriv->dot118021XGrpKeyid-1].skey;
+				//prwskey = psecuritypriv->dot118021XGrpKey[psecuritypriv->dot118021XGrpKeyid].skey;
+				prwskey = psecuritypriv->dot118021XGrpKey[prxattrib->key_index].skey;
 				prwskeylen=16;
 			}
 			else

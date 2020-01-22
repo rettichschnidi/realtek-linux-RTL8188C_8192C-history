@@ -128,6 +128,8 @@ struct rx_pkt_attrib	{
 	u8	tcp_chkrpt; //0: incorrect, 1: correct
 #endif
 
+	u8 	key_index;
+
 	u8	mcs_rate;
 	u8	rxht;
 	u8	signal_qual;
@@ -146,7 +148,11 @@ struct rx_pkt_attrib	{
 //#define REORDER_ENTRY_NUM	128
 #define REORDER_WAIT_TIME	(30) // (ms)
 
+#ifdef CONFIG_MINIMAL_MEMORY_USAGE
 #define RECVBUFF_ALIGN_SZ 512
+#else
+#define RECVBUFF_ALIGN_SZ 8
+#endif
 
 #define RXDESC_SIZE	24
 #define RXDESC_OFFSET RXDESC_SIZE

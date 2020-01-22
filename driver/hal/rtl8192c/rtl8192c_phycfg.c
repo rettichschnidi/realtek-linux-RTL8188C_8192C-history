@@ -2023,7 +2023,7 @@ rtl8192c_PHY_ConfigRFWithHeaderFile(
 			{
 				if(Rtl819XRadioB_Array_Table[i] == 0xfe)
 				{ // Deay specific ms. Only RF configuration require delay.												
-#ifdef CONFIG_USB_HCI
+#if 0//#ifdef CONFIG_USB_HCI
 					rtw_mdelay_os(1000);
 #else
 					rtw_mdelay_os(50);
@@ -5166,8 +5166,15 @@ rtl8192c_PHY_IQCalibrate(
 	}
 	else
 	{
+
+		#if 0
+		DBG_871X("%s do _PHY_ReloadADDARegisters\n");
+		_PHY_ReloadADDARegisters(pAdapter, IQK_BB_REG, pdmpriv->IQK_BB_backup_recover, 9);
+		return;
+		#else
 		pdmpriv->RegE94 = pdmpriv->RegEB4 = 0x100;	//X default value
 		pdmpriv->RegE9C = pdmpriv->RegEBC = 0x0;		//Y default value
+		#endif
 	}
 	
 	if((RegE94 != 0)/*&&(RegEA4 != 0)*/)

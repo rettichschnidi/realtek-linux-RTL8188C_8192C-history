@@ -112,69 +112,72 @@ struct registry_priv
 	u8	rfintfs;
 	u8	lbkmode;
 	u8	hci;
-	u8	network_mode;	//infra, ad-hoc, auto	  
 	NDIS_802_11_SSID	ssid;
+	u8	network_mode;	//infra, ad-hoc, auto	  
 	u8	channel;//ad-hoc support requirement 
 	u8	wireless_mode;//A, B, G, auto
+	u8 	scan_mode;//active, passive
+	u8	radio_enable;
+	u8	preamble;//long, short, auto
 	u8	vrtl_carrier_sense;//Enable, Disable, Auto
 	u8	vcs_type;//RTS/CTS, CTS-to-self
 	u16	rts_thresh;
 	u16  frag_thresh;	
-	u8	preamble;//long, short, auto
-	u8  scan_mode;//active, passive
-	u8  adhoc_tx_pwr;
-	u8      	     soft_ap;
-	u8      	     smart_ps;  
-	 u8                  power_mgnt;
-	 u8                  radio_enable;
-	 u8                  long_retry_lmt;
-	 u8                  short_retry_lmt;
-  	 u16                 busy_thresh;
-    	 u8                  ack_policy;
-	 u8		     mp_mode;	
-	 u8 		     software_encrypt;
-	 u8 		     software_decrypt;	  
+	u8	adhoc_tx_pwr;
+	u8	soft_ap;
+	u8	power_mgnt;
+	u8	smart_ps;
+	u8	long_retry_lmt;
+	u8	short_retry_lmt;
+	u16	busy_thresh;
+	u8	ack_policy;
+	u8	mp_mode;
+	u8	software_encrypt;
+	u8	software_decrypt;
 
 	  //UAPSD
-	  u8		     wmm_enable;
-	  u8		     uapsd_enable;	  
-	  u8		     uapsd_max_sp;
-	  u8		     uapsd_acbk_en;
-	  u8		     uapsd_acbe_en;
-	  u8		     uapsd_acvi_en;
-	  u8		     uapsd_acvo_en;	  
+	u8	wmm_enable;
+	u8	uapsd_enable;	  
+	u8	uapsd_max_sp;
+	u8	uapsd_acbk_en;
+	u8	uapsd_acbe_en;
+	u8	uapsd_acvi_en;
+	u8	uapsd_acvo_en;	  
 
-	  WLAN_BSSID_EX    dev_network;
+	WLAN_BSSID_EX    dev_network;
 
 #ifdef CONFIG_80211N_HT
-
-	u8		ht_enable;
-	u8		cbw40_enable;
-	u8		ampdu_enable;//for tx
-	
-
+	u8	ht_enable;
+	u8	cbw40_enable;
+	u8	ampdu_enable;//for tx
 #endif
-	u8		rf_config ;
-	u8		low_power ;
+	u8	rf_config ;
+	u8	low_power ;
 
-	u8 		wifi_spec;// !turbo_mode	  
+	u8	wifi_spec;// !turbo_mode	  
 	  
-	u8 		channel_plan;
+	u8	channel_plan;
 #ifdef CONFIG_BT_COEXIST
-	u8		bt_iso;
-	u8		bt_sco;
-	u8		bt_ampdu;
+	u8	bt_iso;
+	u8	bt_sco;
+	u8	bt_ampdu;
 #endif
 	BOOLEAN	bAcceptAddbaReq;	
 
-	u8		antdiv_cfg;
-	  
-	u8		usbss_enable;//0:disable,1:enable
-	u8		hwpdn_mode;//0:disable,1:enable,2:deside by EFUSE config
-	u8		hwpwrp_detect;//0:disable,1:enable
-	  
+	u8	antdiv_cfg;
+
+	u8	usbss_enable;//0:disable,1:enable
+	u8	hwpdn_mode;//0:disable,1:enable,2:deside by EFUSE config
+	u8	hwpwrp_detect;//0:disable,1:enable
+
+	u8	hw_wps_pbc;//0:disable,1:enable
+
 #ifdef CONFIG_ADAPTOR_INFO_CACHING_FILE
 	char	adaptor_info_caching_file_path[PATH_LENGTH_MAX];
+#endif
+
+#ifdef CONFIG_LAYER2_ROAMING
+	u8	max_roaming_times; // the max number driver will try to roaming
 #endif
 };
 
@@ -185,6 +188,7 @@ struct registry_priv
 #define BSSID_OFT(field) ((ULONG)FIELD_OFFSET(WLAN_BSSID_EX,field))
 #define BSSID_SZ(field)   sizeof(((PWLAN_BSSID_EX) 0)->field)
 
+#define MAX_CONTINUAL_URB_ERR 4
 
 struct dvobj_priv {
 
@@ -247,7 +251,11 @@ struct dvobj_priv {
 	int	RegUsbSS;
 	
 	_sema	usb_suspend_sema;
-	
+#ifdef CONFIG_USB_VENDOR_REQ_PREALLOC
+	_mutex  usb_vendor_req_mutex;
+	u8 * usb_alloc_vendor_req_buf;
+	u8 * usb_vendor_req_buf;
+#endif	
 #ifdef PLATFORM_WINDOWS
 	//related device objects
 	PDEVICE_OBJECT	pphysdevobj;//pPhysDevObj;
@@ -278,6 +286,7 @@ struct dvobj_priv {
 	struct usb_device *pusbdev;
 #endif//PLATFORM_LINUX
 
+	ATOMIC_T continual_urb_error;
 #endif//CONFIG_USB_HCI
 
 /*-------- below is for PCIE INTERFACE --------*/
@@ -327,7 +336,7 @@ typedef enum _DRIVER_STATE{
 
 struct _ADAPTER{	
 	int	DriverState;// for disable driver using module, use dongle to replace module.
-	int	pid;//process id from UI
+	int	pid[3];//process id from UI, 0:wpa_supplicant, 1:hostapd, 2:dhcpcd
 	int	bDongle;//build-in module or external dongle
 	u16 	chip_type;
 	u16	HardwareType;

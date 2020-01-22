@@ -34,6 +34,12 @@
 
 #endif
 
+#ifdef CONFIG_RESUME_IN_WORKQUEUE
+#include <linux/workqueue.h>
+static struct workqueue_struct *rtw_workqueue;
+static struct work_struct rtw_resume_work;
+#endif
+
 #include <usb_vendor_req.h>
 #include <usb_ops.h>
 #include <usb_osintf.h>
@@ -55,15 +61,17 @@ extern int rtw_ampdu_enable;//for enable tx_ampdu
 #endif
 
 static struct usb_interface *pintf;
+static struct usb_interface  *net_pusb = NULL; // keep usb_interface for resume in workqueue
 
-#ifdef CONFIG_SIGNAL_PID_WHILE_DRV_INIT
-int ui_pid = 0;
+#ifdef CONFIG_GLOBAL_UI_PID
+int ui_pid[3] = {0, 0, 0};
 #endif
 
 
 extern int pm_netdev_open(struct net_device *pnetdev,u8 bnormal);
 static int rtw_suspend(struct usb_interface *intf, pm_message_t message);
 static int rtw_resume(struct usb_interface *intf);
+static int rtw_resume_process(struct usb_interface *pusb_intf);
 
 
 static int rtw_drv_init(struct usb_interface *pusb_intf,const struct usb_device_id *pdid);
@@ -71,21 +79,22 @@ static void rtw_dev_remove(struct usb_interface *pusb_intf);
 
 #define USB_VENDER_ID_REALTEK		0x0BDA
 
+//DID_USB_V71_20110628
 static struct usb_device_id rtw_usb_id_tbl[] ={
 #ifdef CONFIG_RTL8192C
-	//DID_USB_V60_20110425
 	/*=== Realtek demoboard ===*/		
 	{USB_DEVICE(0x0BDA, 0x8191)},//Default ID
-	
+
 	/****** 8188CUS ********/
-	{USB_DEVICE(USB_VENDER_ID_REALTEK, 0x8176)},//8188cu 1*1 dongole 
+	{USB_DEVICE(USB_VENDER_ID_REALTEK, 0x8176)},//8188cu 1*1 dongole
 	{USB_DEVICE(USB_VENDER_ID_REALTEK, 0x8170)},//8188CE-VAU USB minCard
+	{USB_DEVICE(USB_VENDER_ID_REALTEK, 0x817E)},//8188CE-VAU USB minCard
 	{USB_DEVICE(USB_VENDER_ID_REALTEK, 0x817A)},//8188cu Slim Solo
-	{USB_DEVICE(USB_VENDER_ID_REALTEK, 0x817B)},//8188cu Slim Combo	
+	{USB_DEVICE(USB_VENDER_ID_REALTEK, 0x817B)},//8188cu Slim Combo
 	{USB_DEVICE(USB_VENDER_ID_REALTEK, 0x817D)},//8188RU High-power USB Dongle
 	{USB_DEVICE(USB_VENDER_ID_REALTEK, 0x8754)},//8188 Combo for BC4
 	{USB_DEVICE(USB_VENDER_ID_REALTEK, 0x817F)},//8188RU
-	
+
 	/****** 8192CUS ********/
 	{USB_DEVICE(USB_VENDER_ID_REALTEK, 0x8177)},//8191cu 1*2
 	{USB_DEVICE(USB_VENDER_ID_REALTEK, 0x8178)},//8192cu 2*2
@@ -93,69 +102,79 @@ static struct usb_device_id rtw_usb_id_tbl[] ={
 	{USB_DEVICE(USB_VENDER_ID_REALTEK, 0x8186)},//8192CE-VAU USB minCard
 
 	/*=== Customer ID ===*/	
-	/****** 8188CUS Dongle********/
-	{USB_DEVICE(0x07B8, 0x8189)},//Funai - Abocom
-	{USB_DEVICE(0x2019, 0xED17)},//PCI - Edimax        
-	{USB_DEVICE(0x0DF6, 0x0052)}, //Sitecom - Edimax    
-	{USB_DEVICE(0x7392, 0x7811)},//Edimax - Edimax  
-	{USB_DEVICE(0x07B8, 0x8189)},//Abocom - Abocom 
-	{USB_DEVICE(0x0EB0, 0x9071)},//NO Brand - Etop  
-	{USB_DEVICE(0x06F8, 0xE033)},//Hercules - Edimax 
+	/****** 8188CUS Dongle ********/
+	{USB_DEVICE(0x2019, 0xED17)},//PCI - Edimax
+	{USB_DEVICE(0x0DF6, 0x0052)},//Sitecom - Edimax
+	{USB_DEVICE(0x7392, 0x7811)},//Edimax - Edimax
+	{USB_DEVICE(0x07B8, 0x8189)},//Abocom - Abocom
+	{USB_DEVICE(0x0EB0, 0x9071)},//NO Brand - Etop
+	{USB_DEVICE(0x06F8, 0xE033)},//Hercules - Edimax
 	{USB_DEVICE(0x103C, 0x1629)},//HP - Lite-On ,8188CUS Slim Combo
 	{USB_DEVICE(0x2001, 0x3308)},//D-Link - Alpha
 	{USB_DEVICE(0x050D, 0x1102)},//Belkin - Edimax
 	{USB_DEVICE(0x2019, 0xAB2A)},//Planex - Abocom
 	{USB_DEVICE(0x20F4, 0x648B)},//TRENDnet - Cameo
-	{USB_DEVICE(0x4855, 0x0090)},// 	- Feixun
-	{USB_DEVICE(0x13D3, 0x3357)},	// -AzureWave
-	{USB_DEVICE(0x0DF6, 0x005C)},//Sitecom-Edimax
-	{USB_DEVICE(0x0BDA, 0x5088)},//Thinkware-CC&C
-	{USB_DEVICE(0x4856, 0x0091)},//NetweeN-Feixun
-	{USB_DEVICE(0x9846, 0x9041)},//Netgear,Cameo
-	{USB_DEVICE(0x0846, 0x9041)},//Netgear,Cameo
-	{USB_DEVICE(0x2019, 0x4902)},//Planex,Etop
+	{USB_DEVICE(0x4855, 0x0090)},// - Feixun
+	{USB_DEVICE(0x13D3, 0x3357)},// - AzureWave
+	{USB_DEVICE(0x0DF6, 0x005C)},//Sitecom - Edimax
+	{USB_DEVICE(0x0BDA, 0x5088)},//Thinkware - CC&C
+	{USB_DEVICE(0x4856, 0x0091)},//NetweeN - Feixun
+	{USB_DEVICE(0x9846, 0x9041)},//Netgear - Cameo
+	{USB_DEVICE(0x0846, 0x9041)},//Netgear - Cameo
+	{USB_DEVICE(0x2019, 0x4902)},//Planex - Etop
+	{USB_DEVICE(0x2019, 0xAB2E)},//SW-WF02-AD15 -Abocom
 	
-	/****** 8188CE-VAU********/
-	{USB_DEVICE(0x13D3, 0x3358)},// -Azwave 8188CE-VAU
+	/****** 8188CE-VAU ********/
+	{USB_DEVICE(0x13D3, 0x3359)},// - Azwave
+	{USB_DEVICE(0x13D3, 0x3358)},// - Azwave
 
 	/****** 8188CUS Slim Solo********/
-	{USB_DEVICE(0x04F2, 0xAFF7)},//XAVI-XAVI
-	{USB_DEVICE(0x04F2, 0xAFF9)},//XAVI-XAVI
-	{USB_DEVICE(0x04F2, 0xAFFA)},//XAVI-XAVI
+	{USB_DEVICE(0x04F2, 0xAFF7)},//XAVI - XAVI
+	{USB_DEVICE(0x04F2, 0xAFF9)},//XAVI - XAVI
+	{USB_DEVICE(0x04F2, 0xAFFA)},//XAVI - XAVI
 
 	/****** 8188CUS Slim Combo ********/
-	{USB_DEVICE(0x04F2, 0xAFF8)},//XAVI-XAVI
-	{USB_DEVICE(0x04F2, 0xAFFB)},//XAVI-XAVI
-	{USB_DEVICE(0x04F2, 0xAFFC)},//XAVI-XAVI
+	{USB_DEVICE(0x04F2, 0xAFF8)},//XAVI - XAVI
+	{USB_DEVICE(0x04F2, 0xAFFB)},//XAVI - XAVI
+	{USB_DEVICE(0x04F2, 0xAFFC)},//XAVI - XAVI
+	{USB_DEVICE(0x2019, 0x1201)},//Planex - Vencer
 	
-	
-	/****** 8192CUS Dongle********/	
-	{USB_DEVICE(0x07b8, 0x8178)},//Funai -Abocom
-	{USB_DEVICE(0x2001, 0x3307)},//D-Link-Cameo   
-	{USB_DEVICE(0x2001, 0x330A)},//D-Link-Alpha   
-	{USB_DEVICE(0x2001, 0x3309)},//D-Link-Alpha   	
-	{USB_DEVICE(0x0586, 0x341F)},//Zyxel -Abocom
-	{USB_DEVICE(0x7392, 0x7822)},//Edimax -Edimax	
-	{USB_DEVICE(0x2019, 0xAB2B)},//Planex -Abocom
-	{USB_DEVICE(0x07B8, 0x8178)},//Abocom -Abocom	
-	{USB_DEVICE(0x07AA, 0x0056)},//ATKK-Gemtek	
-	{USB_DEVICE(0x4855, 0x0091)},// 	-Feixun
-	{USB_DEVICE(0x050D, 0x2102)},//Belkin-Sercomm
-	{USB_DEVICE(0x2001, 0x3307)},//D-Link-Cameo	
-	{USB_DEVICE(0x050D, 0x2102)},//Belkin-Sercomm
-	{USB_DEVICE(0x050D, 0x2103)},//Belkin-Edimax
+	/****** 8192CUS Dongle ********/
+	{USB_DEVICE(0x2001, 0x3307)},//D-Link - Cameo
+	{USB_DEVICE(0x2001, 0x330A)},//D-Link - Alpha
+	{USB_DEVICE(0x2001, 0x3309)},//D-Link - Alpha
+	{USB_DEVICE(0x0586, 0x341F)},//Zyxel - Abocom
+	{USB_DEVICE(0x7392, 0x7822)},//Edimax - Edimax
+	{USB_DEVICE(0x2019, 0xAB2B)},//Planex - Abocom
+	{USB_DEVICE(0x07B8, 0x8178)},//Abocom - Abocom
+	{USB_DEVICE(0x07AA, 0x0056)},//ATKK - Gemtek
+	{USB_DEVICE(0x4855, 0x0091)},// - Feixun
+	{USB_DEVICE(0x050D, 0x2102)},//Belkin - Sercomm
+	{USB_DEVICE(0x050D, 0x2102)},//Belkin - Sercomm
+	{USB_DEVICE(0x050D, 0x2103)},//Belkin - Edimax
 	{USB_DEVICE(0x20F4, 0x624D)},//TRENDnet
+	{USB_DEVICE(0x0DF6, 0x0061)},//Sitecom - Edimax
+	{USB_DEVICE(0x0B05, 0x17AB)},//ASUS - Edimax
 #endif
 #ifdef CONFIG_RTL8192D
-	//92DU
-	// Realtek */
-	{USB_DEVICE(USB_VENDER_ID_REALTEK, 0x8193)},
-	{USB_DEVICE(USB_VENDER_ID_REALTEK, 0x8194)},
+	/*=== Realtek demoboard ===*/
+	/****** 8192DU ********/
+	{USB_DEVICE(USB_VENDER_ID_REALTEK, 0x8193)},//8192DU-VC
+	{USB_DEVICE(USB_VENDER_ID_REALTEK, 0x8194)},//8192DU-VS
+	{USB_DEVICE(USB_VENDER_ID_REALTEK, 0x8111)},//Realtek 5G dongle for WiFi Display
 
-	/*=== Customer ID ===*/	
-	{USB_DEVICE(0x2019, 0xAB2C)},//PCI-Abocm
-	{USB_DEVICE(USB_VENDER_ID_REALTEK, 0x8111)}, // Realtek 5G dongle for WiFi Display 
-	{USB_DEVICE(0x2019, 0xAB2D)}, // PCI-Abocom 5G dongle for WiFi Display 
+	/*=== Customer ID ===*/
+	/****** 8192DU-VC ********/
+	{USB_DEVICE(0x2019, 0xAB2C)},//PCI - Abocm
+	{USB_DEVICE(0x2019, 0x4903)},//PCI - ETOP
+	{USB_DEVICE(0x2019, 0x4904)},//PCI - ETOP
+	{USB_DEVICE(0x07B8, 0x8193)},//Abocom - Abocom
+	
+	/****** 8192DU-VS ********/
+	{USB_DEVICE(0x20F4, 0x664B)},//TRENDnet
+
+	/****** 8192DU-WiFi Display Dongle ********/
+	{USB_DEVICE(0x2019, 0xAB2D)},//Planex - Abocom ,5G dongle for WiFi Display
 #endif
 	{}	/* Terminating entry */
 };
@@ -241,6 +260,42 @@ static inline int RT_usb_endpoint_num(const struct usb_endpoint_descriptor *epd)
 	return epd->bEndpointAddress & USB_ENDPOINT_NUMBER_MASK;
 }
 
+#ifdef CONFIG_USB_VENDOR_REQ_PREALLOC
+u8 rtw_init_intf_priv(_adapter * padapter)
+{
+	u8 rst = _SUCCESS; 
+	
+	_rtw_mutex_init(&padapter->dvobjpriv.usb_vendor_req_mutex);
+
+	padapter->dvobjpriv.usb_alloc_vendor_req_buf = rtw_zmalloc(MAX_USB_IO_CTL_SIZE);
+
+	if (padapter->dvobjpriv.usb_alloc_vendor_req_buf   == NULL){
+		padapter->dvobjpriv.usb_alloc_vendor_req_buf  =NULL;
+		printk("alloc usb_vendor_req_buf failed... /n");
+		rst = _FAIL;
+		goto exit;
+	}
+	padapter->dvobjpriv.usb_vendor_req_buf  = 
+		(u8 *)N_BYTE_ALIGMENT((SIZE_PTR)(padapter->dvobjpriv.usb_alloc_vendor_req_buf ), ALIGNMENT_UNIT);
+exit:
+	return rst;
+	
+}
+
+u8 rtw_deinit_intf_priv(_adapter * padapter)
+{
+	u8 rst = _SUCCESS; 
+
+	if(padapter->dvobjpriv.usb_vendor_req_buf)
+	{
+		rtw_mfree(padapter->dvobjpriv.usb_alloc_vendor_req_buf,MAX_USB_IO_CTL_SIZE);
+	}
+	
+exit:
+	return rst;
+	
+}
+#endif
 static u32 usb_dvobj_init(_adapter *padapter)
 {
 	int	i;
@@ -381,7 +436,13 @@ _func_enter_;
 		RT_TRACE(_module_hci_intfs_c_,_drv_err_,(" \n Can't init io_reqs\n"));
 		status = _FAIL;
 	}
-
+#ifdef CONFIG_USB_VENDOR_REQ_PREALLOC
+	if((rtw_init_intf_priv(padapter) )== _FAIL)
+	{
+		RT_TRACE(_module_os_intfs_c_,_drv_err_,("\n Can't INIT rtw_init_intf_priv\n"));
+		status = _FAIL;
+	}
+#endif
 	//.3 misc
 	_rtw_init_sema(&(padapter->dvobjpriv.usb_suspend_sema), 0);	
 
@@ -390,6 +451,8 @@ _func_enter_;
 	//.4 usb endpoint mapping
 	intf_chip_configure(padapter);
 
+	ATOMIC_SET(&pdvobjpriv->continual_urb_error, 0);
+	
 _func_exit_;
 
 	return status;
@@ -400,8 +463,9 @@ static void usb_dvobj_deinit(_adapter * padapter){
 	struct dvobj_priv *pdvobjpriv=&padapter->dvobjpriv;
 
 	_func_enter_;
-
-
+#ifdef CONFIG_USB_VENDOR_REQ_PREALLOC
+	rtw_deinit_intf_priv(padapter);
+#endif
 	_func_exit_;
 }
 
@@ -487,8 +551,7 @@ static void rtw_dev_unload(_adapter *padapter)
 		DBG_8192C("===> rtw_dev_unload\n");
 
 		padapter->bDriverStopped = _TRUE;
-		val8 = 0xFF;
-		padapter->HalFunc.SetHwRegHandler(padapter, HW_VAR_TXPAUSE,&val8);
+
 		//s3.
 		if(padapter->intf_stop)
 		{
@@ -514,16 +577,6 @@ static void rtw_dev_unload(_adapter *padapter)
 				rtw_hal_deinit(padapter);
 			}
 			padapter->bSurpriseRemoved = _TRUE;
-		}
-
-		//s6.
-		if(padapter->dvobj_deinit)
-		{
-			padapter->dvobj_deinit(padapter);
-		}
-		else
-		{
-			RT_TRACE(_module_hci_intfs_c_,_drv_err_,("Initialize hcipriv.hci_priv_init error!!!\n"));
 		}
 
 		padapter->bup = _FALSE;
@@ -602,7 +655,7 @@ int rtw_hw_suspend(_adapter *padapter )
 		DBG_8192C("==> rtw_hw_suspend\n");	
 		_enter_pwrlock(&pwrpriv->lock);
 		pwrpriv->bips_processing = _TRUE;
-		padapter->net_closed = _TRUE;
+		//padapter->net_closed = _TRUE;
 		//s1.
 		if(pnetdev)
 		{
@@ -620,9 +673,9 @@ int rtw_hw_suspend(_adapter *padapter )
 		{
 			struct	mlme_priv *pmlmepriv = &padapter->mlmepriv;		
 
-			if((pmlmepriv->fw_state & _FW_LINKED))
+			if(check_fwstate(pmlmepriv, _FW_LINKED))
 			{
-			        pmlmepriv->fw_state ^= _FW_LINKED;
+				_clr_fwstate_(pmlmepriv, _FW_LINKED);
 
 				padapter->ledpriv.LedControlHandler(padapter, LED_CTL_NO_LINK);
 
@@ -715,6 +768,7 @@ static int rtw_suspend(struct usb_interface *pusb_intf, pm_message_t message)
 {
 	struct net_device *pnetdev=usb_get_intfdata(pusb_intf);
 	_adapter *padapter = (_adapter*)rtw_netdev_priv(pnetdev);
+	struct mlme_priv *pmlmepriv = &padapter->mlmepriv;
 	struct pwrctrl_priv *pwrpriv = &padapter->pwrctrlpriv;
 	struct usb_device *usb_dev = interface_to_usbdev(pusb_intf);
 	
@@ -736,7 +790,7 @@ static int rtw_suspend(struct usb_interface *pusb_intf, pm_message_t message)
 		LeaveAllPowerSaveMode(padapter);
 
 		_enter_pwrlock(&pwrpriv->lock);
-		padapter->net_closed = _TRUE;
+		//padapter->net_closed = _TRUE;
 		//s1.
 		if(pnetdev)
 		{
@@ -748,7 +802,24 @@ static int rtw_suspend(struct usb_interface *pusb_intf, pm_message_t message)
 #else		
 		//s2.
 		//s2-1.  issue rtw_disassoc_cmd to fw
-		rtw_disassoc_cmd(padapter);
+		disconnect_hdl(padapter, NULL);
+		//rtw_disassoc_cmd(padapter);
+#endif
+
+#ifdef CONFIG_LAYER2_ROAMING_RESUME
+		if(check_fwstate(pmlmepriv, WIFI_STATION_STATE) && check_fwstate(pmlmepriv, _FW_LINKED) )
+		{
+			//printk("%s:%d assoc_ssid:%s\n", __FUNCTION__, __LINE__, pmlmepriv->assoc_ssid.Ssid);
+			DBG_871X("%s:%d %s(%02x:%02x:%02x:%02x:%02x:%02x), length:%d assoc_ssid.length:%d\n",__FUNCTION__, __LINE__,
+					pmlmepriv->cur_network.network.Ssid.Ssid,
+					pmlmepriv->cur_network.network.MacAddress[0],pmlmepriv->cur_network.network.MacAddress[1],
+					pmlmepriv->cur_network.network.MacAddress[2],pmlmepriv->cur_network.network.MacAddress[3],
+					pmlmepriv->cur_network.network.MacAddress[4],pmlmepriv->cur_network.network.MacAddress[5],
+					pmlmepriv->cur_network.network.Ssid.SsidLength,
+					pmlmepriv->assoc_ssid.SsidLength);
+			
+			pmlmepriv->to_roaming = 1;
+		}
 #endif
 		//s2-2.  indicate disconnect to os
 		rtw_indicate_disconnect(padapter);
@@ -770,11 +841,13 @@ static int rtw_suspend(struct usb_interface *pusb_intf, pm_message_t message)
 	else
 		goto error_exit;
 	
+	DBG_871X("###########  rtw_suspend  done #################\n");
+
 	_func_exit_;
 	return 0;
 	
 error_exit:
-	DBG_8192C("%s, failed \n",__FUNCTION__);
+	DBG_871X("###########  rtw_suspend  fail !! #################\n");
 	return (-1);
 
 }
@@ -784,11 +857,59 @@ static int rtw_resume(struct usb_interface *pusb_intf)
 	struct net_device *pnetdev=usb_get_intfdata(pusb_intf);
 	_adapter *padapter = (_adapter*)rtw_netdev_priv(pnetdev);
 	struct pwrctrl_priv *pwrpriv = &padapter->pwrctrlpriv;
-	struct usb_device *usb_dev = interface_to_usbdev(pusb_intf);
+	 int ret = 0;
+	 int ret_queue;
+	 net_pusb = NULL;
+ 
+	if(pwrpriv->bInternalAutoSuspend ){
+ 		ret = rtw_resume_process(pusb_intf);
+	} else {
+
+#ifdef CONFIG_RESUME_IN_WORKQUEUE
+		// accquire system's suspend lock preventing from falliing asleep while resume in workqueue
+		rtw_lock_suspend();
+
+		net_pusb  = pusb_intf;
+		ret_queue=queue_work(rtw_workqueue, &rtw_resume_work);
+		DBG_871X("%s:%d queue_work(rtw_workqueue, &rtw_resume_work) return %d\n",__FUNCTION__, __LINE__,ret_queue);
+#else
+		ret = rtw_resume_process(pusb_intf);
+#endif
+
+	}
+	
+	return ret;
+
+}
+
+
+static int rtw_resume_process(struct usb_interface *pusb_intf)
+{
+	struct net_device *pnetdev;
+	struct usb_device *usb_dev;
+	_adapter *padapter;
+	struct pwrctrl_priv *pwrpriv;
 	
 	_func_enter_;
 
 	DBG_8192C("###########  rtw_resume  #################\n");
+
+	DBG_871X("%s:%d net_pusb:%p, pusb_intf:%p\n"
+		, __FUNCTION__, __LINE__, net_pusb, pusb_intf);
+
+	if(net_pusb) {
+		pnetdev=usb_get_intfdata(pintf);
+		usb_dev = interface_to_usbdev(pintf);
+	} else if(pusb_intf) {
+		pnetdev=usb_get_intfdata(pusb_intf);
+		usb_dev = interface_to_usbdev(pusb_intf);
+	} else {
+		goto error_exit;
+	}
+
+	padapter = (_adapter*)rtw_netdev_priv(pnetdev);
+	pwrpriv = &padapter->pwrctrlpriv;
+
 	DBG_8192C("bkeepfwalive(%x)\n",pwrpriv->bkeepfwalive);
 	
 	if(padapter)//system resume
@@ -817,8 +938,12 @@ static int rtw_resume(struct usb_interface *pusb_intf)
 					sint keyid;	
 			
 					for(keyid=0;keyid<4;keyid++){				
-						if(pwrpriv->wepkeymask & BIT(keyid))
-							rtw_set_key(padapter,&padapter->securitypriv, keyid);	
+						if(pwrpriv->wepkeymask & BIT(keyid)) {
+							if(keyid == padapter->securitypriv.dot11PrivacyKeyIndex)
+								rtw_set_key(padapter,&padapter->securitypriv, keyid, 1);
+							else
+								rtw_set_key(padapter,&padapter->securitypriv, keyid, 0);
+						}
 					}
 				}
 			}
@@ -831,11 +956,25 @@ static int rtw_resume(struct usb_interface *pusb_intf)
 		goto error_exit;
 	}
 
+	if( padapter->pid[1]!=0) {
+		DBG_871X("pid[1]:%d\n",padapter->pid[1]);
+		rtw_signal_process(padapter->pid[1], SIGUSR2);
+	}	
+
+#ifdef CONFIG_LAYER2_ROAMING_RESUME
+	rtw_roaming(padapter, NULL);
+#endif	
+	printk("###########  rtw_resume  done#################\n");
+	rtw_unlock_suspend();
 	_func_exit_;
 	
 	return 0;
 error_exit:
 	DBG_8192C("%s, Open net dev failed \n",__FUNCTION__);
+
+	DBG_871X("###########  rtw_resume  done with error#################\n");
+	rtw_unlock_suspend();
+	_func_exit_;
 	return (-1);
 }
 
@@ -883,7 +1022,8 @@ int autoresume_enter(_adapter* padapter)
 	DBG_8192C("====> autoresume_enter \n");
 	
 	if(rf_off == pwrpriv->current_rfpwrstate )
-	{			
+	{
+		pwrpriv->ps_flag = _FALSE;
 		#if (LINUX_VERSION_CODE>=KERNEL_VERSION(2,6,33))				
 			if (usb_autopm_get_interface( padapter->dvobjpriv.pusbintf) < 0) 
 			{
@@ -910,7 +1050,7 @@ error_exit:
 }
 #endif
 
-
+extern char* ifname;
 /*
  * drv_init() - a device potentially for us
  *
@@ -941,7 +1081,7 @@ static int rtw_drv_init(struct usb_interface *pusb_intf, const struct usb_device
 
 	//step 1. set USB interface data
 	// init data
-	pnetdev = rtw_init_netdev();
+	pnetdev = rtw_init_netdev(NULL);
 	if (!pnetdev) 
 		goto error;
 	
@@ -983,13 +1123,14 @@ static int rtw_drv_init(struct usb_interface *pusb_intf, const struct usb_device
 		goto error;
 	}
 
+	//step 3.	initialize the dvobj_priv 
 	padapter->dvobj_init=&usb_dvobj_init;
 	padapter->dvobj_deinit=&usb_dvobj_deinit;
 	padapter->intf_start=&usb_intf_start;
 	padapter->intf_stop=&usb_intf_stop;
 
 	//step 3.
-	//initialize the dvobj_priv 		
+	//initialize the dvobj_priv ,include Chip version		
 	if (padapter->dvobj_init == NULL){
 		RT_TRACE(_module_hci_intfs_c_,_drv_err_,("\n Initialize dvobjpriv.dvobj_init error!!!\n"));
 		goto error;
@@ -1001,17 +1142,16 @@ static int rtw_drv_init(struct usb_interface *pusb_intf, const struct usb_device
 		goto error;
 	}
 
+	//step 4. read efuse/eeprom data and get mac_addr
+	intf_read_chip_info(padapter);	
 
-	//step 4.
+	//step 5.
 	status = rtw_init_drv_sw(padapter);
 	if(status ==_FAIL){
 		RT_TRACE(_module_hci_intfs_c_,_drv_err_,("Initialize driver software resource Failed!\n"));
 		goto error;
 	}
 
-
-	//step 5. read efuse/eeprom data and get mac_addr
-	intf_read_chip_info(padapter);	
 #ifdef CONFIG_PM
 #if (LINUX_VERSION_CODE > KERNEL_VERSION(2,6,18))
 	if(padapter->pwrctrlpriv.bSupportRemoteWakeup)
@@ -1053,14 +1193,12 @@ static int rtw_drv_init(struct usb_interface *pusb_intf, const struct usb_device
 	}	
 #endif
 	// alloc dev name after read efuse.
-	rtw_init_netdev_name(pnetdev);
+	rtw_init_netdev_name(pnetdev, ifname);
 
 	rtw_macaddr_cfg(padapter->eeprompriv.mac_addr);
 
 	_rtw_memcpy(pnetdev->dev_addr, padapter->eeprompriv.mac_addr, ETH_ALEN);
-	DBG_8192C("MAC Address from pnetdev->dev_addr= %02x:%02x:%02x:%02x:%02x:%02x\n",
-				pnetdev->dev_addr[0], pnetdev->dev_addr[1], pnetdev->dev_addr[2], 
-				pnetdev->dev_addr[3], pnetdev->dev_addr[4], pnetdev->dev_addr[5]);	
+	DBG_8192C("MAC Address from pnetdev->dev_addr= " MACSTR "\n", MAC2STR(pnetdev->dev_addr));	
 
 
 	//step 6.
@@ -1090,18 +1228,11 @@ static int rtw_drv_init(struct usb_interface *pusb_intf, const struct usb_device
 #endif
 
 
-#ifdef CONFIG_SIGNAL_PID_WHILE_DRV_INIT
-	if(ui_pid!=0) {
-#ifdef PLATFORM_LINUX
-		DBG_8192C("ui_pid:%d\n",ui_pid);
-		#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,27))
-		kill_pid(find_vpid(ui_pid), SIGUSR2, 1);
-		#endif
-		#if (LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,26))
-		kill_proc(ui_pid, SIGUSR2, 1);
-		#endif
-	}	
-#endif
+#ifdef CONFIG_GLOBAL_UI_PID
+	if(ui_pid[1]!=0) {
+		DBG_871X("ui_pid[1]:%d\n",ui_pid[1]);
+		rtw_signal_process(ui_pid[1], SIGUSR2);
+	}
 #endif
 
 	DBG_8192C("bDriverStopped:%d, bSurpriseRemoved:%d, bup:%d, hw_init_completed:%d\n"
@@ -1141,6 +1272,7 @@ static void rtw_dev_remove(struct usb_interface *pusb_intf)
 {
 	struct net_device *pnetdev=usb_get_intfdata(pusb_intf);
 	_adapter *padapter = (_adapter*)rtw_netdev_priv(pnetdev);
+	struct mlme_priv *pmlmepriv= &padapter->mlmepriv;
 	struct dvobj_priv *pdvobjpriv = &padapter->dvobjpriv;
 	u8	bResetDevice = _FALSE;
 
@@ -1157,6 +1289,10 @@ _func_exit_;
 		hostapd_mode_unload(padapter);
 #endif
 		LeaveAllPowerSaveMode(padapter);
+
+		if(check_fwstate(pmlmepriv, _FW_LINKED))
+			disconnect_hdl(padapter, NULL);
+
 		if(drvpriv.drv_registered == _TRUE)
 		{
 			//DBG_8192C("r871xu_dev_remove():padapter->bSurpriseRemoved == _TRUE\n");
@@ -1189,9 +1325,18 @@ _func_exit_;
 		if((pdvobjpriv->NumInterfaces != 2) || (pdvobjpriv->InterfaceNumber == 1))
 			bResetDevice = _TRUE;
 
-		rtw_free_drv_sw(padapter);
+		//s6.
+		if(padapter->dvobj_deinit)
+		{
+			padapter->dvobj_deinit(padapter);
+		}
+		else
+		{
+			RT_TRACE(_module_hci_intfs_c_,_drv_err_,("Initialize hcipriv.hci_priv_init error!!!\n"));
+		}
 
 		//after rtw_free_drv_sw(), padapter has beed freed, don't refer to it.
+		rtw_free_drv_sw(padapter);	
 		
 	}
 
@@ -1243,8 +1388,21 @@ static int __init rtw_drv_entry(void)
 
 	DBG_8192C("\nrtw driver version=%s\n", DRIVERVERSION);		
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,24)) 
-	console_suspend_enabled=0;
+	//console_suspend_enabled=0;
 #endif	
+
+#ifdef CONFIG_RESUME_IN_WORKQUEUE
+	INIT_WORK(&rtw_resume_work, (work_func_t)rtw_resume_process);
+	rtw_workqueue = create_singlethread_workqueue("rtw_workqueue");
+	
+	if (rtw_workqueue == NULL) {
+		printk("%s, %d, create_workqueuen fail\n", __FILE__, __LINE__);
+		return -ENOMEM;
+	}
+#endif
+
+	rtw_suspend_lock_init();
+
 	drvpriv.drv_registered = _TRUE;
 	return usb_register(&drvpriv.rtw_usb_drv);
 }
@@ -1253,6 +1411,16 @@ static void __exit rtw_drv_halt(void)
 {
 	RT_TRACE(_module_hci_intfs_c_,_drv_err_,("+rtw_drv_halt\n"));
 	DBG_8192C("+rtw_drv_halt\n");
+
+#ifdef CONFIG_RESUME_IN_WORKQUEUE
+	if (rtw_workqueue) { 
+		flush_workqueue(rtw_workqueue);
+		destroy_workqueue(rtw_workqueue);
+	}
+#endif
+
+	rtw_suspend_lock_uninit();
+	
 	drvpriv.drv_registered = _FALSE;
 	usb_deregister(&drvpriv.rtw_usb_drv);
 	DBG_8192C("-rtw_drv_halt\n");

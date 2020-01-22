@@ -619,6 +619,7 @@ extern void	SetCarrierSuppressionTx(PADAPTER pAdapter, u8 bStart);
 
 extern void	fill_txdesc_for_mp(PADAPTER padapter, struct tx_desc *ptxdesc);
 extern void	SetPacketTx(PADAPTER padapter);
+extern void	SetPacketRx(PADAPTER pAdapter, u8 bStartRx);
 
 extern void	ResetPhyRxPktCount(PADAPTER pAdapter);
 extern u32	GetPhyRxPktReceived(PADAPTER pAdapter);

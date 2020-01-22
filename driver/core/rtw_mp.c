@@ -377,8 +377,7 @@ MPT_InitializeAdapter(
 
 #if 1
 	// Don't accept any packets
-	pHalData->ReceiveConfig = 0;
-	rtw_write32(pAdapter, REG_RCR, pHalData->ReceiveConfig);
+	rtw_write32(pAdapter, REG_RCR, 0);
 #else
 	// Accept CRC error and destination address
 	pHalData->ReceiveConfig |= (RCR_ACRC32|RCR_AAP);
@@ -789,53 +788,69 @@ static void mpt_SwitchRfSetting(PADAPTER pAdapter)
 	u8 ChannelToSw = pmp->channel;
 	u8 ulRateIdx = pmp->rateidx;
 	u8 ulbandwidth = pmp->bandwidth;
-
+	PMPT_CONTEXT	pMptCtx = &(pAdapter->mppriv.MptCtx);
 #ifdef CONFIG_USB_HCI
 
 	if (IS_92C_SERIAL(pHalData->VersionID))
 	{
-		if (ulRateIdx < MPT_RATE_6M)	// CCK rate
+		//92CE-VAU (92cu mCard)
+		if( BOARD_MINICARD == pHalData->BoardType)
 		{
-			write_rfreg(pAdapter, 0, RF_SYN_G2, 0x0F400);
+			if (ulRateIdx < MPT_RATE_6M)					// CCK rate
+			{
+				write_rfreg(pAdapter, 0, RF_SYN_G2, 0x0F400);
+			}			
+			else 											//OFDM~MCS rate
+			{
+				write_rfreg(pAdapter, 0, RF_SYN_G2, 0x4F000);			
+			}
 		}
-		else if (ChannelToSw & BIT0)	// OFDM rate, odd number channel
+		else	//92CU dongle
 		{
-			write_rfreg(pAdapter, 0, RF_SYN_G2, 0x4F200);
-		}
-		else if (ChannelToSw == 4)	// OFDM rate, even number channel
-		{
-			write_rfreg(pAdapter, 0, RF_SYN_G2, 0x28200);
-			write_rfreg(pAdapter, 0, RF_SYN_G6, 0xe0004);
-			write_rfreg(pAdapter, 0, RF_SYN_G7, 0x709);
-			rtw_msleep_os(1);
-			write_rfreg(pAdapter, 0, RF_SYN_G7, 0x4B333);
-		}
-		else if(ChannelToSw == 10)	// OFDM rate, even number channel
-		{
-			write_rfreg(pAdapter, 0, RF_SYN_G2, 0x28000);
-			write_rfreg(pAdapter, 0, RF_SYN_G6, 0xe000A);
-			write_rfreg(pAdapter, 0, RF_SYN_G7, 0x709);
-			rtw_msleep_os(1);
-			write_rfreg(pAdapter, 0, RF_SYN_G7, 0x7B333);
-		}
-		else if(ChannelToSw == 12)	// OFDM rate, even number channel
-		{
-			write_rfreg(pAdapter, 0, RF_SYN_G2, 0x28200);
-			write_rfreg(pAdapter, 0, RF_SYN_G6, 0xe000C);
-			write_rfreg(pAdapter, 0, RF_SYN_G7, 0x50B);
-			rtw_msleep_os(1);
-			write_rfreg(pAdapter, 0, RF_SYN_G7, 0x4B333);
-		}
-		else
-		{
-			write_rfreg(pAdapter, 0, RF_SYN_G2, 0x4F200);
+			if (ulRateIdx < MPT_RATE_6M)	// CCK rate
+			{
+				write_rfreg(pAdapter, 0, RF_SYN_G2, 0x0F400);
+			}
+			else if (ChannelToSw & BIT0)	// OFDM rate, odd number channel
+			{
+				write_rfreg(pAdapter, 0, RF_SYN_G2, 0x4F200);
+			}
+			else if (ChannelToSw == 4)	// OFDM rate, even number channel
+			{
+				write_rfreg(pAdapter, 0, RF_SYN_G2, 0x28200);
+				write_rfreg(pAdapter, 0, RF_SYN_G6, 0xe0004);
+				write_rfreg(pAdapter, 0, RF_SYN_G7, 0x709);
+				rtw_msleep_os(1);
+				write_rfreg(pAdapter, 0, RF_SYN_G7, 0x4B333);
+			}
+			else if(ChannelToSw == 10)	// OFDM rate, even number channel
+			{
+				write_rfreg(pAdapter, 0, RF_SYN_G2, 0x28000);
+				write_rfreg(pAdapter, 0, RF_SYN_G6, 0xe000A);
+				write_rfreg(pAdapter, 0, RF_SYN_G7, 0x709);
+				rtw_msleep_os(1);
+				write_rfreg(pAdapter, 0, RF_SYN_G7, 0x7B333);
+			}
+			else if(ChannelToSw == 12)	// OFDM rate, even number channel
+			{
+				write_rfreg(pAdapter, 0, RF_SYN_G2, 0x28200);
+				write_rfreg(pAdapter, 0, RF_SYN_G6, 0xe000C);
+				write_rfreg(pAdapter, 0, RF_SYN_G7, 0x50B);
+				rtw_msleep_os(1);
+				write_rfreg(pAdapter, 0, RF_SYN_G7, 0x4B333);
+			}
+			else
+			{
+				write_rfreg(pAdapter, 0, RF_SYN_G2, 0x4F200);
+			}
 		}
 	}
 	else	//88cu
 	{
-#if 0
+
 		//mcard interface
-		if (pAdapter->HalFunc.GetInterfaceSelectionHandler(pAdapter) == INTF_SEL2_MINICARD)
+		
+		if( BOARD_MINICARD == pHalData->BoardType)
 		{
 			if (ulRateIdx < MPT_RATE_6M)	// CCK rate
 			{
@@ -843,11 +858,23 @@ static void mpt_SwitchRfSetting(PADAPTER pAdapter)
 			}
 			else 	//OFDM~MCS rate
 			{
-				write_rfreg(pAdapter, 0, RF_SYN_G2, 0x4F000);
+				write_rfreg(pAdapter, 0, RF_SYN_G2, 0x4F200);			
+			}
+
+			if(ChannelToSw == 6 || ChannelToSw == 8)
+			{				
+				write_bbreg(pAdapter, rOFDM0_XAAGCCore1, bMaskByte0, 0x22);
+				write_bbreg(pAdapter, rOFDM0_XBAGCCore1, bMaskByte0, 0x22);	
+				write_bbreg(pAdapter, rOFDM0_RxDetector1, bMaskByte0, 0x4F);												
+			}
+			else
+			{
+				write_bbreg(pAdapter, rOFDM0_XAAGCCore1, bMaskByte0, 0x20);
+				write_bbreg(pAdapter, rOFDM0_XBAGCCore1, bMaskByte0, 0x20);				
+				write_bbreg(pAdapter, rOFDM0_RxDetector1, bMaskByte0, pMptCtx->backup0xc30);																
 			}
 		}
 		else
-#endif
 		{
 			if (ulRateIdx < MPT_RATE_6M)	// CCK rate
 			{
@@ -874,6 +901,22 @@ static void mpt_SwitchRfSetting(PADAPTER pAdapter)
 	{
 		write_rfreg(pAdapter, 0, RF_SYN_G2, 0x4F000);
 	}
+	//88CE
+	if(!IS_92C_SERIAL(pHalData->VersionID))
+	{
+		if(ChannelToSw == 6 || ChannelToSw == 8)
+		{				
+			write_bbreg(pAdapter, rOFDM0_XAAGCCore1, bMaskByte0, 0x22);
+			write_bbreg(pAdapter, rOFDM0_XBAGCCore1, bMaskByte0, 0x22);				
+			write_bbreg(pAdapter, rOFDM0_RxDetector1, bMaskByte0, 0x4F);												
+		}
+		else
+		{
+			write_bbreg(pAdapter, rOFDM0_XAAGCCore1, bMaskByte0, pMptCtx->backup0xc50);
+			write_bbreg(pAdapter, rOFDM0_XBAGCCore1, bMaskByte0, pMptCtx->backup0xc58);				
+			write_bbreg(pAdapter, rOFDM0_RxDetector1, bMaskByte0, pMptCtx->backup0xc30);																
+		}
+	 }
 
 #endif
 }
@@ -1005,7 +1048,7 @@ static void MPT_CCKTxPowerAdjustbyIndex(PADAPTER pAdapter, BOOLEAN beven)
 		{
 			if (pHalData->dmpriv.bCCKinCH14)
 			{
-				if (_rtw_memcmp((void*)&TempCCk, (void*)&CCKSwingTable_Ch14[i][2], 4) == 0)
+				if (_rtw_memcmp((void*)&TempCCk, (void*)&CCKSwingTable_Ch14[i][2], 4) == _TRUE)
 				{
 					CCK_index_old = (u8) i;
 //					RTPRINT(FINIT, INIT_TxPower,("MPT_CCKTxPowerAdjustbyIndex: Initial reg0x%x = 0x%lx, CCK_index=0x%x, ch 14 %d\n",
@@ -1015,7 +1058,7 @@ static void MPT_CCKTxPowerAdjustbyIndex(PADAPTER pAdapter, BOOLEAN beven)
 			}
 			else
 			{
-				if (_rtw_memcmp((void*)&TempCCk, (void*)&CCKSwingTable_Ch1_Ch13[i][2], 4) == 0)
+				if (_rtw_memcmp((void*)&TempCCk, (void*)&CCKSwingTable_Ch1_Ch13[i][2], 4) == _TRUE)
 				{
 					CCK_index_old = (u8) i;
 //					RTPRINT(FINIT, INIT_TxPower,("MPT_CCKTxPowerAdjustbyIndex: Initial reg0x%x = 0x%lx, CCK_index=0x%x, ch14 %d\n",
@@ -2062,6 +2105,21 @@ void SetPacketTx(PADAPTER padapter)
 
 }
 
+void SetPacketRx(PADAPTER pAdapter, u8 bStartRx)
+{
+	HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(pAdapter);
+
+	if(bStartRx)
+	{
+		// Accept CRC error and destination address
+		pHalData->ReceiveConfig |= (RCR_ACRC32|RCR_AAP);
+		rtw_write32(pAdapter, REG_RCR, pHalData->ReceiveConfig);
+	}
+	else
+	{
+		rtw_write32(pAdapter, REG_RCR, 0);
+	}
+}
 
 void ResetPhyRxPktCount(PADAPTER pAdapter)
 {

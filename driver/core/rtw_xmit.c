@@ -129,11 +129,7 @@ _func_enter_;
 	Please also apply  free_txobj to link_up all the xmit_frames...
 	*/
 
-	#ifdef MEM_ALLOC_REFINE
 	pxmitpriv->pallocated_frame_buf = rtw_zvmalloc(NR_XMITFRAME * sizeof(struct xmit_frame) + 4);
-	#else
-	pxmitpriv->pallocated_frame_buf = rtw_zmalloc(NR_XMITFRAME * sizeof(struct xmit_frame) + 4);
-	#endif
 	
 	if (pxmitpriv->pallocated_frame_buf  == NULL){
 		pxmitpriv->pxmit_frame_buf =NULL;
@@ -173,11 +169,7 @@ _func_enter_;
 	_rtw_init_queue(&pxmitpriv->free_xmitbuf_queue);
 	_rtw_init_queue(&pxmitpriv->pending_xmitbuf_queue);
 
-	#ifdef MEM_ALLOC_REFINE
 	pxmitpriv->pallocated_xmitbuf = rtw_zvmalloc(NR_XMITBUFF * sizeof(struct xmit_buf) + 4);
-	#else
-	pxmitpriv->pallocated_xmitbuf = rtw_zmalloc(NR_XMITBUFF * sizeof(struct xmit_buf) + 4);
-	#endif
 	
 	if (pxmitpriv->pallocated_xmitbuf  == NULL){
 		RT_TRACE(_module_rtl871x_xmit_c_,_drv_err_,("alloc xmit_buf fail!\n"));
@@ -231,11 +223,7 @@ _func_enter_;
 	// Init xmit extension buff
 	_rtw_init_queue(&pxmitpriv->free_xmit_extbuf_queue);
 
-	#ifdef MEM_ALLOC_REFINE
 	pxmitpriv->pallocated_xmit_extbuf = rtw_zvmalloc(NR_XMIT_EXTBUFF * sizeof(struct xmit_buf) + 4);
-	#else
-	pxmitpriv->pallocated_xmit_extbuf = rtw_zmalloc(NR_XMIT_EXTBUFF * sizeof(struct xmit_buf) + 4);
-	#endif
 	
 	if (pxmitpriv->pallocated_xmit_extbuf  == NULL){
 		RT_TRACE(_module_rtl871x_xmit_c_,_drv_err_,("alloc xmit_extbuf fail!\n"));
@@ -359,20 +347,12 @@ void _rtw_free_xmit_priv (struct xmit_priv *pxmitpriv)
 	}
 
 	if(pxmitpriv->pallocated_frame_buf) {
-		#ifdef MEM_ALLOC_REFINE
 		rtw_vmfree(pxmitpriv->pallocated_frame_buf, NR_XMITFRAME * sizeof(struct xmit_frame) + 4);
-		#else
-		rtw_mfree(pxmitpriv->pallocated_frame_buf, NR_XMITFRAME * sizeof(struct xmit_frame) + 4);
-		#endif
 	}
 	
 
 	if(pxmitpriv->pallocated_xmitbuf) {
-		#ifdef MEM_ALLOC_REFINE
 		rtw_vmfree(pxmitpriv->pallocated_xmitbuf, NR_XMITBUFF * sizeof(struct xmit_buf) + 4);
-		#else
-		rtw_mfree(pxmitpriv->pallocated_xmitbuf, NR_XMITBUFF * sizeof(struct xmit_buf) + 4);
-		#endif
 	}
 
 	// free xmit extension buff
@@ -390,11 +370,7 @@ void _rtw_free_xmit_priv (struct xmit_priv *pxmitpriv)
 	}
 
 	if(pxmitpriv->pallocated_xmit_extbuf) {
-		#ifdef MEM_ALLOC_REFINE
 		rtw_vmfree(pxmitpriv->pallocated_xmit_extbuf, NR_XMIT_EXTBUFF * sizeof(struct xmit_buf) + 4);	
-		#else
-		rtw_mfree(pxmitpriv->pallocated_xmit_extbuf, NR_XMIT_EXTBUFF * sizeof(struct xmit_buf) + 4);	
-		#endif
 	}
 
 	rtw_free_hwxmits(padapter);
@@ -636,6 +612,13 @@ static s32 update_attrib(_adapter *padapter, _pkt *pkt, struct pkt_attrib *pattr
 		}
 	}
 
+	#ifdef CONFIG_SET_SCAN_DENY_TIMER
+	if ( (pattrib->ether_type == 0x888e) || (pattrib->dhcp_pkt == 1) )
+	{
+		rtw_set_scan_deny(pmlmepriv, 3000);
+	}
+	#endif
+
 #ifdef CONFIG_LPS
 	// If EAPOL , ARP , OR DHCP packet, driver must be in active mode.
 	if ( (pattrib->ether_type == 0x0806) || (pattrib->ether_type == 0x888e) || (pattrib->dhcp_pkt == 1) )
@@ -652,11 +635,10 @@ static s32 update_attrib(_adapter *padapter, _pkt *pkt, struct pkt_attrib *pattr
 	} else {
 		psta = rtw_get_stainfo(pstapriv, pattrib->ra);
 		if (psta == NULL)	{ // if we cannot get psta => drrp the pkt
-			RT_TRACE(_module_rtl871x_xmit_c_, _drv_alert_, ("\nupdate_attrib => get sta_info fail \n"));
-			RT_TRACE(_module_rtl871x_xmit_c_, _drv_alert_, ("\nra:%x:%x:%x:%x:%x:%x\n", 
-			pattrib->ra[0], pattrib->ra[1],
-			pattrib->ra[2], pattrib->ra[3],
-			pattrib->ra[4], pattrib->ra[5]));
+			RT_TRACE(_module_rtl871x_xmit_c_, _drv_alert_, ("\nupdate_attrib => get sta_info fail, ra:" MACSTR"\n", MAC2STR(pattrib->ra)));
+			#ifdef DBG_TX_DROP_FRAME
+			DBG_871X("DBG_TX_DROP_FRAME %s get sta_info fail, ra:" MACSTR"\n", __FUNCTION__, MAC2STR(pattrib->ra));
+			#endif
 			res =_FAIL;
 			goto exit;
 		}
@@ -670,11 +652,10 @@ static s32 update_attrib(_adapter *padapter, _pkt *pkt, struct pkt_attrib *pattr
 	else
 	{
 		// if we cannot get psta => drop the pkt
-		RT_TRACE(_module_rtl871x_xmit_c_, _drv_alert_, ("\nupdate_attrib => get sta_info fail\n"));
-		RT_TRACE(_module_rtl871x_xmit_c_, _drv_alert_,
-			 ("\nra:%x:%x:%x:%x:%x:%x\n",
-			  pattrib->ra[0], pattrib->ra[1], pattrib->ra[2],
-			  pattrib->ra[3], pattrib->ra[4], pattrib->ra[5]));
+		RT_TRACE(_module_rtl871x_xmit_c_, _drv_alert_, ("\nupdate_attrib => get sta_info fail, ra:" MACSTR "\n", MAC2STR(pattrib->ra)));
+		#ifdef DBG_TX_DROP_FRAME
+		DBG_871X("DBG_TX_DROP_FRAME %s get sta_info fail, ra:" MACSTR"\n", __FUNCTION__, MAC2STR(pattrib->ra));
+		#endif
 		res = _FAIL;
 		goto exit;
 	}
@@ -708,7 +689,10 @@ static s32 update_attrib(_adapter *padapter, _pkt *pkt, struct pkt_attrib *pattr
 
 		if((pattrib->ether_type != 0x888e) && (check_fwstate(pmlmepriv, WIFI_MP_STATE) == _FALSE))
 		{
-			RT_TRACE(_module_rtl871x_xmit_c_,_drv_err_,("\npsta->ieee8021x_blocked == _TRUE pattrib->ether_type(%.4x) != 0x888\n",pattrib->ether_type));
+			RT_TRACE(_module_rtl871x_xmit_c_,_drv_err_,("\npsta->ieee8021x_blocked == _TRUE,  pattrib->ether_type(%.4x) != 0x888e\n",pattrib->ether_type));
+			#ifdef DBG_TX_DROP_FRAME
+			DBG_871X("DBG_TX_DROP_FRAME %s psta->ieee8021x_blocked == _TRUE,  pattrib->ether_type(%.4x) != 0x888e\n", __FUNCTION__,pattrib->ether_type);
+			#endif
 			res = _FAIL;
 			goto exit;
 		}
@@ -753,6 +737,9 @@ static s32 update_attrib(_adapter *padapter, _pkt *pkt, struct pkt_attrib *pattr
 			if(padapter->securitypriv.busetkipkey==_FAIL)
 			{
 				RT_TRACE(_module_rtl871x_xmit_c_,_drv_err_,("\npadapter->securitypriv.busetkipkey(%d)==_FAIL drop packet\n", padapter->securitypriv.busetkipkey));
+				#ifdef DBG_TX_DROP_FRAME
+				DBG_871X("DBG_TX_DROP_FRAME %s padapter->securitypriv.busetkipkey(%d)==_FAIL drop packet\n", __FUNCTION__, padapter->securitypriv.busetkipkey);
+				#endif
 				res =_FAIL;
 				goto exit;
 			}
@@ -836,13 +823,13 @@ _func_enter_;
 			
 			if(bmcst)
 			{
-				if(_rtw_memcmp(psecuritypriv->dot118021XGrptxmickey[psecuritypriv->dot118021XGrpKeyid-1].skey, null_key, 16)==_TRUE){
+				if(_rtw_memcmp(psecuritypriv->dot118021XGrptxmickey[psecuritypriv->dot118021XGrpKeyid].skey, null_key, 16)==_TRUE){
 					//DbgPrint("\nxmitframe_addmic:stainfo->dot11tkiptxmickey==0\n");
 					//rtw_msleep_os(10);
 					return _FAIL;
 				}				
 				//start to calculate the mic code
-				rtw_secmicsetkey(&micdata, psecuritypriv->dot118021XGrptxmickey[psecuritypriv->dot118021XGrpKeyid-1].skey);
+				rtw_secmicsetkey(&micdata, psecuritypriv->dot118021XGrptxmickey[psecuritypriv->dot118021XGrpKeyid].skey);
 			}
 			else
 			{
@@ -1290,8 +1277,15 @@ void fill_tdls_setup_req_frbody(_adapter * padapter, struct xmit_frame * pxmitfr
 	_rtw_memset(&ht_capie, 0, sizeof(struct ieee80211_ht_cap));
 
 	ht_capie.cap_info = IEEE80211_HT_CAP_SUP_WIDTH |IEEE80211_HT_CAP_SGI_20 |IEEE80211_HT_CAP_SM_PS |
-						IEEE80211_HT_CAP_SGI_40 | IEEE80211_HT_CAP_TX_STBC |
-						IEEE80211_HT_CAP_MAX_AMSDU | IEEE80211_HT_CAP_DSSSCCK40;
+						IEEE80211_HT_CAP_SGI_40 | IEEE80211_HT_CAP_TX_STBC |IEEE80211_HT_CAP_DSSSCCK40;
+
+	{
+		u32 rx_packet_offset, max_recvbuf_sz;
+		padapter->HalFunc.GetHalDefVarHandler(padapter, HAL_DEF_RX_PACKET_OFFSET, &rx_packet_offset);
+		padapter->HalFunc.GetHalDefVarHandler(padapter, HAL_DEF_MAX_RECVBUF_SZ, &max_recvbuf_sz);
+		if(max_recvbuf_sz-rx_packet_offset>(8191-256))
+			ht_capie.cap_info = ht_capie.cap_info |IEEE80211_HT_CAP_MAX_AMSDU;
+	}
 	
 	ht_capie.ampdu_params_info = (IEEE80211_HT_CAP_AMPDU_FACTOR&0x03) |
 									(IEEE80211_HT_CAP_AMPDU_DENSITY&0x00) ; 
@@ -1465,8 +1459,15 @@ void fill_tdls_setup_rsp_frbody(_adapter * padapter, struct xmit_frame * pxmitfr
 	_rtw_memset(&ht_capie, 0, sizeof(struct ieee80211_ht_cap));
 
 	ht_capie.cap_info = IEEE80211_HT_CAP_SUP_WIDTH |IEEE80211_HT_CAP_SGI_20 |IEEE80211_HT_CAP_SM_PS |
-						IEEE80211_HT_CAP_SGI_40 | IEEE80211_HT_CAP_TX_STBC |
-						IEEE80211_HT_CAP_MAX_AMSDU | IEEE80211_HT_CAP_DSSSCCK40;
+						IEEE80211_HT_CAP_SGI_40 | IEEE80211_HT_CAP_TX_STBC |IEEE80211_HT_CAP_DSSSCCK40;
+
+	{
+		u32 rx_packet_offset, max_recvbuf_sz;
+		padapter->HalFunc.GetHalDefVarHandler(padapter, HAL_DEF_RX_PACKET_OFFSET, &rx_packet_offset);
+		padapter->HalFunc.GetHalDefVarHandler(padapter, HAL_DEF_MAX_RECVBUF_SZ, &max_recvbuf_sz);
+		if(max_recvbuf_sz-rx_packet_offset>(8191-256))
+			ht_capie.cap_info = ht_capie.cap_info |IEEE80211_HT_CAP_MAX_AMSDU;
+	}
 	
 	ht_capie.ampdu_params_info = (IEEE80211_HT_CAP_AMPDU_FACTOR&0x03) |
 									(IEEE80211_HT_CAP_AMPDU_DENSITY&0x00) ; 
@@ -1759,8 +1760,15 @@ void fill_tdls_dis_rsp_frbody(_adapter * padapter, struct xmit_frame * pxmitfram
 	_rtw_memset(&ht_capie, 0, sizeof(struct ieee80211_ht_cap));
 
 	ht_capie.cap_info = IEEE80211_HT_CAP_SUP_WIDTH |IEEE80211_HT_CAP_SGI_20 |IEEE80211_HT_CAP_SM_PS |
-						IEEE80211_HT_CAP_SGI_40 | IEEE80211_HT_CAP_TX_STBC |
-						IEEE80211_HT_CAP_MAX_AMSDU | IEEE80211_HT_CAP_DSSSCCK40;
+						IEEE80211_HT_CAP_SGI_40 | IEEE80211_HT_CAP_TX_STBC |IEEE80211_HT_CAP_DSSSCCK40;
+
+	{
+		u32 rx_packet_offset, max_recvbuf_sz;
+		padapter->HalFunc.GetHalDefVarHandler(padapter, HAL_DEF_RX_PACKET_OFFSET, &rx_packet_offset);
+		padapter->HalFunc.GetHalDefVarHandler(padapter, HAL_DEF_MAX_RECVBUF_SZ, &max_recvbuf_sz);
+		if(max_recvbuf_sz-rx_packet_offset>(8191-256))
+			ht_capie.cap_info = ht_capie.cap_info |IEEE80211_HT_CAP_MAX_AMSDU;
+	}
 	
 	ht_capie.ampdu_params_info = (IEEE80211_HT_CAP_AMPDU_FACTOR&0x03) |
 									(IEEE80211_HT_CAP_AMPDU_DENSITY&0x00) ; 
@@ -3275,12 +3283,18 @@ s32 rtw_xmit(_adapter *padapter, _pkt *pkt)
 	pxmitframe = rtw_alloc_xmitframe(pxmitpriv);
 	if (pxmitframe == NULL) {
 		RT_TRACE(_module_xmit_osdep_c_, _drv_err_, ("rtw_xmit: no more pxmitframe\n"));
+		#ifdef DBG_TX_DROP_FRAME
+		DBG_871X("DBG_TX_DROP_FRAME %s no more pxmitframe\n", __FUNCTION__);
+		#endif
 		return -1;
 	}
 
 	res = update_attrib(padapter, pkt, &pxmitframe->attrib);
 	if (res == _FAIL) {
 		RT_TRACE(_module_xmit_osdep_c_, _drv_err_, ("rtw_xmit: update attrib fail\n"));
+		#ifdef DBG_TX_DROP_FRAME
+		DBG_871X("DBG_TX_DROP_FRAME %s update attrib fail\n", __FUNCTION__);
+		#endif
 		rtw_free_xmitframe(pxmitpriv, pxmitframe);
 		return -1;
 	}

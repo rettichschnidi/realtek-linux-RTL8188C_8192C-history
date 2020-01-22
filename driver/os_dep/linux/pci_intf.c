@@ -1434,16 +1434,6 @@ static void rtw_dev_unload(_adapter *padapter)
 			padapter->bSurpriseRemoved = _TRUE;
 		}
 
-		//s6.
-		if(padapter->dvobj_deinit)
-		{
-			padapter->dvobj_deinit(padapter);
-		}
-		else
-		{
-			RT_TRACE(_module_hci_intfs_c_,_drv_err_,("Initialize hcipriv.hci_priv_init error!!!\n"));
-		}
-
 		padapter->bup = _FALSE;
 
 	}
@@ -1508,6 +1498,8 @@ static int rtw_resume(struct pci_dev *pdev)
 #define pci_iounmap(x,y) iounmap(y)
 #endif
 
+extern char* ifname;
+
 /*
  * drv_init() - a device potentially for us
  *
@@ -1565,12 +1557,12 @@ static int rtw_drv_init(struct pci_dev *pdev, const struct pci_device_id *pdid)
 
 	//step 1. set USB interface data
 	// init data
-	pnetdev = rtw_init_netdev();
+	pnetdev = rtw_init_netdev(NULL);
 	if (!pnetdev){
 		err = -ENOMEM;
 		goto fail1;
 	}
-	rtw_init_netdev_name(pnetdev);
+	rtw_init_netdev_name(pnetdev,ifname);
 
 	if(bdma64){
 		pnetdev->features |= NETIF_F_HIGHDMA;
@@ -1643,13 +1635,13 @@ static int rtw_drv_init(struct pci_dev *pdev, const struct pci_device_id *pdid)
 		status = _FAIL;
 		goto error;
 	}
-		
+
+	//step 3.	initialize the dvobj_priv 
 	padapter->dvobj_init=&pci_dvobj_init;
 	padapter->dvobj_deinit=&pci_dvobj_deinit;
 	padapter->intf_start=&pci_intf_start;
 	padapter->intf_stop=&pci_intf_stop;
 
-	//initialize the dvobj_priv 		
 	if (padapter->dvobj_init == NULL){
 		RT_TRACE(_module_hci_intfs_c_,_drv_err_,("\n Initialize dvobjpriv.dvobj_init error!!!\n"));
 		goto error;
@@ -1663,7 +1655,10 @@ static int rtw_drv_init(struct pci_dev *pdev, const struct pci_device_id *pdid)
 
 	pnetdev->irq = pdev->irq;
 
-	//step 4.
+	//step 4. read efuse/eeprom data and get mac_addr
+	intf_read_chip_info(padapter);	
+
+	//step 5. 
 	status = rtw_init_drv_sw(padapter);
 	if(status ==_FAIL){
 		RT_TRACE(_module_hci_intfs_c_,_drv_err_,("Initialize driver software resource Failed!\n"));
@@ -1675,11 +1670,6 @@ static int rtw_drv_init(struct pci_dev *pdev, const struct pci_device_id *pdid)
 		RT_TRACE(_module_hci_intfs_c_,_drv_err_,("Initialize PCI desc ring Failed!\n"));
 		goto error;
 	}
-	
-
-
-	//step 5. read efuse/eeprom data and get mac_addr
-	intf_read_chip_info(padapter);	
 
 	rtw_macaddr_cfg(padapter->eeprompriv.mac_addr);
 
@@ -1833,7 +1823,16 @@ _func_exit_;
 	pci_set_drvdata(pdev, NULL);
 
 	padapter->HalFunc.inirp_deinit(padapter);
-
+	//s6.
+	if(padapter->dvobj_deinit)
+	{
+		padapter->dvobj_deinit(padapter);
+	}
+	else
+	{
+		RT_TRACE(_module_hci_intfs_c_,_drv_err_,("Initialize hcipriv.hci_priv_init error!!!\n"));
+	}
+	
 	rtw_free_drv_sw(padapter);
 
 	//after rtw_free_drv_sw(), padapter has beed freed, don't refer to it.

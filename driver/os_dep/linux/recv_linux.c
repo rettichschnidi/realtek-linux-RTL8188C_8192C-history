@@ -220,7 +220,7 @@ void rtw_hostapd_mlme_rx(_adapter *padapter, union recv_frame *precv_frame)
 #endif	
 }
 
-void rtw_recv_indicatepkt(_adapter *padapter, union recv_frame *precv_frame)
+int rtw_recv_indicatepkt(_adapter *padapter, union recv_frame *precv_frame)
 {	
 	struct recv_priv *precvpriv;
 	_queue	*pfree_recv_queue;	     
@@ -238,8 +238,7 @@ _func_enter_;
 #ifdef CONFIG_DRVEXT_MODULE		
 	if (drvext_rx_handler(padapter, precv_frame->u.hdr.rx_data, precv_frame->u.hdr.len) == _SUCCESS)
 	{		
-		rtw_free_recvframe(precv_frame, pfree_recv_queue);
-		return;
+		goto _recv_indicatepkt_drop;
 	}
 #endif
 
@@ -341,7 +340,7 @@ _recv_indicatepkt_end:
 
 _func_exit_;		
 
-        return;		
+        return _SUCCESS;		
 
 _recv_indicatepkt_drop:
 
@@ -351,6 +350,8 @@ _recv_indicatepkt_drop:
 
 	 
  	 precvpriv->rx_drop++;	
+
+	 return _FAIL;
 
 _func_exit_;
 
