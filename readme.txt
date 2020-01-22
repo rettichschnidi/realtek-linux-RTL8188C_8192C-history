@@ -15,20 +15,11 @@
 		2.9 SoftAP_Mode_features.pdf
 		2.10 linux_dhcp_server_notes.txt
 		2.11 Quick_Start_Guide_for_Bridge.pdf
-		2.12 sample_code/
-			2.12.1 hardware_wps_pbc/
-				2.12.1.1 Readme.txt
-				2.12.1.2 sample.c
-			2.12.2 WiFi_Direct_User_Interface/
-				2.12.2.1 p2p_api_test_linux.c
-				2.12.2.2 p2p_ui_test_linux.c
-				2.12.2.3 p2p_test.h
-				2.12.2.4 Start_Guide_P2P_User_Interface_Linux.pdf
 		2.13 RTK_Wi-Fi_Direct_Programming_guide.pdf
 		2.14 RTL8192D_operation_mode.pdf
 
 	3. driver/ 
-		3.1 rtl8188C_8192C_8192D_usb_linux_v3.3.2_3192.20120103.tar.gz
+		3.1 rtl8188C_8192C_8192D_usb_linux_v3.4.2_3727.20120404.tar.gz
 			Naming rule: rtlCHIPS_linux_vM.N.P_ssss.yyyymmdd.tar.gz
 			where:
 				CHIPS: supported chips
@@ -66,22 +57,32 @@
 		
 	5. wireless_tools/
 		5.1 wireless_tools.30.rtl.tar.gz
+
+	6. hardware_wps_pbc/
+		6.1 Readme.txt
+		6.2 sample.c
 		
-	6. android_reference_codes/
-		6.1 realtek_wifi_SDK_for_android_20111103.tar.gz
+	7. WiFi_Direct_User_Interface/
+		7.1 p2p_api_test_linux.c
+		7.2 p2p_ui_test_linux.c
+		7.3 p2p_test.h
+		7.4 Start_Guide_P2P_User_Interface_Linux.pdf
+		
+	8. android_reference_codes/
+		8.1 realtek_wifi_SDK_for_android_20111103.tar.gz
 			This tar ball includes our android wifi reference codes
 			
-		6.2 realtek_wifi_SDK_for_android.txt
+		8.2 realtek_wifi_SDK_for_android.txt
 			Guide for porting Realtek wifi onto your Android system
 			
-	7. android_reference_codes_ICS/
-		7.1 realtek_wifi_SDK_for_android_ICS_20111229.tar.gz
+	9. android_reference_codes_ICS_nl80211/
+		9.1 realtek_wifi_SDK_for_android_ICS_20120404.tar.gz
 			This tar ball includes our android wifi reference codes for Android 4.x (ICS)
 			
-		7.2 Realtek_Wi-Fi_SDK_for_Android_ICS.pdf
+		9.2 Realtek_Wi-Fi_SDK_for_Android_ICS.pdf
 			Guide for porting Realtek wifi onto your Android 4.x (ICS) system
 			
-	8. install.sh 
+	10. install.sh 
 		Script to compile and install WiFi driver easily in PC-Linux
 	
 ==================================================================================================================
@@ -104,7 +105,7 @@
 			(*) Please refer to document/RTK_Wi-Fi_Direct_Programming_guide.pdf
 			(*) Please use wpa_supplicant_hostapd-0.8_rtw_20111118.zip
 			(*) Please refer to document/linux_dhcp_server_notes.txt
-			(*) Please refer to sample_code/WiFi_Direct_User_Interface/
+			(*) Please refer to WiFi_Direct_User_Interface/
 ==================================================================================================================
 		User Guide for WPS2.0
 ==================================================================================================================
@@ -117,4 +118,4 @@
 		User Guide for Applying Wi-Fi solution onto Andriod System
 ==================================================================================================================
 			(*) For Android 1.6 ~ 2.3, Please refer to android_reference_codes/realtek_wifi_SDK_for_android.txt
-			(*) For Android 4.x (ICS), please refer to android_reference_codes_ICS/Realtek_Wi-Fi_SDK_for_Android_ICS.pdf
+			(*) For Android 4.x (ICS), please refer to android_reference_codes_ICS_nl80211/Realtek_Wi-Fi_SDK_for_Android_ICS.pdf
