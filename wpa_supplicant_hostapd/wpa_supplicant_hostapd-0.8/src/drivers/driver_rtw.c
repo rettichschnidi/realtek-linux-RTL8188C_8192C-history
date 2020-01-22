@@ -1135,8 +1135,8 @@ static struct hostapd_hw_modes *rtl871x_get_hw_feature_data_ops(void *priv,
 	modes[2].rates[5] = 360;
 	modes[2].rates[6] = 480;
 	modes[2].rates[7] = 540;
-
 	
+
 	//
 #if 0	
 #define HT_CAP_INFO_LDPC_CODING_CAP		((u16) BIT(0))
@@ -1329,7 +1329,7 @@ static int rtl871x_sta_remove_ops(void *priv, const u8 *addr)
 //static int rtl871x_set_beacon_ops(const char *iface, void *priv,
 //			   u8 *head, size_t head_len,
 //			   u8 *tail, size_t tail_len)
-int rtl871x_set_beacon_ops(void *priv, const u8 *head, size_t head_len,
+static int rtl871x_set_beacon_ops(void *priv, const u8 *head, size_t head_len,
 			  const u8 *tail, size_t tail_len, int dtim_period,
 			  int beacon_int)
 {

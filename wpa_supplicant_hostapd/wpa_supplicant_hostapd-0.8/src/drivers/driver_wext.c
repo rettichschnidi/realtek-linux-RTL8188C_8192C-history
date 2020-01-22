@@ -980,7 +980,7 @@ static int wpa_driver_wext_set_probe_req_ie(struct wpa_driver_wext_data *drv, co
 	os_strlcpy(iwr.ifr_name, drv->ifname, IFNAMSIZ);
 
 	os_memcpy(pbuf, extra_ies, extra_ies_len);
-	
+
 	iwr.u.data.pointer = (caddr_t)pbuf;
 	iwr.u.data.length = extra_ies_len;
 	iwr.u.data.flags = 0x8766;//magic number

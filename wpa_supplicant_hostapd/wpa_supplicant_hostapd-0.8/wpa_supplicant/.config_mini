@@ -200,7 +200,7 @@ CONFIG_IEEE8021X_EAPOL=y
 # Wi-Fi Protected Setup (WPS)
 CONFIG_WPS=y
 # Enable WSC 2.0 support
-CONFIG_WPS2=y
+#CONFIG_WPS2=y
 
 # EAP-IKEv2
 #CONFIG_EAP_IKEV2=y

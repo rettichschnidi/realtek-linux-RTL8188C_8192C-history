@@ -4,9 +4,15 @@
 	1. ReleaseNotes.doc
 
 	2. document/
-		2.1 sample code for hardware wps pbc/
-			2.1.1 Readme.txt
-			2.2.2 sample.c
+		2.1 sample code/
+			2.1.1 hardware wps pbc/
+				2.1.1.1 Readme.txt
+				2.1.1.2 sample.c
+			2.1.2 WiFi Direct User Interface/
+				2.1.2.1 p2p_api_test_linux.c
+				2.1.2.2 p2p_ui_test_linux.c
+				2.1.2.3 p2p_test.h
+				2.1.2.4 Start Guide P2P User Interface V03 Linux.doc
 		2.2 WiFi Direct APIs/
 			2.2.1 p2p.h
 			2.2.2 RTK Wi-Fi Direct Programming guide 20110601.doc
@@ -19,7 +25,8 @@
 		2.9 RTL8192C_usb_quick_installation_guide.ppt	
 		2.10 SoftAP_Mode_features.doc
 		2.11 Wireless tools porting guide.doc		
-		2.12 wpa_cli_with_wpa_supplicant_20100728.doc		
+		2.12 wpa_cli_with_wpa_supplicant_20100728.doc
+		2.13 linux_dhcp_server_notes.txt
 
 	3. driver/ 
 		driver source code
@@ -162,12 +169,14 @@
 ==================================================================================================================
 			(*) Please refer to the document/Quick_Start_Guide_for_SoftAP.doc			
 			(*) Please use wpa_supplicant_hostapd-0.8_rtw_20110524.zip
+			(*) Please refer to the linux_dhcp_server_notes.txt
 ==================================================================================================================
 			User Guide for Wi-Fi Direct
 ==================================================================================================================
-			(*) Please refer to the document/RTK Wi-Fi Direct Programming guide 20110601.doc	
+			(*) Please refer to the document/RTK Wi-Fi Direct Programming guide.doc	
 			(*) Please use wpa_supplicant_hostapd-0.8_rtw_20110524.zip			
-
+			(*) Please refer to the linux_dhcp_server_notes.txt
+			(*) Please refer to the folder sample code/WiFi Direct User Interface/
 ==================================================================================================================
 		Power Saving Mode
 ==================================================================================================================
