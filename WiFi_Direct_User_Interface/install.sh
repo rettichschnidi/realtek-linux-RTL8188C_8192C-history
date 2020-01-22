@@ -1,8 +1,12 @@
 
-if [ -e ../wpa_supplicant_hostapd/wpa_supplicant_hostapd-0.8_rtw_20111118.zip ]; then
-        echo "Checking wpa_supplicant_hostapd-0.8_rtw_20111118.zip"
+wpa_supplicant_hostapd=`ls -1 ../wpa_supplicant_hostapd/wpa_supplicant_hostapd-0.8_*`
+echo $wpa_supplicant_hostapd
+
+
+if [ -e $wpa_supplicant_hostapd ]; then
+        echo "Checking wpa_supplicant_hostatpd" 
 else
-        echo "wpa_supplicant_hostapd-0.8_rtw_20111118.zip doesn't exist in corresponding folder"
+        echo "wpa_supplicant_hostapd doesn'tt exist in corresponding folder"
         exit
 fi
 
@@ -20,10 +24,11 @@ else
         exit
 fi
 
-cp ../wpa_supplicant_hostapd/wpa_supplicant_hostapd-0.8_rtw_20111118.zip ./
-wpafolder='wpa_supplicant_hostapd-0.8_rtw_20111118.zip'
-echo "  "$wpafolder
-unzip $wpafolder
+#cp ../wpa_supplicant_hostapd/wpa_supplicant_hostapd-0.8_rtw_20111118.zip ./
+cp $wpa_supplicant_hostapd ./
+wpa_supplicant_hostapd=`ls -1 ./wpa_supplicant_hostapd-0.8_*`
+echo "  "$wpa_supplicant_hostapd
+unzip $wpa_supplicant_hostapd
 
 cd wpa_supplicant_hostapd-0.8
 cd wpa_supplicant
@@ -44,7 +49,7 @@ cp ./wpa_supplicant_hostapd-0.8/wpa_supplicant/wpa_supplicant ./
 cp ./wpa_supplicant_hostapd-0.8/wpa_supplicant/wpa_cli ./
 
 rm -rf wpa_supplicant_hostapd-0.8
-rm -rf $wpafolder
+rm -rf $wpa_supplicant_hostapd
 
 gcc -o P2P_UI ./p2p_api_test_linux.c ./p2p_ui_test_linux.c -lpthread
 
@@ -57,7 +62,7 @@ fi
 if [ ! -e ./wpa_0_8.conf ]; then
         echo "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
         echo "Doesn't have wpa_0_8.conf"
-				result="fail"
+                                result="fail"
 fi
 
 if [ ! -e ./hostapd ]; then
@@ -89,7 +94,8 @@ if [ "$result" == "fail" ]; then
         echo "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
         exit
 fi
-        
+
 echo "##################################################"
 echo "WiFi_Direct_User_Interface install complete!!!!!!!"
 echo "##################################################"
+

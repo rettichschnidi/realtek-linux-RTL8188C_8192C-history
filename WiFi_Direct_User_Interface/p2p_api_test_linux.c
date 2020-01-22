@@ -354,7 +354,7 @@ void scan_result(struct p2p *p)
 			else if( strncmp(parse+20, "Address:", 8) == 0 )
 			{
 				pscan_pool = &p->scan_pool[no_dev];
-				memset( pscan_pool->addr, 0x00, 18 );
+				memset( pscan_pool->addr, 0x00, sizeof(struct scan) );
 				strncpy( pscan_pool->addr, parse+29, 17);
 			}
 			else if( strncmp(parse+20, "ESSID:", 6) == 0 )
