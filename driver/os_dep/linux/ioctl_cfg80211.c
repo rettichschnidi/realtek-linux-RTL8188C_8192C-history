@@ -313,6 +313,7 @@ static int rtw_ieee80211_channel_to_frequency(int chan, int band)
 	}
 }
 
+#define MAX_BSSINFO_LEN 1000
 static int rtw_cfg80211_inform_bss(_adapter *padapter, struct wlan_network *pnetwork)
 {
 	int ret=0;	
@@ -327,8 +328,8 @@ static int rtw_cfg80211_inform_bss(_adapter *padapter, struct wlan_network *pnet
 	u8 *notify_ie;
 	size_t notify_ielen;
 	s32 notify_signal;
-	u8 buf[768], *pbuf;
-	size_t len;
+	u8 buf[MAX_BSSINFO_LEN], *pbuf;
+	size_t len,bssinf_len=0;
 	struct rtw_ieee80211_hdr *pwlanhdr;
 	unsigned short *fctrl;
 	u8	bc_addr[] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
@@ -340,6 +341,11 @@ static int rtw_cfg80211_inform_bss(_adapter *padapter, struct wlan_network *pnet
 
 	//DBG_8192C("%s\n", __func__);
 	
+	bssinf_len = pnetwork->network.IELength+sizeof (struct rtw_ieee80211_hdr_3addr);
+	if(bssinf_len > MAX_BSSINFO_LEN){
+		DBG_871X("%s IE Length too long > %d byte \n",__FUNCTION__,MAX_BSSINFO_LEN);
+		goto exit;
+	}
 
    	channel = pnetwork->network.Configuration.DSConfig;
 	if (channel <= RTW_CH_MAX_2G_CHANNEL)
@@ -379,6 +385,7 @@ static int rtw_cfg80211_inform_bss(_adapter *padapter, struct wlan_network *pnet
 */
 
 	pbuf = buf;
+	
 	pwlanhdr = (struct rtw_ieee80211_hdr *)pbuf;	
 	fctrl = &(pwlanhdr->frame_ctl);
 	*(fctrl) = 0;	
@@ -461,10 +468,10 @@ static int rtw_cfg80211_inform_bss(_adapter *padapter, struct wlan_network *pnet
 
 	cfg80211_put_bss(bss);
 
+exit:	
 	return ret;
 	
 }
-
 void rtw_cfg80211_indicate_connect(_adapter *padapter)
 {
 	struct mlme_priv *pmlmepriv = &padapter->mlmepriv;
