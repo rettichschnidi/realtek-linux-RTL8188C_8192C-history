@@ -231,7 +231,6 @@ rtl8192c_PHY_RF6052SetCckTxPower(
 	BOOLEAN		TurboScanOff = _FALSE;
 	u8			idx1, idx2;
 	u8*			ptr;
-	s8 bias_2m;
 
 	// 2010/10/18 MH Accorsing to SD3 eechou's suggestion, we need to disable turbo scan for RU.	
 	// Otherwise, external PA will be broken if power index > 0x20.
@@ -306,13 +305,13 @@ rtl8192c_PHY_RF6052SetCckTxPower(
 
 	for(idx1=RF_PATH_A; idx1<=RF_PATH_B; idx1++)
 	{
-		bias_2m = tx_power_extra_bias(idx1, MGN_2M, 0, 0);
 		ptr = (u8*)(&(TxAGC[idx1]));
 		for(idx2=0; idx2<4; idx2++)
 		{
-			if (idx2 == 1) /* 2M */
-			{
+			if (idx2 == 1 && Adapter->registrypriv.mp_mode != 1) { /* 2M */
+				s8 bias_2m = tx_power_extra_bias(idx1, MGN_2M, 0, 0);
 				s16 value = *ptr + bias_2m;
+
 				if (value < 0)
 					value = 0;
 				else if (value > RF6052_MAX_TX_PWR)

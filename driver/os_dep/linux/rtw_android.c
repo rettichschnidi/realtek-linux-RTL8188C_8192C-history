@@ -36,6 +36,10 @@
 #endif
 #endif /* defined(RTW_ENABLE_WIFI_CONTROL_FUNC) */
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 0, 0))
+#define strnicmp	strncasecmp
+#endif /* Linux kernel >= 4.0.0 */
+
 const char *android_wifi_cmd_str[ANDROID_WIFI_CMD_MAX] = {
 	"START",
 	"STOP",

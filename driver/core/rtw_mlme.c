@@ -1363,14 +1363,14 @@ _func_enter_;
 						}
 #endif // CONFIG_INTEL_WIDI
 						rtw_free_assoc_resources(adapter, 1);
-						rtw_indicate_disconnect(adapter);
+						rtw_indicate_disconnect(adapter, 0, _FALSE);
 					} else {
 						pmlmepriv->to_join = _TRUE;
 					}
 				}
 				else
 				{
-					rtw_indicate_disconnect(adapter);
+					rtw_indicate_disconnect(adapter, 0, _FALSE);
 				}
 				_clr_fwstate_(pmlmepriv, _FW_UNDER_LINKING);
 			}
@@ -1382,7 +1382,7 @@ _func_enter_;
 			{
 				if (rtw_select_roaming_candidate(pmlmepriv) == _SUCCESS) {
 					receive_disconnect(adapter, pmlmepriv->cur_network.network.MacAddress
-						, WLAN_REASON_ACTIVE_ROAM);
+						, WLAN_REASON_ACTIVE_ROAM, _FALSE);
 				}
 			}
 		}
@@ -1682,15 +1682,34 @@ _func_exit_;
 /*
 *rtw_indicate_disconnect: the caller has to lock pmlmepriv->lock
 */
-void rtw_indicate_disconnect( _adapter *padapter )
+void rtw_indicate_disconnect( _adapter *padapter, u16 reason, u8 locally_generated)
 {
 	struct	mlme_priv *pmlmepriv = &padapter->mlmepriv;	
+	u8 *wps_ie=NULL;
+	uint wpsie_len=0;
 
 _func_enter_;	
 	
 	RT_TRACE(_module_rtl871x_mlme_c_, _drv_err_, ("+rtw_indicate_disconnect\n"));
 
 	_clr_fwstate_(pmlmepriv, _FW_UNDER_LINKING|WIFI_UNDER_WPS);
+
+	// force to clear cur_network_scanned's SELECTED REGISTRAR
+	if (pmlmepriv->cur_network_scanned) {
+		WLAN_BSSID_EX	*current_joined_bss = &(pmlmepriv->cur_network_scanned->network);
+		if (current_joined_bss) {
+			wps_ie=rtw_get_wps_ie(current_joined_bss->IEs +_FIXED_IE_LENGTH_,
+				current_joined_bss->IELength-_FIXED_IE_LENGTH_, NULL, &wpsie_len);
+			if (wps_ie && wpsie_len>0) {
+				u8 *attr = NULL;
+				u32 attr_len;
+				attr=rtw_get_wps_attr(wps_ie, wpsie_len, WPS_ATTR_SELECTED_REGISTRAR,
+						       NULL, &attr_len);
+				if (attr)
+					*(attr + 4) = 0;
+			}
+		}
+	}
 
 	if(rtw_to_roam(padapter) > 0)
 		_clr_fwstate_(pmlmepriv, _FW_LINKED);
@@ -1699,7 +1718,7 @@ _func_enter_;
 		|| (rtw_to_roam(padapter) <= 0)
 	)
 	{
-		rtw_os_indicate_disconnect(padapter);
+		rtw_os_indicate_disconnect(padapter, reason, locally_generated);
 
 		//set ips_deny_time to avoid enter IPS before LPS leave
 		padapter->pwrctrlpriv.ips_deny_time = rtw_get_current_time() + rtw_ms_to_systime(3000);
@@ -2295,7 +2314,7 @@ _func_enter_;
 	
 #ifdef CONFIG_RTL8711
 	//submit SetStaKey_cmd to tell fw, fw will allocate an CAM entry for this sta	
-	rtw_setstakey_cmd(adapter, (unsigned char*)psta, _FALSE);
+	rtw_setstakey_cmd(adapter, psta, _FALSE, _TRUE);
 #endif
 		
 exit:
@@ -2370,7 +2389,7 @@ _func_enter_;
 		rtw_free_uc_swdec_pending_queue(adapter);
 
 		rtw_free_assoc_resources(adapter, 1);
-		rtw_indicate_disconnect(adapter);
+		rtw_indicate_disconnect(adapter, *(u16 *)pstadel->rsvd, pstadel->locally_generated);
 
 		_enter_critical_bh(&(pmlmepriv->scanned_queue.lock), &irqL);
 		// remove the network entry in scanned_queue
@@ -2534,7 +2553,7 @@ _func_enter_;
 				}
 #endif // CONFIG_INTEL_WIDI
 				DBG_871X("%s We've try roaming but fail\n", __FUNCTION__);
-				rtw_indicate_disconnect(adapter);
+				rtw_indicate_disconnect(adapter, 0, _FALSE);
 				break;
 			}
 		}
@@ -2542,12 +2561,12 @@ _func_enter_;
 	} else 
 	#endif
 	{
-		rtw_indicate_disconnect(adapter);
+		rtw_indicate_disconnect(adapter, 0, _FALSE);
 		free_scanqueue(pmlmepriv);//???
 
 #ifdef CONFIG_IOCTL_CFG80211
 		//indicate disconnect for the case that join_timeout and check_fwstate != FW_LINKED
-		rtw_cfg80211_indicate_disconnect(adapter);
+		rtw_cfg80211_indicate_disconnect(adapter, 0, _FALSE);
 #endif //CONFIG_IOCTL_CFG80211
 
  	}
@@ -3091,7 +3110,7 @@ candidate_exist:
 		#endif
 		{
 			rtw_disassoc_cmd(adapter, 0, _TRUE);
-			rtw_indicate_disconnect(adapter);
+			rtw_indicate_disconnect(adapter, 0, _FALSE);
 			rtw_free_assoc_resources(adapter, 0);
 		}
 	}
@@ -3166,7 +3185,7 @@ _func_exit_;
 }
 
 
-sint rtw_set_key(_adapter * adapter,struct security_priv *psecuritypriv,sint keyid, u8 set_tx)
+sint rtw_set_key(_adapter * adapter, struct security_priv *psecuritypriv,sint keyid, u8 set_tx, bool enqueue)
 {
 	u8	keylen;
 	struct cmd_obj		*pcmd;
@@ -3176,19 +3195,12 @@ sint rtw_set_key(_adapter * adapter,struct security_priv *psecuritypriv,sint key
 	sint	res=_SUCCESS;
 	
 _func_enter_;
-	
-	pcmd = (struct	cmd_obj*)rtw_zmalloc(sizeof(struct	cmd_obj));
-	if(pcmd==NULL){
-		res= _FAIL;  //try again
-		goto exit;
-	}
+
 	psetkeyparm=(struct setkey_parm*)rtw_zmalloc(sizeof(struct setkey_parm));
 	if(psetkeyparm==NULL){
-		rtw_mfree((unsigned char *)pcmd, sizeof(struct	cmd_obj));
 		res= _FAIL;
 		goto exit;
 	}
-
 	_rtw_memset(psetkeyparm, 0, sizeof(struct setkey_parm));
 
 	if(psecuritypriv->dot11AuthAlgrthm ==dot11AuthAlgrthm_8021X){		
@@ -3209,7 +3221,6 @@ _func_enter_;
 	RT_TRACE(_module_rtl871x_mlme_c_,_drv_err_,("\n rtw_set_key: psetkeyparm->algorithm=%d psetkeyparm->keyid=(u8)keyid=%d \n",psetkeyparm->algorithm, keyid));
 
 	switch(psetkeyparm->algorithm){
-		
 		case _WEP40_:
 			keylen=5;
 			_rtw_memcpy(&(psetkeyparm->key[0]), &(psecuritypriv->dot11DefKey[keyid].skey[0]), keylen);
@@ -3231,29 +3242,37 @@ _func_enter_;
 		default:
 			RT_TRACE(_module_rtl871x_mlme_c_,_drv_err_,("\n rtw_set_key:psecuritypriv->dot11PrivacyAlgrthm = %x (must be 1 or 2 or 4 or 5)\n",psecuritypriv->dot11PrivacyAlgrthm));
 			res= _FAIL;
+			rtw_mfree((u8*)psetkeyparm, sizeof(struct setkey_parm));
 			goto exit;
 	}
 
-	
-	pcmd->cmdcode = _SetKey_CMD_;
-	pcmd->parmbuf = (u8 *)psetkeyparm;   
-	pcmd->cmdsz =  (sizeof(struct setkey_parm));  
-	pcmd->rsp = NULL;
-	pcmd->rspsz = 0;
+	if (enqueue) {
+		pcmd = (struct	cmd_obj*)rtw_zmalloc(sizeof(struct	cmd_obj));
+		if(pcmd==NULL){
+			rtw_mfree((u8*)psetkeyparm, sizeof(struct setkey_parm));
+			res= _FAIL;
+			goto exit;
+		}
 
+		pcmd->cmdcode = _SetKey_CMD_;
+		pcmd->parmbuf = (u8 *)psetkeyparm;
+		pcmd->cmdsz =  (sizeof(struct setkey_parm));
+		pcmd->rsp = NULL;
+		pcmd->rspsz = 0;
 
-	_rtw_init_listhead(&pcmd->list);
-
-	//_rtw_init_sema(&(pcmd->cmd_sem), 0);
-
-	res = rtw_enqueue_cmd(pcmdpriv, pcmd);
+		_rtw_init_listhead(&pcmd->list);
+		//_rtw_init_sema(&(pcmd->cmd_sem), 0);
+		res = rtw_enqueue_cmd(pcmdpriv, pcmd);
+	}
+	else {
+		setkey_hdl(adapter, (u8 *)psetkeyparm);
+		rtw_mfree((u8*)psetkeyparm, sizeof(struct setkey_parm));
+	}
 
 exit:
 _func_exit_;
 	return res;
-
 }
-
 
 //adjust IEs for rtw_joinbss_cmd in WMM
 int rtw_restruct_wmm_ie(_adapter *adapter, u8 *in_ie, u8 *out_ie, uint in_len, uint initial_out_len)
@@ -3351,25 +3370,70 @@ static int SecIsInPMKIDList(_adapter *Adapter, u8 *bssid)
 // 13th element in the array is the IE length  
 //
 
-static int rtw_append_pmkid(_adapter *Adapter,int iEntry, u8 *ie, uint ie_len)
+static int rtw_append_pmkid(_adapter *adapter,int iEntry, u8 *ie, uint ie_len)
 {
-	struct security_priv *psecuritypriv=&Adapter->securitypriv;
+	struct security_priv *sec=&adapter->securitypriv;
 
-	if(ie[13]<=20){	
-		// The RSN IE didn't include the PMK ID, append the PMK information 
-			ie[ie_len]=1;
-			ie_len++;
-			ie[ie_len]=0;	//PMKID count = 0x0100
-			ie_len++;
-			_rtw_memcpy(	&ie[ie_len], &psecuritypriv->PMKIDList[iEntry].PMKID, 16);
-		
-			ie_len+=16;
-			ie[13]+=18;//PMKID length = 2+16
+	if (ie[13] > 20) {
+		int i;
+		u16 pmkid_cnt = RTW_GET_LE16(ie+14+20);
+		if (pmkid_cnt == 1 && _rtw_memcmp(ie+14+20+2, &sec->PMKIDList[iEntry].PMKID, 16)) {
+			DBG_871X(FUNC_ADPT_FMT" has carried the same PMKID:"KEY_FMT"\n"
+				, FUNC_ADPT_ARG(adapter), KEY_ARG(&sec->PMKIDList[iEntry].PMKID));
+			goto exit;
+		}
 
+		DBG_871X(FUNC_ADPT_FMT" remove original PMKID, count:%u\n"
+			, FUNC_ADPT_ARG(adapter), pmkid_cnt);
+
+		for (i=0;i<pmkid_cnt;i++)
+			DBG_871X("    "KEY_FMT"\n", KEY_ARG(ie+14+20+2+i*16));
+
+		ie_len -= 2+pmkid_cnt*16;
+		ie[13] = 20;
 	}
+
+	if (ie[13] <= 20) {	
+		/* The RSN IE didn't include the PMK ID, append the PMK information */
+
+		DBG_871X(FUNC_ADPT_FMT" append PMKID:"KEY_FMT"\n"
+				, FUNC_ADPT_ARG(adapter), KEY_ARG(&sec->PMKIDList[iEntry].PMKID));
+
+		RTW_PUT_LE16(&ie[ie_len], 1);
+		ie_len += 2;
+
+		_rtw_memcpy(&ie[ie_len], &sec->PMKIDList[iEntry].PMKID, 16);
+		ie_len += 16;
+
+		ie[13] += 18;//PMKID length = 2+16
+	}
+
+exit:
 	return (ie_len);
 	
 }
+static int rtw_remove_pmkid(_adapter *adapter, u8 *ie, uint ie_len)
+{
+	struct security_priv *sec=&adapter->securitypriv;
+	int i;
+	u16 pmkid_cnt = RTW_GET_LE16(ie+14+20);
+
+	if (ie[13] <= 20)
+		goto exit;
+
+	DBG_871X(FUNC_ADPT_FMT" remove original PMKID, count:%u\n"
+		, FUNC_ADPT_ARG(adapter), pmkid_cnt);
+
+	for (i=0;i<pmkid_cnt;i++)
+		DBG_871X("    "KEY_FMT"\n", KEY_ARG(ie+14+20+2+i*16));
+
+	ie_len -= 2+pmkid_cnt*16;
+	ie[13] = 20;
+
+exit:
+	return (ie_len);
+}
+
 sint rtw_restruct_sec_ie(_adapter *adapter,u8 *in_ie, u8 *out_ie, uint in_len)
 {
 	u8 authmode, securitytype, match;
@@ -3426,14 +3490,13 @@ _func_enter_;
 	iEntry = SecIsInPMKIDList(adapter, pmlmepriv->assoc_bssid);
 	if(iEntry<0)
 	{
-		return ielength;
+		if(authmode == _WPA2_IE_ID_)
+			ielength = rtw_remove_pmkid(adapter, out_ie, ielength);
 	}
 	else
 	{
 		if(authmode == _WPA2_IE_ID_)
-		{
 			ielength=rtw_append_pmkid(adapter, iEntry, out_ie, ielength);
-		}
 	}
 
 _func_exit_;
@@ -3999,7 +4062,7 @@ void _rtw_roaming(_adapter *padapter, struct wlan_network *tgt_network)
 					continue;
 				} else {
 					DBG_871X("%s(%d) -to roaming fail, indicate_disconnect\n", __FUNCTION__,__LINE__);
-					rtw_indicate_disconnect(padapter);
+					rtw_indicate_disconnect(padapter, 0, _FALSE);
 					break;
 				}
 			}

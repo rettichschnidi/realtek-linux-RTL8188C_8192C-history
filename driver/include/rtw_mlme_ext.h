@@ -139,6 +139,7 @@ typedef enum _RT_CHANNEL_DOMAIN
 	RT_CHANNEL_DOMAIN_MKK1_MKK3 = 0x38,
 	RT_CHANNEL_DOMAIN_FCC1_NCC1 = 0x39,
 	RT_CHANNEL_DOMAIN_FCC1_NCC2 = 0x40,
+	RT_CHANNEL_DOMAIN_WORLD_ETSI12 = 0x41,
 
 	//===== Add new channel plan above this line===============//
 	RT_CHANNEL_DOMAIN_MAX,
@@ -181,6 +182,7 @@ typedef enum _RT_CHANNEL_DOMAIN_5G
 	RT_CHANNEL_DOMAIN_5G_FCC = 0x11,
 	RT_CHANNEL_DOMAIN_5G_JAPAN_NO_DFS = 0x12,
 	RT_CHANNEL_DOMAIN_5G_FCC4_NO_DFS = 0x13,
+	RT_CHANNEL_DOMAIN_5G_ETSI12 = 0x14,
 	RT_CHANNEL_DOMAIN_5G_MAX,
 }RT_CHANNEL_DOMAIN_5G, *PRT_CHANNEL_DOMAIN_5G;
 
@@ -542,8 +544,18 @@ void SetBWMode(_adapter *padapter, unsigned short bwmode, unsigned char channel_
 
 unsigned int decide_wait_for_beacon_timeout(unsigned int bcn_interval);
 
-void write_cam(_adapter *padapter, u8 entry, u16 ctrl, u8 *mac, u8 *key);
-void clear_cam_entry(_adapter *padapter, u8 entry);
+/* modify HW only */
+void _write_cam(_adapter *padapter, u8 entry, u16 ctrl, u8 *mac, u8 *key);
+void _clear_cam_entry(_adapter *padapter, u8 entry);
+void write_cam_from_cache(_adapter *adapter, u8 id);
+
+/* modify both HW and cache */
+void write_cam(_adapter *padapter, u8 id, u16 ctrl, u8 *mac, u8 *key);
+void clear_cam_entry(_adapter *padapter, u8 id);
+
+/* modify cache only */
+void write_cam_cache(_adapter *adapter, u8 id, u16 ctrl, u8 *mac, u8 *key);
+void clear_cam_cache(_adapter *adapter, u8 id);
 
 void invalidate_cam_all(_adapter *padapter);
 void CAM_empty_entry(PADAPTER Adapter, u8 ucIndex);
@@ -599,20 +611,25 @@ unsigned int update_MSC_rate(struct HT_caps_element *pHT_caps);
 void Update_RA_Entry(_adapter *padapter, u32 mac_id);
 void set_sta_rate(_adapter *padapter, struct sta_info *psta);
 
-unsigned int receive_disconnect(_adapter *padapter, unsigned char *MacAddr, unsigned short reason);
+unsigned int receive_disconnect(_adapter *padapter, unsigned char *MacAddr, unsigned short reason, u8 locally_generated);
 
 unsigned char get_highest_rate_idx(u32 mask);
 int support_short_GI(_adapter *padapter, struct HT_caps_element *pHT_caps);
 unsigned int is_ap_in_tkip(_adapter *padapter);
 
+s16 rtw_get_camid(_adapter *adapter, struct sta_info* sta, s16 kid);
+s16 rtw_camid_search(_adapter *adapter, u8 *addr, s16 kid);
+s16 rtw_camid_alloc(_adapter *adapter, struct sta_info *sta, u8 kid);
+void rtw_camid_free(_adapter *adapter, u8 cam_id);
 
 void report_join_res(_adapter *padapter, int res);
 void report_survey_event(_adapter *padapter, union recv_frame *precv_frame);
 void report_surveydone_event(_adapter *padapter);
-void report_del_sta_event(_adapter *padapter, unsigned char* MacAddr, unsigned short reason);
+void report_del_sta_event(_adapter *padapter, unsigned char* MacAddr, unsigned short reason, u8 locally_generated);
 void report_add_sta_event(_adapter *padapter, unsigned char* MacAddr, int cam_idx);
 
 void beacon_timing_control(_adapter *padapter);
+u8 chk_bmc_sleepq_cmd(_adapter* padapter);
 extern u8 set_tx_beacon_cmd(_adapter*padapter);
 unsigned int setup_beacon_frame(_adapter *padapter, unsigned char *beacon_frame);
 void update_mgnt_tx_rate(_adapter *padapter, u8 rate);
@@ -774,6 +791,7 @@ u8 add_ba_hdl(_adapter *padapter, unsigned char *pbuf);
 
 u8 mlme_evt_hdl(_adapter *padapter, unsigned char *pbuf);
 u8 h2c_msg_hdl(_adapter *padapter, unsigned char *pbuf);
+u8 chk_bmc_sleepq_hdl(_adapter *padapter, unsigned char *pbuf);
 u8 tx_beacon_hdl(_adapter *padapter, unsigned char *pbuf);
 u8 set_ch_hdl(_adapter *padapter, u8 *pbuf);
 u8 set_chplan_hdl(_adapter *padapter, unsigned char *pbuf);
@@ -854,6 +872,7 @@ struct cmd_hdl wlancmds[] =
 	GEN_MLME_EXT_HANDLER(sizeof(struct LedBlink_param), led_blink_hdl) /*60*/
 	GEN_MLME_EXT_HANDLER(sizeof(struct SetChannelSwitch_param), set_csa_hdl) /*61*/
 	GEN_MLME_EXT_HANDLER(sizeof(struct TDLSoption_param), tdls_hdl) /*62*/
+	GEN_MLME_EXT_HANDLER(0, chk_bmc_sleepq_hdl) /*63*/
 };
 
 #endif

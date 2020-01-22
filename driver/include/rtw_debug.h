@@ -232,7 +232,7 @@ extern void rtl871x_cedbg(const char *fmt, ...);
 		if (sel == RTW_DBGDUMP)\
 			_DBG_871X_LEVEL(_drv_always_, fmt, ##arg); \
 		else {\
-			if(_seqdump(sel, fmt, ##arg)) /*rtw_warn_on(1)*/; \
+			_seqdump(sel, fmt, ##arg); \
 		} \
 	}while(0)
 
@@ -242,7 +242,7 @@ extern void rtl871x_cedbg(const char *fmt, ...);
 		if (sel == RTW_DBGDUMP)\
 			DBG_871X_LEVEL(_drv_always_, fmt, ##arg); \
 		else {\
-			if(_seqdump(sel, fmt, ##arg)) /*rtw_warn_on(1)*/; \
+			_seqdump(sel, fmt, ##arg) /*rtw_warn_on(1)*/; \
 		} \
 	}while(0)
 
@@ -329,6 +329,8 @@ void mac_reg_dump(void *sel, _adapter *adapter);
 void bb_reg_dump(void *sel, _adapter *adapter);
 void rf_reg_dump(void *sel, _adapter *adapter);
 
+u32 rtw_get_wait_hiq_empty_ms(void);
+
 #ifdef CONFIG_PROC_DEBUG
 ssize_t proc_set_write_reg(struct file *file, const char __user *buffer, size_t count, loff_t *pos, void *data);
 int proc_get_read_reg(struct seq_file *m, void *v);
@@ -354,6 +356,8 @@ int proc_get_adapter_state(struct seq_file *m, void *v);
 int proc_get_trx_info(struct seq_file *m, void *v);
 int proc_get_rate_ctl(struct seq_file *m, void *v);
 ssize_t proc_set_rate_ctl(struct file *file, const char __user *buffer, size_t count, loff_t *pos, void *data);
+
+ssize_t proc_set_wait_hiq_empty(struct file *file, const char __user *buffer, size_t count, loff_t *pos, void *data);
 
 #ifdef CONFIG_AP_MODE
 int proc_get_all_sta_info(struct seq_file *m, void *v);

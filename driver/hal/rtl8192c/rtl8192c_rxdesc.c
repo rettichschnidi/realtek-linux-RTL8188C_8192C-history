@@ -797,6 +797,7 @@ void rtl8192c_translate_rx_signal_stuff(union recv_frame *precvframe, struct phy
 			if(psta)
 			{
 				precvframe->u.hdr.psta = psta;
+				psta->rssi = pattrib->RecvSignalPower;
 				process_phy_info(padapter, precvframe);
 			}
 		}
@@ -837,6 +838,8 @@ void rtl8192c_query_rx_desc_status(union recv_frame *precvframe, struct recv_sta
 	pattrib->icv_err = (u8)((le32_to_cpu(pdesc->rxdw0) >> 15) & 0x1);
 	pattrib->qos = (u8)(( le32_to_cpu( pdesc->rxdw0 ) >> 23) & 0x1);// Qos data, wireless lan header length is 26
 	pattrib->bdecrypted = (le32_to_cpu(pdesc->rxdw0) & BIT(27))? 0:1;
+
+	pattrib->encrypt = (u8)(( le32_to_cpu( pdesc->rxdw0 ) >> 20) & 0x7);
 
 	//Offset 4
 	pattrib->mfrag = (u8)((le32_to_cpu(pdesc->rxdw1) >> 27) & 0x1);//more fragment bit

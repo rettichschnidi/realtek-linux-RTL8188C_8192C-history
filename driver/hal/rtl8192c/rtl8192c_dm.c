@@ -218,7 +218,7 @@ dm_FalseAlarmCounterStatistics(
 }
 
 
-static VOID
+VOID
 DM_Write_DIG(
 	IN	PADAPTER	pAdapter
 	)
@@ -258,6 +258,10 @@ DM_Write_DIG(
 		//PHY_SetBBReg(pAdapter, rOFDM0_XAAGCCore1, bMaskByte0, pDigTable->CurIGValue);
 		//PHY_SetBBReg(pAdapter, rOFDM0_XBAGCCore1, bMaskByte0, pDigTable->CurIGValue);
 		//printk("%s DIG(0x%02x)\n",__FUNCTION__,pDigTable->CurIGValue);
+
+		/*Add by YuChen for USB IO too slow issue*/
+		if ((pdmpriv->DMFlag & DYNAMIC_FUNC_ADAPTIVITY) && (pDigTable->CurIGValue > pDigTable->PreIGValue))
+			odm_Adaptivity(adapter_to_odm(pAdapter));
 
 #if defined CONFIG_WIDI_DIG_3E && defined CONFIG_INTEL_WIDI
 		if( pAdapter->mlmepriv.widi_enable == _TRUE )

@@ -127,7 +127,7 @@ void rtw_cfg80211_surveydone_event_callback(_adapter *padapter);
 struct cfg80211_bss *rtw_cfg80211_inform_bss(_adapter *padapter, struct wlan_network *pnetwork);
 int rtw_cfg80211_check_bss(_adapter *padapter);
 void rtw_cfg80211_indicate_connect(_adapter *padapter);
-void rtw_cfg80211_indicate_disconnect(_adapter *padapter);
+void rtw_cfg80211_indicate_disconnect(_adapter *padapter, u16 reason, u8 locally_generated);
 void rtw_cfg80211_indicate_scan_done(_adapter *adapter, bool aborted);
 
 #ifdef CONFIG_AP_MODE
@@ -148,8 +148,12 @@ bool rtw_cfg80211_pwr_mgmt(_adapter *adapter);
 #define rtw_cfg80211_rx_mgmt(adapter, freq, sig_dbm, buf, len, gfp) cfg80211_rx_mgmt((adapter)->pnetdev, freq, buf, len, gfp)
 #elif (LINUX_VERSION_CODE < KERNEL_VERSION(3,6,0))
 #define rtw_cfg80211_rx_mgmt(adapter, freq, sig_dbm, buf, len, gfp) cfg80211_rx_mgmt((adapter)->pnetdev, freq, sig_dbm, buf, len, gfp)
-#else
+#elif (LINUX_VERSION_CODE < KERNEL_VERSION(3,12,0))
 #define rtw_cfg80211_rx_mgmt(adapter, freq, sig_dbm, buf, len, gfp) cfg80211_rx_mgmt((adapter)->rtw_wdev, freq, sig_dbm, buf, len, gfp)
+#elif (LINUX_VERSION_CODE < KERNEL_VERSION(3 , 18 , 0))
+#define rtw_cfg80211_rx_mgmt(adapter , freq , sig_dbm , buf , len , gfp) cfg80211_rx_mgmt((adapter)->rtw_wdev, freq, sig_dbm, buf, len, 0, gfp)
+#else
+#define rtw_cfg80211_rx_mgmt(adapter, freq, sig_dbm, buf, len, gfp) cfg80211_rx_mgmt((adapter)->rtw_wdev, freq, sig_dbm, buf, len, 0)
 #endif
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(3,4,0))  && !defined(COMPAT_KERNEL_RELEASE)

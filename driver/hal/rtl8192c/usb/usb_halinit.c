@@ -5185,13 +5185,6 @@ _func_enter_;
 				rtw_write8(Adapter, REG_RRSR+2, regTmp);
 			}
 			break;
-		case HW_VAR_SEC_CFG:
-#ifdef CONFIG_CONCURRENT_MODE
-			rtw_write8(Adapter, REG_SECCFG, 0x0c|BIT(5));// enable tx enc and rx dec engine, and no key search for MC/BC				
-#else
-			rtw_write8(Adapter, REG_SECCFG, *((u8 *)val));
-#endif
-			break;
 		case HW_VAR_DM_FUNC_OP:
 			if(val[0])
 			{// save dm flag
@@ -5438,14 +5431,16 @@ _func_enter_;
 
 				if(rx_gain == 0xff){//restore rx gain
 					pDigTable->CurIGValue = pDigTable->BackupIGValue;
-					PHY_SetBBReg(Adapter, rOFDM0_XAAGCCore1, 0x7f,pDigTable->CurIGValue );
-					PHY_SetBBReg(Adapter, rOFDM0_XBAGCCore1, 0x7f,pDigTable->CurIGValue);
+					DM_Write_DIG(Adapter);
+					//PHY_SetBBReg(Adapter, rOFDM0_XAAGCCore1, 0x7f,pDigTable->CurIGValue );
+					//PHY_SetBBReg(Adapter, rOFDM0_XBAGCCore1, 0x7f,pDigTable->CurIGValue);
 				}
 				else{
 					pDigTable->BackupIGValue = pDigTable->CurIGValue;
-					PHY_SetBBReg(Adapter, rOFDM0_XAAGCCore1, 0x7f,rx_gain );
-					PHY_SetBBReg(Adapter, rOFDM0_XBAGCCore1, 0x7f,rx_gain);
+					//PHY_SetBBReg(Adapter, rOFDM0_XAAGCCore1, 0x7f,rx_gain );
+					//PHY_SetBBReg(Adapter, rOFDM0_XBAGCCore1, 0x7f,rx_gain);
 					pDigTable->CurIGValue = (u8)rx_gain;
+					DM_Write_DIG(Adapter);
 				}
 
 

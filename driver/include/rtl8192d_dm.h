@@ -402,5 +402,5 @@ void	rtl8192d_InitHalDm(IN PADAPTER Adapter);
 void	rtl8192d_HalDmWatchDog(IN PADAPTER Adapter);
 
 VOID rtl8192d_dm_CheckTXPowerTracking(IN PADAPTER Adapter);
-
+VOID DM_Write_DIG(IN PADAPTER pAdapter);
 #endif	//__HAL8190PCIDM_H__

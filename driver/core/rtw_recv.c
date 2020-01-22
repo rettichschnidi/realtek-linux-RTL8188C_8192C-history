@@ -846,6 +846,93 @@ _func_exit_;
 
 }
 
+#define PN_LESS_CHK(a, b)	(((a-b) & 0x800000000000) != 0)
+#define PN_EQUAL_CHK(a, b)	(a == b)
+sint recv_ucast_pn_decache(union recv_frame *precv_frame, struct stainfo_rxcache *prxcache);
+sint recv_ucast_pn_decache(union recv_frame *precv_frame, struct stainfo_rxcache *prxcache)
+{
+	_adapter *padapter = precv_frame->u.hdr.adapter;
+	struct rx_pkt_attrib *pattrib = &precv_frame->u.hdr.attrib;
+	u8 *pdata = precv_frame->u.hdr.rx_data;
+	u32 data_len = precv_frame->u.hdr.len;
+	sint tid = precv_frame->u.hdr.attrib.priority;
+	u64 tmp_iv_hdr = 0;
+	u64 curr_pn = 0, pkt_pn = 0;
+
+	if (tid > 15)
+		return _FAIL;
+
+	if (pattrib->encrypt == _AES_) {		
+		_rtw_memcpy(&tmp_iv_hdr, (pdata + pattrib->hdrlen), 8);
+		tmp_iv_hdr = le64_to_cpu(tmp_iv_hdr);
+		pkt_pn = (tmp_iv_hdr & 0x000000000000ffff)		|	
+			((tmp_iv_hdr & 0xffffffff00000000) >> 16);
+		
+		_rtw_memcpy(&tmp_iv_hdr, prxcache->iv[tid], 8);
+		tmp_iv_hdr = le64_to_cpu(tmp_iv_hdr);
+		curr_pn = (tmp_iv_hdr & 0x000000000000ffff)		|	
+			((tmp_iv_hdr & 0xffffffff00000000) >> 16);		
+		
+		if (curr_pn == 0) {
+			_rtw_memcpy(prxcache->iv[tid], (pdata + pattrib->hdrlen), sizeof(prxcache->iv[tid]));
+			goto exit;
+		}
+
+		if (PN_LESS_CHK(pkt_pn, curr_pn) || PN_EQUAL_CHK(pkt_pn, curr_pn)) {
+			/* return _FAIL; */
+		} else 
+			_rtw_memcpy(prxcache->iv[tid], (pdata + pattrib->hdrlen), sizeof(prxcache->iv[tid]));
+	}
+
+exit:
+	return _SUCCESS;
+}
+
+sint recv_bcast_pn_decache(union recv_frame *precv_frame);
+sint recv_bcast_pn_decache(union recv_frame *precv_frame)
+{
+	_adapter *padapter = precv_frame->u.hdr.adapter;
+	struct mlme_priv *pmlmepriv = &padapter->mlmepriv;
+	struct security_priv *psecuritypriv = &padapter->securitypriv;
+	struct rx_pkt_attrib *pattrib = &precv_frame->u.hdr.attrib;
+	u8 *pdata = precv_frame->u.hdr.rx_data;
+	u32 data_len = precv_frame->u.hdr.len;
+	u64 tmp_iv_hdr = 0;
+	u64 curr_pn = 0, pkt_pn = 0;
+	u8 key_id;
+
+	if ((pattrib->encrypt == _AES_) &&
+		(check_fwstate(pmlmepriv, WIFI_STATION_STATE) == _TRUE)) {		
+		_rtw_memcpy(&tmp_iv_hdr, (pdata + pattrib->hdrlen), 8);
+		tmp_iv_hdr = le64_to_cpu(tmp_iv_hdr);
+		key_id = ((tmp_iv_hdr & 0x00000000c0000000) >> 30);
+		pkt_pn = (tmp_iv_hdr & 0x000000000000ffff)		|	
+			((tmp_iv_hdr & 0xffffffff00000000) >> 16);
+
+		if (key_id >= 4 )
+			return _FAIL;
+		
+		_rtw_memcpy(&tmp_iv_hdr,  psecuritypriv->iv_seq[key_id], 8);
+		tmp_iv_hdr = le64_to_cpu(tmp_iv_hdr);
+		curr_pn = (tmp_iv_hdr & 0x0000ffffffffffff);	
+	
+		if ((curr_pn == 0) && (pkt_pn >= 0)) {
+			_rtw_memcpy(psecuritypriv->iv_seq[key_id], &pkt_pn, 8);
+			goto exit;
+		}
+
+		if (PN_LESS_CHK(pkt_pn, curr_pn) || PN_EQUAL_CHK(pkt_pn, curr_pn)) {
+			return _FAIL;
+		} else{
+			pkt_pn = cpu_to_le64(pkt_pn);
+			_rtw_memcpy(psecuritypriv->iv_seq[key_id], &pkt_pn, 8);		
+		}
+	}
+
+exit:
+	return _SUCCESS;
+}
+
 void process_pwrbit_data(_adapter *padapter, union recv_frame *precv_frame);
 void process_pwrbit_data(_adapter *padapter, union recv_frame *precv_frame)
 {
@@ -1074,6 +1161,10 @@ void count_rx_stats(_adapter *padapter, union recv_frame *prframe, struct sta_in
 
 	if( (!MacAddr_isBcst(pattrib->dst)) && (!IS_MCAST(pattrib->dst))){
 		padapter->mlmepriv.LinkDetectInfo.NumRxUnicastOkInPeriod++;
+	}
+
+	if( (!MacAddr_isBcst(pattrib->dst)) && (IS_MCAST(pattrib->dst))){
+		padapter->mlmepriv.LinkDetectInfo.NumRxMulticastOkInPeriod++;
 	}
 
 	if(sta)
@@ -1636,12 +1727,12 @@ sint validate_recv_ctrl_frame(_adapter *padapter, union recv_frame *precv_frame)
 
 				if(psta->sleepq_len>0)
 					pxmitframe->attrib.mdata = 1;
-                                else
+				else
 					pxmitframe->attrib.mdata = 0;
 
 				pxmitframe->attrib.triggered = 1;
 
-	                        //DBG_871X("handling ps-poll, q_len=%d, tim=%x\n", psta->sleepq_len, pstapriv->tim_bitmap);
+				//DBG_871X("handling ps-poll, q_len=%d, tim=%x\n", psta->sleepq_len, pstapriv->tim_bitmap);
 
 #if 0
 				_exit_critical_bh(&psta->sleep_q.lock, &irqL);		
@@ -1943,6 +2034,25 @@ _func_enter_;
 			pattrib->encrypt=psta->dot118021XPrivacy;
 	}
 #endif //CONFIG_TDLS
+
+	if (!IS_MCAST(pattrib->ra)) {
+		if (recv_ucast_pn_decache(precv_frame, &psta->sta_recvpriv.rxcache) == _FAIL) {
+			#ifdef DBG_RX_DROP_FRAME
+			DBG_871X("DBG_RX_DROP_FRAME %s recv_decache return _FAIL\n", __func__);
+			#endif
+			ret = _FAIL;
+			goto exit;
+		}		
+	} else {
+		if (recv_bcast_pn_decache(precv_frame) == _FAIL) {
+			#ifdef DBG_RX_DROP_FRAME
+			DBG_871X("DBG_RX_DROP_FRAME "FUNC_ADPT_FMT" recv_bcast_pn_decache _FAIL for invalid PN!\n"
+				, FUNC_ADPT_ARG(adapter));
+			#endif
+			ret = _FAIL;
+			goto exit;
+		}
+	}
 
 	if(pattrib->privacy){
 

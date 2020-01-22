@@ -21,7 +21,7 @@
 		2.15 Miracast_for_Realtek_WiFi.pdf
 
 	3. driver/
-		3.1 rtl8188C_8192C_usb_linux_v4.0.5_11249.20140422.tar.gz
+		3.1 rtl8188C_8192C_usb_linux_v4.0.9_25039.20171107.tar.gz
 			Naming rule: rtlCHIPS_linux_vM.N.P[.H]_sssss.yyyymmdd[_beta].tar.gz
 			where:
 				CHIPS: supported chips

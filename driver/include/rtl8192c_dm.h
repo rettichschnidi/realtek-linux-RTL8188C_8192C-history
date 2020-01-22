@@ -482,7 +482,7 @@ void rtl8192c_HalDmWatchDog(IN PADAPTER Adapter);
 VOID rtl8192c_dm_CheckTXPowerTracking(IN PADAPTER Adapter);
 
 void rtl8192c_dm_RF_Saving(IN PADAPTER pAdapter, IN u8 bForceInNormal);
-
+VOID DM_Write_DIG(IN PADAPTER pAdapter);
 #ifdef CONFIG_BT_COEXIST
 void rtl8192c_set_dm_bt_coexist(_adapter *padapter, u8 bStart);
 void rtl8192c_issue_delete_ba(_adapter *padapter, u8 dir);

@@ -165,6 +165,7 @@ typedef struct _RT_LINK_DETECT_T{
 	u32				NumTxOkInPeriod;
 	u32				NumRxOkInPeriod;
 	u32				NumRxUnicastOkInPeriod;
+	u32				NumRxMulticastOkInPeriod;
 	BOOLEAN			bBusyTraffic;
 	BOOLEAN			bTxBusyTraffic;
 	BOOLEAN			bRxBusyTraffic;
@@ -262,6 +263,7 @@ struct cfg80211_wifidirect_info{
 	struct ieee80211_channel	remain_on_ch_channel;
 	enum nl80211_channel_type	remain_on_ch_type;
 	u64						remain_on_ch_cookie;
+	bool not_indic_ro_ch_exp;
 	bool is_ro_ch;
 };
 #endif //CONFIG_IOCTL_CFG80211
@@ -667,7 +669,7 @@ extern void rtw_free_mlme_priv (struct mlme_priv *pmlmepriv);
 
 
 extern sint rtw_select_and_join_from_scanned_queue(struct mlme_priv *pmlmepriv);
-extern sint rtw_set_key(_adapter *adapter,struct security_priv *psecuritypriv,sint keyid, u8 set_tx);
+extern sint rtw_set_key(_adapter *adapter,struct security_priv *psecuritypriv,sint keyid, u8 set_tx, bool enqueue);
 extern sint rtw_set_auth(_adapter *adapter,struct security_priv *psecuritypriv);
 
 __inline static u8 *get_bssid(struct mlme_priv *pmlmepriv)
@@ -771,7 +773,7 @@ struct wlan_network *_rtw_find_same_network(_queue *scanned_queue, struct wlan_n
 struct wlan_network *rtw_find_same_network(_queue *scanned_queue, struct wlan_network *network);
 
 extern void rtw_free_assoc_resources(_adapter* adapter, int lock_scanned_queue);
-extern void rtw_indicate_disconnect(_adapter* adapter);
+extern void rtw_indicate_disconnect(_adapter* adapter, u16 reason, u8 locally_generated);
 extern void rtw_indicate_connect(_adapter* adapter);
 void rtw_indicate_scan_done( _adapter *padapter, bool aborted);
 void rtw_scan_abort(_adapter *adapter);

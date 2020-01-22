@@ -387,6 +387,7 @@ _func_enter_;
 		for( i = 0; i < 16; i++ )
 		{
                      _rtw_memcpy( &psta->sta_recvpriv.rxcache.tid_rxseq[ i ], &wRxSeqInitialValue, 2 );
+			_rtw_memset(&psta->sta_recvpriv.rxcache.iv[i], 0, sizeof(psta->sta_recvpriv.rxcache.iv[i]));
 		}
 
 		RT_TRACE(_module_rtl871x_sta_mgt_c_,_drv_info_,("alloc number_%d stainfo  with hwaddr = %x %x %x %x %x %x  \n", 
@@ -459,7 +460,7 @@ u32	rtw_free_stainfo(_adapter *padapter , struct sta_info *psta)
 	struct	xmit_priv	*pxmitpriv= &padapter->xmitpriv;
 	struct	sta_priv *pstapriv = &padapter->stapriv;
 	struct hw_xmit *phwxmit;
-	
+	int pending_qcnt[4];
 
 _func_enter_;	
 	
@@ -491,6 +492,7 @@ _func_enter_;
 	rtw_list_delete(&(pstaxmitpriv->vo_q.tx_pending));
 	phwxmit = pxmitpriv->hwxmits;
 	phwxmit->accnt -= pstaxmitpriv->vo_q.qcnt;
+	pending_qcnt[0] = pstaxmitpriv->vo_q.qcnt;
 	pstaxmitpriv->vo_q.qcnt = 0;
 	//_exit_critical_bh(&(pxmitpriv->vo_pending.lock), &irqL0);
 
@@ -500,6 +502,7 @@ _func_enter_;
 	rtw_list_delete(&(pstaxmitpriv->vi_q.tx_pending));
 	phwxmit = pxmitpriv->hwxmits+1;
 	phwxmit->accnt -= pstaxmitpriv->vi_q.qcnt;
+	pending_qcnt[1] = pstaxmitpriv->vi_q.qcnt;
 	pstaxmitpriv->vi_q.qcnt = 0;
 	//_exit_critical_bh(&(pxmitpriv->vi_pending.lock), &irqL0);
 
@@ -509,6 +512,7 @@ _func_enter_;
 	rtw_list_delete(&(pstaxmitpriv->be_q.tx_pending));
 	phwxmit = pxmitpriv->hwxmits+2;
 	phwxmit->accnt -= pstaxmitpriv->be_q.qcnt;
+	pending_qcnt[2] = pstaxmitpriv->be_q.qcnt;
 	pstaxmitpriv->be_q.qcnt = 0;
 	//_exit_critical_bh(&(pxmitpriv->be_pending.lock), &irqL0);
 	
@@ -518,9 +522,12 @@ _func_enter_;
 	rtw_list_delete(&(pstaxmitpriv->bk_q.tx_pending));
 	phwxmit = pxmitpriv->hwxmits+3;
 	phwxmit->accnt -= pstaxmitpriv->bk_q.qcnt;
+	pending_qcnt[3] = pstaxmitpriv->bk_q.qcnt;
 	pstaxmitpriv->bk_q.qcnt = 0;
 	//_exit_critical_bh(&(pxmitpriv->bk_pending.lock), &irqL0);
-	
+
+	rtw_os_wake_queue_at_free_stainfo(padapter, pending_qcnt);
+
 	_exit_critical_bh(&pxmitpriv->lock, &irqL0);
 	
 	rtw_list_delete(&psta->hash_list);

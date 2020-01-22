@@ -188,6 +188,7 @@ static void rtw_dev_remove(struct usb_interface *pusb_intf);
 	{USB_DEVICE(0x050D, 0x120A)}, /* Belkin - Edimax */ \
 	{USB_DEVICE(0x1668, 0x8102)}, /*  -  */ \
 	{USB_DEVICE(0x0BDA, 0xE194)}, /*  - Edimax */ \
+	{USB_DEVICE(0x0930, 0x0A0A)}, /* Toshiba */ \
 	/****** 8192DU-WiFi Display Dongle ********/ \
 	{USB_DEVICE(0x2019, 0xAB2D)},/* Planex - Abocom ,5G dongle for WiFi Display */
 
@@ -762,7 +763,7 @@ int rtw_hw_suspend(_adapter *padapter )
 
 				rtw_led_control(padapter, LED_CTL_NO_LINK);
 
-				rtw_os_indicate_disconnect(padapter);
+				rtw_os_indicate_disconnect(padapter, 0, _FALSE);
 
 				#ifdef CONFIG_LPS
 				//donnot enqueue cmd
@@ -910,7 +911,9 @@ static int rtw_suspend(struct usb_interface *pusb_intf, pm_message_t message)
 		//set H2C command
 		poidparam.subcode=WOWLAN_ENABLE;
 		rtw_hal_set_hwreg(padapter,HW_VAR_WOWLAN,(u8 *)&poidparam);
+		#ifndef DYNAMIC_CAMID_ALLOC
 		rtw_hal_set_hwreg(padapter, HW_VAR_ENC_BMC_ENABLE, 0);
+		#endif
 		//rtw_hal_set_hwreg(padapter, HW_VAR_H2C_FW_PWRMODE, &ps_mode);
 		//rtw_set_rpwm(padapter, PS_STATE_S2);
 	}
@@ -936,7 +939,7 @@ static int rtw_suspend(struct usb_interface *pusb_intf, pm_message_t message)
 	}
 
 	//s2-2.  indicate disconnect to os
-	rtw_indicate_disconnect(padapter);
+	rtw_indicate_disconnect(padapter, 0, _FALSE);
 	//s2-3.
 	rtw_free_assoc_resources(padapter, 1);
 #ifdef CONFIG_AUTOSUSPEND
@@ -956,7 +959,7 @@ static int rtw_suspend(struct usb_interface *pusb_intf, pm_message_t message)
 		rtw_indicate_scan_done(padapter, 1);
 
 	if(check_fwstate(pmlmepriv, _FW_UNDER_LINKING))
-		rtw_indicate_disconnect(padapter);
+		rtw_indicate_disconnect(padapter, 0, _FALSE);
 
 exit:
 	DBG_871X("<===  %s return %d.............. in %dms\n", __FUNCTION__
@@ -1025,7 +1028,9 @@ int rtw_resume_process(_adapter *padapter)
 		//set H2C command
 		poidparam.subcode=WOWLAN_DISABLE;
 		rtw_hal_set_hwreg(padapter,HW_VAR_WOWLAN,(u8 *)&poidparam);
+		#ifndef DYNAMIC_CAMID_ALLOC
 		rtw_hal_set_hwreg(padapter, HW_VAR_ENC_BMC_DISABLE, 0);
+		#endif
 	}
 #endif //CONFIG_WOWLAN
 	DBG_871X("bkeepfwalive(%x)\n",pwrpriv->bkeepfwalive);

@@ -15,6 +15,7 @@ EXTRA_CFLAGS += -Wno-unused-function
 EXTRA_CFLAGS += -Wno-unused
 
 EXTRA_CFLAGS += -Wno-uninitialized
+#EXTRA_CFLAGS += -Wno-error=date-time	# Fix compile error on gcc 4.9 and later
 
 EXTRA_CFLAGS += -I$(src)/include
 
@@ -75,6 +76,7 @@ CONFIG_PLATFORM_MSTAR = n
 CONFIG_PLATFORM_ARM_SUNxI = n
 CONFIG_PLATFORM_ARM_SUN6I = n
 CONFIG_PLATFORM_ARM_RTD299X = n
+CONFIG_PLATFORM_MSTAR_MSD8361 = n
 
 CONFIG_DRVEXT_MODULE = n
 
@@ -294,6 +296,16 @@ KSRC:= /usr/src/Mstar_kernel/3.1.10/
 #MODULE_NAME = wlan
 endif
 
+ifeq ($(CONFIG_PLATFORM_MSTAR_MSD8361), y)
+EXTRA_CFLAGS += -DCONFIG_LITTLE_ENDIAN -DCONFIG_PLATFORM_MSTAR
+EXTRA_CFLAGS += -DCONFIG_IOCTL_CFG80211 -DRTW_USE_CFG80211_STA_EVENT
+EXTRA_CFLAGS += -DCONFIG_P2P_IPS
+ARCH:=arm
+CROSS_COMPILE:= /usr/src/bin/arm-none-linux-gnueabi-
+KVER:= 3.1.10
+KSRC:= /usr/src/Mstar_kernel/3.1.10/
+#MODULE_NAME = wlan
+endif
 
 ifeq ($(CONFIG_PLATFORM_ANDROID_X86), y)
 EXTRA_CFLAGS += -DCONFIG_LITTLE_ENDIAN

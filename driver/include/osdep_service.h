@@ -786,6 +786,10 @@ __inline static void _set_workitem(_workitem *pwork)
 	#include <linux/ip.h>
 	#include <linux/kthread.h>
 
+	#ifdef CONFIG_NET_RADIO
+		#define CONFIG_WIRELESS_EXT
+	#endif
+
 #ifdef CONFIG_IOCTL_CFG80211	
 //	#include <linux/ieee80211.h>        
         #include <net/ieee80211_radiotap.h>

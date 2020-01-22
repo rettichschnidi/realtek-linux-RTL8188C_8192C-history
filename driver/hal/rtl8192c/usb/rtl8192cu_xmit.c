@@ -713,6 +713,9 @@ s32 rtl8192cu_xmitframe_complete(_adapter *padapter, struct xmit_priv *pxmitpriv
 		pxmitframe = LIST_CONTAINOR(xmitframe_plist, struct xmit_frame, list);
 		xmitframe_plist = get_next(xmitframe_plist);
 
+		if(_FAIL == rtw_hal_busagg_qsel_check(padapter,pfirstframe->attrib.qsel,pxmitframe->attrib.qsel))
+			break;
+
 		len = xmitframe_need_length(pxmitframe) + TXDESC_SIZE; // no offset
 		if (pbuf + len > MAX_XMITBUF_SZ) break;
 
