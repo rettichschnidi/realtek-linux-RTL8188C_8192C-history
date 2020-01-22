@@ -990,7 +990,7 @@ static VOID PWDB_Monitor(
 
 				plist = get_next(plist);
 
-				if(_rtw_memcmp(psta	->hwaddr, bcast_addr, ETH_ALEN) || 
+				if(_rtw_memcmp(psta->hwaddr, bcast_addr, ETH_ALEN) || 
 					_rtw_memcmp(psta->hwaddr, myid(&Adapter->eeprompriv), ETH_ALEN))
 					continue;
 
@@ -4496,6 +4496,8 @@ rtl8192c_InitHalDm(
 	pdmpriv->DM_Type = DM_Type_ByDriver;	
 	pdmpriv->DMFlag = DYNAMIC_FUNC_DISABLE;
 	pdmpriv->UndecoratedSmoothedPWDB = (-1);
+	pdmpriv->UndecoratedSmoothedCCK = (-1);
+	
 	
 	//.1 DIG INIT
 	pdmpriv->bDMInitialGainEnable = _TRUE;

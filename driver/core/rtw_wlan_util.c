@@ -640,16 +640,19 @@ int WMM_param_handler(_adapter *padapter, PNDIS_802_11_VARIABLE_IEs	pIE)
 }
 
 void WMMOnAssocRsp(_adapter *padapter)
-{	
-	unsigned char		ACI, ACM, AIFS, ECWMin, ECWMax, aSifsTime;
-	unsigned short	TXOP;
-	unsigned int		acParm, i;
+{
+	u8	ACI, ACM, AIFS, ECWMin, ECWMax, aSifsTime;
+	u8	acm_ctrl;
+	u16	TXOP;
+	u32	acParm, i;
 	struct registry_priv	*pregpriv = &padapter->registrypriv;
 	struct mlme_ext_priv	*pmlmeext = &padapter->mlmeextpriv;
 	struct mlme_ext_info	*pmlmeinfo = &(pmlmeext->mlmext_info);
 	
 	if (pmlmeinfo->WMM_enable == 0)
 		return;
+
+	acm_ctrl = 0;
 
 	if( pmlmeext->cur_wireless_mode == WIRELESS_11B)
 		aSifsTime = 10;
@@ -674,24 +677,30 @@ void WMMOnAssocRsp(_adapter *padapter)
 		{
 			case 0x0:
 				padapter->HalFunc.SetHwRegHandler(padapter, HW_VAR_AC_PARAM_BE, (u8 *)(&acParm));
+				acm_ctrl |= (ACM? BIT(1):0);
 				break;
 								
 			case 0x1:
 				padapter->HalFunc.SetHwRegHandler(padapter, HW_VAR_AC_PARAM_BK, (u8 *)(&acParm));
+				acm_ctrl |= (ACM? BIT(0):0);
 				break;
 								
 			case 0x2:
 				padapter->HalFunc.SetHwRegHandler(padapter, HW_VAR_AC_PARAM_VI, (u8 *)(&acParm));
+				acm_ctrl |= (ACM? BIT(2):0);
 				break;
 								
 			case 0x3:
 				padapter->HalFunc.SetHwRegHandler(padapter, HW_VAR_AC_PARAM_VO, (u8 *)(&acParm));
+				acm_ctrl |= (ACM? BIT(3):0);
 				break;							
 		}
 		
 		DBG_871X("WMM(%x): %x, %x\n", ACI, ACM, acParm);
 	}
-	
+
+	padapter->HalFunc.SetHwRegHandler(padapter, HW_VAR_ACM_CTRL, (u8 *)(&acm_ctrl));
+
 	return;	
 }
 
@@ -792,6 +801,8 @@ void HT_caps_handler(_adapter *padapter, PNDIS_802_11_VARIABLE_IEs pIE)
 	struct mlme_priv 		*pmlmepriv = &padapter->mlmepriv;	
 	struct ht_priv			*phtpriv = &pmlmepriv->htpriv;
 
+	if(pIE==NULL) return;
+	
 	if(phtpriv->ht_option == _FALSE)	return;
 
 	pmlmeinfo->HT_caps_enable = 1;
@@ -864,6 +875,8 @@ void HT_info_handler(_adapter *padapter, PNDIS_802_11_VARIABLE_IEs pIE)
 	struct mlme_ext_info	*pmlmeinfo = &(pmlmeext->mlmext_info);
 	struct mlme_priv 		*pmlmepriv = &padapter->mlmepriv;	
 	struct ht_priv			*phtpriv = &pmlmepriv->htpriv;
+
+	if(pIE==NULL) return;
 
 	if(phtpriv->ht_option == _FALSE)	return;
 

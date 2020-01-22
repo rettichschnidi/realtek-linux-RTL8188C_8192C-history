@@ -421,7 +421,15 @@ struct _ADAPTER{
 
 #ifdef PLATFORM_LINUX	
 	_nic_hdl pnetdev;
-	_nic_hdl old_pnetdev; // used for rtw_change_ifname
+
+	// used by rtw_rereg_nd_name related function
+	struct rereg_nd_name_data {
+		_nic_hdl old_pnetdev;
+		char old_ifname[IFNAMSIZ];
+		u8 old_ips_mode;
+		u8 old_bRegUseLed;
+	} rereg_nd_name_priv;
+	
 	int bup;
 	struct net_device_stats stats;
 	struct iw_statistics iwstats;

@@ -1249,15 +1249,18 @@ int rtw_change_ifname(_adapter *padapter, const char *ifname)
 {
 	struct net_device *pnetdev;
 	struct net_device *cur_pnetdev = padapter->pnetdev;
+	struct rereg_nd_name_data *rereg_priv;
 	int ret;
 
 	if(!padapter)
 		goto error;
+
+	rereg_priv = &padapter->rereg_nd_name_priv;
 	
 	//free the old_pnetdev
-	if(padapter->old_pnetdev) {
-		free_netdev(padapter->old_pnetdev);
-		padapter->old_pnetdev = NULL;
+	if(rereg_priv->old_pnetdev) {
+		free_netdev(rereg_priv->old_pnetdev);
+		rereg_priv->old_pnetdev = NULL;
 	}
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,26))
@@ -1271,7 +1274,7 @@ int rtw_change_ifname(_adapter *padapter, const char *ifname)
 	rtw_proc_remove_one(cur_pnetdev);
 	#endif //CONFIG_PROC_DEBUG
 
-	padapter->old_pnetdev=cur_pnetdev;
+	rereg_priv->old_pnetdev=cur_pnetdev;
 
 	pnetdev = rtw_init_netdev(padapter);
 	if (!pnetdev)  {

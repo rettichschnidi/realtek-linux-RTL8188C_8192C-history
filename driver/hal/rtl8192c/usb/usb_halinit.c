@@ -1894,6 +1894,9 @@ _InitAntenna_Selection(IN	PADAPTER Adapter)
 
 	DBG_8192C("==>  %s ....\n",__FUNCTION__);
 	
+	if(pHalData->AntDivCfg==0)
+		return;
+	
 	if((RF_1T1R == pHalData->rf_type))
 	{	
 		rtw_write32(Adapter, REG_LEDCFG0, rtw_read32(Adapter, REG_LEDCFG0)|BIT23);	
@@ -2273,6 +2276,9 @@ _func_enter_;
 
 	if(pregistrypriv->wifi_spec)
 		rtw_write16(Adapter,REG_FAST_EDCA_CTRL ,0);
+
+	//Nav limit , suggest by scott
+	rtw_write8(Adapter, 0x652, 0x0);
 
 #if (MP_DRIVER == 1)
 	Adapter->mppriv.channel = pHalData->CurrentChannel;
@@ -4917,6 +4923,33 @@ _func_enter_;
 			break;
 		case HW_VAR_AC_PARAM_BK:
 			rtw_write32(Adapter, REG_EDCA_BK_PARAM, ((u32 *)(val))[0]);
+			break;
+		case HW_VAR_ACM_CTRL:
+			{
+				u8	acm_ctrl = *((u8 *)val);
+				u8	AcmCtrl = rtw_read8( Adapter, REG_ACMHWCTRL);
+
+				if(acm_ctrl > 1)
+					AcmCtrl = AcmCtrl | 0x1;
+
+				if(acm_ctrl & BIT(3))
+					AcmCtrl |= AcmHw_VoqEn;
+				else
+					AcmCtrl &= (~AcmHw_VoqEn);
+
+				if(acm_ctrl & BIT(2))
+					AcmCtrl |= AcmHw_ViqEn;
+				else
+					AcmCtrl &= (~AcmHw_ViqEn);
+
+				if(acm_ctrl & BIT(1))
+					AcmCtrl |= AcmHw_BeqEn;
+				else
+					AcmCtrl &= (~AcmHw_BeqEn);
+
+				DBG_871X("[HW_VAR_ACM_CTRL] Write 0x%X\n", AcmCtrl );
+				rtw_write8(Adapter, REG_ACMHWCTRL, AcmCtrl );
+			}
 			break;
 		case HW_VAR_AMPDU_MIN_SPACE:
 			{

@@ -4979,16 +4979,14 @@ static int rtw_rereg_nd_name(struct net_device *dev,
                                struct iw_request_info *info,
                                union iwreq_data *wrqu, char *extra)
 {
-	static char old_ifname[IFNAMSIZ] = {0};
-	static u8 old_ips_mode;
-	static u8 old_bRegUseLed;
 	int ret = 0;	
 	_adapter *padapter = rtw_netdev_priv(dev);
+	struct rereg_nd_name_data *rereg_priv = &padapter->rereg_nd_name_priv;
 	char new_ifname[IFNAMSIZ];
 
-	if(old_ifname[0] == 0) {
-		strncpy(old_ifname, ifname, IFNAMSIZ);
-		old_ifname[IFNAMSIZ-1] = 0;
+	if(rereg_priv->old_ifname[0] == 0) {
+		strncpy(rereg_priv->old_ifname, ifname, IFNAMSIZ);
+		rereg_priv->old_ifname[IFNAMSIZ-1] = 0;
 	}
 
 	//DBG_871X("%s wrqu->data.length:%d\n", __FUNCTION__, wrqu->data.length);
@@ -4999,7 +4997,7 @@ static int rtw_rereg_nd_name(struct net_device *dev,
 		return -EFAULT;
 	}
 
-	if( 0 == strcmp(old_ifname, new_ifname) ) {
+	if( 0 == strcmp(rereg_priv->old_ifname, new_ifname) ) {
 		return ret;
 	}
 
@@ -5008,14 +5006,14 @@ static int rtw_rereg_nd_name(struct net_device *dev,
 		goto exit;
 	}
 
-	if(_rtw_memcmp(old_ifname, "disable%d", 9) == _TRUE) {
-		padapter->ledpriv.bRegUseLed= old_bRegUseLed;		
+	if(_rtw_memcmp(rereg_priv->old_ifname, "disable%d", 9) == _TRUE) {
+		padapter->ledpriv.bRegUseLed= rereg_priv->old_bRegUseLed;
 		rtw_sw_led_init(padapter);
-		rtw_ips_mode_req(&padapter->pwrctrlpriv, old_ips_mode);
+		rtw_ips_mode_req(&padapter->pwrctrlpriv, rereg_priv->old_ips_mode);
 	}
 
-	strncpy(old_ifname, new_ifname, IFNAMSIZ);
-	old_ifname[IFNAMSIZ-1] = 0;
+	strncpy(rereg_priv->old_ifname, new_ifname, IFNAMSIZ);
+	rereg_priv->old_ifname[IFNAMSIZ-1] = 0;
 	
 	if(_rtw_memcmp(new_ifname, "disable%d", 9) == _TRUE) {
 
@@ -5025,12 +5023,12 @@ static int rtw_rereg_nd_name(struct net_device *dev,
 		
 		// close led
 		rtw_led_control(padapter, LED_CTL_POWER_OFF);
-		old_bRegUseLed = padapter->ledpriv.bRegUseLed;
+		rereg_priv->old_bRegUseLed = padapter->ledpriv.bRegUseLed;
 		padapter->ledpriv.bRegUseLed= _FALSE;
 		rtw_sw_led_deinit(padapter);
 		
 		// the interface is being "disabled", we can do deeper IPS
-		old_ips_mode = rtw_get_ips_mode_req(&padapter->pwrctrlpriv);
+		rereg_priv->old_ips_mode = rtw_get_ips_mode_req(&padapter->pwrctrlpriv);
 		rtw_ips_mode_req(&padapter->pwrctrlpriv, IPS_NORMAL);
 	}
 exit:

@@ -171,8 +171,6 @@ int proc_get_read_reg(char *page, char **start,
 int proc_set_read_reg(struct file *file, const char *buffer,
 		unsigned long count, void *data)
 {
-	struct net_device *dev = (struct net_device *)data;
-	_adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
 	char tmp[16];
 	u32 addr, len;
 
@@ -310,6 +308,7 @@ int proc_get_ap_info(char *page, char **start,
 	struct net_device *dev = data;
 	_adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
 	struct mlme_priv *pmlmepriv = &(padapter->mlmepriv);
+	struct mlme_ext_priv *pmlmeext = &padapter->mlmeextpriv;
 	struct wlan_network *cur_network = &(pmlmepriv->cur_network);
 	struct sta_priv *pstapriv = &padapter->stapriv;
 	int len = 0;
@@ -320,7 +319,9 @@ int proc_get_ap_info(char *page, char **start,
 		int i;
 		struct recv_reorder_ctrl *preorder_ctrl;
 					
+		len += snprintf(page + len, count - len, "SSID=%s\n", cur_network->network.Ssid.Ssid);		
 		len += snprintf(page + len, count - len, "sta's macaddr:" MAC_FMT "\n", MAC_ARG(psta->hwaddr));
+		len += snprintf(page + len, count - len, "cur_channel=%d, cur_bwmode=%d, cur_ch_offset=%d\n", pmlmeext->cur_channel, pmlmeext->cur_bwmode, pmlmeext->cur_ch_offset);		
 		len += snprintf(page + len, count - len, "rtsen=%d, cts2slef=%d\n", psta->rtsen, psta->cts2self);
 		len += snprintf(page + len, count - len, "qos_en=%d, ht_en=%d, init_rate=%d\n", psta->qos_option, psta->htpriv.ht_option, psta->init_rate);	
 		len += snprintf(page + len, count - len, "state=0x%x, aid=%d, macid=%d, raid=%d\n", psta->state, psta->aid, psta->mac_id, psta->raid);	
@@ -374,8 +375,8 @@ int proc_get_trx_info(char *page, char **start,
 	struct recv_priv  *precvpriv = &padapter->recvpriv;
 	int len = 0;
 	
-	len += snprintf(page + len, count - len, "free_xmitbuf_cnt=%d, free_xmitframe_cnt=%d\n", 
-				pxmitpriv->free_xmitbuf_cnt, pxmitpriv->free_xmitframe_cnt);
+	len += snprintf(page + len, count - len, "free_xmitbuf_cnt=%d, free_xmitframe_cnt=%d, free_ext_xmitbuf_cnt=%d, free_recvframe_cnt=%d\n", 
+				pxmitpriv->free_xmitbuf_cnt, pxmitpriv->free_xmitframe_cnt,pxmitpriv->free_xmit_extbuf_cnt, precvpriv->free_recvframe_cnt);
 #ifdef CONFIG_USB_HCI
 	len += snprintf(page + len, count - len, "rx_urb_pending_cn=%d\n", precvpriv->rx_pending_cnt);
 #endif

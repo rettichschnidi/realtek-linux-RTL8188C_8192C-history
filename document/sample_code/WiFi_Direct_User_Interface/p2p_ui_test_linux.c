@@ -146,12 +146,14 @@ void init_p2p(struct p2p *p)
 	p->ap_open=0;
 	strcpy(p->ok_msg, "WiFi Direct handshake done" );
 	strcpy(p->redo_msg, "Re-do GO handshake" );
-	strcpy(p->fail_msg, "GO handshake unsuccessful" );	
+	strcpy(p->fail_msg, "GO handshake unsuccessful" );
 	strcpy(p->nego_msg, "Start P2P negotiation" );
 	strcpy(p->wpa_conf, "/etc/wpa_supplicant/wpa_supplicant.conf" );
-	strcpy(p->wpa_path, "../wpa_supplicant_hostapd-0.8/wpa_supplicant" );
+	strcpy(p->wpa_path, "../wpa_supplicant_hostapd-0.8/wpa_supplicant/wpa_supplicant" );
+	strcpy(p->wpacli_path, "../wpa_supplicant_hostapd-0.8/wpa_supplicant/wpa_cli" );
 	strcpy(p->ap_conf, "/etc/hostapd.conf" );
-	strcpy(p->ap_path, "../wpa_supplicant_hostapd-0.8/hostapd" );
+	strcpy(p->ap_path, "../wpa_supplicant_hostapd-0.8/hostapd/hostapd" );
+	strcpy(p->apcli_path, "../wpa_supplicant_hostapd-0.8/hostapd/hostapd_cli" );
 	strcpy(p->scan_msg, "Device haven't enable p2p functionalities" );
 	
 }
@@ -160,7 +162,6 @@ void init_p2p(struct p2p *p)
 int main(int argc, char **argv)
 {
 	char	peerifa[40] = { 0x00 };
-	int ret=0;
 	char	scan[CMD_SZ];	
 	struct p2p *p=NULL;
 	
@@ -271,7 +272,7 @@ int main(int argc, char **argv)
 			}
 			else if( strncmp(scan, "n", 1) == 0 )	// Set negotiation
 			{
-				ret=p2p_set_nego(p);
+				p2p_set_nego(p);
 			}
 			else if( strncmp(scan, "f", 1) == 0 ) // Reflash current state
 			{
@@ -344,9 +345,9 @@ int main(int argc, char **argv)
 			else if( strncmp(scan, "q", 1) == 0 )	// Quit
 			{
 				if( p->res == 0 )
-					pthread_cancel(p->pthread);
+					p->res = 1;
 				if( p->res_go == 0 )
-					pthread_cancel(p->pthread_go);
+					p->res_go = 1;
 				break;
 			}
 			else	// Insert wrong commamd

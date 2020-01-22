@@ -1146,6 +1146,7 @@ static int recvbuf2recvframe(_adapter *padapter, _pkt *pskb)
 		if((pkt_len<=0) || (pkt_offset>transfer_len))
 		{	
 			RT_TRACE(_module_rtl871x_recv_c_,_drv_info_,("recvbuf2recvframe: pkt_len<=0\n"));
+			DBG_8192C("%s()-%d: RX Warning!\n", __FUNCTION__, __LINE__);	
 			goto _exit_recvbuf2recvframe;
 		}		
 
@@ -1164,6 +1165,7 @@ static int recvbuf2recvframe(_adapter *padapter, _pkt *pskb)
 		if(precvframe==NULL)
 		{
 			RT_TRACE(_module_rtl871x_recv_c_,_drv_err_,("recvbuf2recvframe: precvframe==NULL\n"));
+			DBG_8192C("%s()-%d: rtw_alloc_recvframe() failed! RX Drop!\n", __FUNCTION__, __LINE__);	
 			goto _exit_recvbuf2recvframe;
 		}
 
@@ -1336,7 +1338,7 @@ static void usb_read_port_complete(struct urb *purb, struct pt_regs *regs)
 			dev_kfree_skb_any(precvbuf->pskb);				
 		}	
 	#endif
-	
+		DBG_8192C("%s()-%d: RX Warning!\n", __FUNCTION__, __LINE__);	
 		goto exit;
 	}
 
@@ -1347,6 +1349,7 @@ static void usb_read_port_complete(struct urb *purb, struct pt_regs *regs)
 			RT_TRACE(_module_hci_ops_os_c_,_drv_err_,("usb_read_port_complete: (purb->actual_length > MAX_RECVBUF_SZ) || (purb->actual_length < RXDESC_SIZE)\n"));
 			precvbuf->reuse = _TRUE;
 			rtw_read_port(padapter, precvpriv->ff_hwaddr, 0, (unsigned char *)precvbuf);
+			DBG_8192C("%s()-%d: RX Warning!\n", __FUNCTION__, __LINE__);	
 		}
 		else 
 		{	

@@ -4,10 +4,11 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <pthread.h>
 
 #define	P2P_AUTO	1
-#define DHCP	1
+//#define DHCP	1
 #define CMD_SZ 100
 #define SSID_SZ	32
 
@@ -106,8 +107,10 @@ struct p2p{
 	int ap_open;
 	char ap_conf[CMD_SZ];
 	char ap_path[CMD_SZ];
+	char apcli_path[CMD_SZ];
 	char wpa_conf[CMD_SZ];
 	char wpa_path[CMD_SZ];
+	char wpacli_path[CMD_SZ];
 	char ok_msg[CMD_SZ];
 	char redo_msg[CMD_SZ];
 	char fail_msg[CMD_SZ];
@@ -122,6 +125,7 @@ struct p2p{
 	int connect_go;
 };
 
+void ui_screen(struct p2p *p);
 char *naming_wpsinfo(int wps_info);
 char *naming_role(int role);
 char *naming_status(int status);
@@ -136,7 +140,7 @@ void p2p_role(struct p2p *p, int flag);
 void p2p_status(struct p2p *p, int flag);
 void p2p_prov_disc_no_addr(struct p2p *p, char *msg);
 void p2p_prov_disc(struct p2p *p, char *msg, char *dis_msg, char *label_msg);
-int p2p_set_nego(struct p2p *p);
+void p2p_set_nego(struct p2p *p);
 void p2p_ifaddr(struct p2p *p);
 void p2p_client_mode(struct p2p *p);
 void p2p_go_mode(struct p2p *p);

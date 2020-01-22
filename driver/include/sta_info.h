@@ -141,6 +141,8 @@ struct sta_info {
 
 	//for A-MPDU Tx
 	//unsigned char		ampdu_txen_bitmap;
+	u16	BA_starting_seqctrl[16];
+	
 
 #ifdef CONFIG_80211N_HT
 	struct ht_priv	htpriv;	
@@ -242,6 +244,8 @@ struct	sta_priv {
 #ifdef CONFIG_AP_MODE
 	_list asoc_list;
 	_list auth_list;
+	_lock asoc_list_lock;
+	_lock auth_list_lock;
 
 	unsigned int auth_to;  //sec, time to expire in authenticating.
 	unsigned int assoc_to; //sec, time to expire before associating.

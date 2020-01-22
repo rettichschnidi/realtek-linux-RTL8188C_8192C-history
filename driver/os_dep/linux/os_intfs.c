@@ -1077,9 +1077,9 @@ u8 rtw_free_drv_sw(_adapter *padapter)
 	RT_TRACE(_module_os_intfs_c_,_drv_info_,("<==rtw_free_drv_sw\n"));
 
 	//free the old_pnetdev
-	if(padapter->old_pnetdev) {
-		free_netdev(padapter->old_pnetdev);
-		padapter->old_pnetdev = NULL;
+	if(padapter->rereg_nd_name_priv.old_pnetdev) {
+		free_netdev(padapter->rereg_nd_name_priv.old_pnetdev);
+		padapter->rereg_nd_name_priv.old_pnetdev = NULL;
 	}	
 
 	if(pnetdev)
@@ -1152,6 +1152,9 @@ static int netdev_open(struct net_device *pnetdev)
 		rtw_proc_init_one(pnetdev);
 #endif
 #endif
+
+		rtw_led_control(padapter, LED_CTL_NO_LINK);
+
 		padapter->bup = _TRUE;
 	}
 	padapter->net_closed = _FALSE;
@@ -1238,6 +1241,9 @@ int rtw_ips_pwr_up(_adapter *padapter)
 	DBG_8192C("===>  rtw_ips_pwr_up..............\n");
 	rtw_reset_drv_sw(padapter);
 	result = ips_netdrv_open(padapter);
+	
+	rtw_led_control(padapter, LED_CTL_NO_LINK);
+	
  	DBG_8192C("<===  rtw_ips_pwr_up.............. in %dms\n", rtw_get_passing_time_ms(start_time));
 	return result;
 
@@ -1251,7 +1257,7 @@ void rtw_ips_pwr_down(_adapter *padapter)
 	padapter->bCardDisableWOHSM = _TRUE;
 	padapter->net_closed = _TRUE;
 
-	rtw_led_control(padapter, LED_CTL_NO_LINK);
+	rtw_led_control(padapter, LED_CTL_POWER_OFF);
 	
 	rtw_ips_dev_unload(padapter);
 	padapter->bCardDisableWOHSM = _FALSE;

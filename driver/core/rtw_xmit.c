@@ -510,11 +510,11 @@ static void update_attrib_phy_info(struct pkt_attrib *pattrib, struct sta_info *
 	pattrib->sgi= psta->htpriv.sgi;
 	pattrib->ampdu_en = _FALSE;
 
-	if(pattrib->ht_en && psta->htpriv.ampdu_enable)
-	{
-		if(psta->htpriv.agg_enable_bitmap & BIT(pattrib->priority))
-			pattrib->ampdu_en = _TRUE;
-	}	
+	//if(pattrib->ht_en && psta->htpriv.ampdu_enable)
+	//{
+	//	if(psta->htpriv.agg_enable_bitmap & BIT(pattrib->priority))
+	//		pattrib->ampdu_en = _TRUE;
+	//}	
 	
 }
 
@@ -644,6 +644,11 @@ static s32 update_attrib(_adapter *padapter, _pkt *pkt, struct pkt_attrib *pattr
 			#ifdef DBG_TX_DROP_FRAME
 			DBG_871X("DBG_TX_DROP_FRAME %s get sta_info fail, ra:" MAC_FMT"\n", __FUNCTION__, MAC_ARG(pattrib->ra));
 			#endif
+			res =_FAIL;
+			goto exit;
+		}
+		else if((check_fwstate(pmlmepriv, WIFI_AP_STATE)==_TRUE)&&(!(psta->state & _FW_LINKED)))
+		{
 			res =_FAIL;
 			goto exit;
 		}
@@ -863,7 +868,8 @@ _func_enter_;
 
 			}
 
-                    if(pqospriv->qos_option==1)
+                    //if(pqospriv->qos_option==1)
+                    if(pattrib->qos_en)
 				priority[0]=(u8)pxmitframe->attrib.priority;
 
 			
@@ -961,9 +967,10 @@ s32 rtw_make_wlanhdr (_adapter *padapter , u8 *hdr, struct pkt_attrib *pattrib)
 	struct ieee80211_hdr *pwlanhdr = (struct ieee80211_hdr *)hdr;
 	struct mlme_priv *pmlmepriv = &padapter->mlmepriv;
 	struct qos_priv *pqospriv = &pmlmepriv->qospriv;
+        u8 qos_option = _FALSE; 
+#ifdef CONFIG_TDLS
 	struct mlme_ext_priv	*pmlmeext = &(padapter->mlmeextpriv);
 	struct mlme_ext_info	*pmlmeinfo = &(pmlmeext->mlmext_info);
-#ifdef CONFIG_TDLS
 	struct sta_priv 	*pstapriv = &padapter->stapriv;
 	struct sta_info *ptdls_sta=NULL;
 	u8 tdls_seq=0;
@@ -976,7 +983,21 @@ s32 rtw_make_wlanhdr (_adapter *padapter , u8 *hdr, struct pkt_attrib *pattrib)
 	sint res = _SUCCESS;
 	u16 *fctrl = &pwlanhdr->frame_ctl;
 
+	struct sta_info *psta;
+
+	sint bmcst = IS_MCAST(pattrib->ra);
+
 _func_enter_;
+
+	if (pattrib->psta) {
+		psta = pattrib->psta;
+	} else {
+		if(bmcst) {
+			psta = rtw_get_bcmc_stainfo(padapter);
+		} else {
+			psta = rtw_get_stainfo(&padapter->stapriv, pattrib->ra);
+		}
+	}
 
 	_rtw_memset(hdr, 0, WLANHDR_OFFSET);
 
@@ -1012,6 +1033,10 @@ _func_enter_;
 				_rtw_memcpy(pwlanhdr->addr2, pattrib->src, ETH_ALEN);
 				_rtw_memcpy(pwlanhdr->addr3, pattrib->dst, ETH_ALEN);
 			} 
+
+			if (pqospriv->qos_option)
+				qos_option = _TRUE;
+
 		}
 		else if ((check_fwstate(pmlmepriv,  WIFI_AP_STATE) == _TRUE) ) {
 			//to_ds = 0, fr_ds = 1;
@@ -1019,12 +1044,18 @@ _func_enter_;
 			_rtw_memcpy(pwlanhdr->addr1, pattrib->dst, ETH_ALEN);
 			_rtw_memcpy(pwlanhdr->addr2, get_bssid(pmlmepriv), ETH_ALEN);
 			_rtw_memcpy(pwlanhdr->addr3, pattrib->src, ETH_ALEN);
+
+			if(psta->qos_option)			
+				qos_option = _TRUE;
 		}
 		else if ((check_fwstate(pmlmepriv, WIFI_ADHOC_STATE) == _TRUE) ||
 		(check_fwstate(pmlmepriv, WIFI_ADHOC_MASTER_STATE) == _TRUE)) {
 			_rtw_memcpy(pwlanhdr->addr1, pattrib->dst, ETH_ALEN);
 			_rtw_memcpy(pwlanhdr->addr2, pattrib->src, ETH_ALEN);
 			_rtw_memcpy(pwlanhdr->addr3, get_bssid(pmlmepriv), ETH_ALEN);
+
+			if(psta->qos_option)			
+				qos_option = _TRUE;
 		}
 		else {
 			RT_TRACE(_module_rtl871x_xmit_c_,_drv_err_,("fw_state:%x is not allowed to xmit frame\n", get_fwstate(pmlmepriv)));
@@ -1046,7 +1077,7 @@ _func_enter_;
 		if (pattrib->encrypt)
 			SetPrivacy(fctrl);
 
-		if (pqospriv->qos_option)
+		if (qos_option)
 		{
 			qc = (unsigned short *)(hdr + pattrib->hdrlen - 2);
 
@@ -1062,20 +1093,7 @@ _func_enter_;
 		//TODO: fill HT Control Field
 
 		//Update Seq Num will be handled by f/w
-		{
-			struct sta_info *psta;
-
-			sint bmcst = IS_MCAST(pattrib->ra);
-
-			if (pattrib->psta) {
-				psta = pattrib->psta;
-			} else {
-				if(bmcst) {
-					psta = rtw_get_bcmc_stainfo(padapter);
-				} else {
-					psta = rtw_get_stainfo(&padapter->stapriv, pattrib->ra);
-				}
-			}
+		{		
 
 #ifdef CONFIG_TDLS
 			//  1. update seq_num per link by sta_info
@@ -1100,10 +1118,48 @@ _func_enter_;
 				psta->sta_xmitpriv.txseq_tid[pattrib->priority] &= 0xFFF;
 
 				pattrib->seqnum = psta->sta_xmitpriv.txseq_tid[pattrib->priority];
-
+		
 				SetSeqNum(hdr, pattrib->seqnum);
+
+		
+				//check if enable ampdu
+				if(pattrib->ht_en && psta->htpriv.ampdu_enable)
+				{
+					if(psta->htpriv.agg_enable_bitmap & BIT(pattrib->priority))
+					pattrib->ampdu_en = _TRUE;
+				}
+
+				//re-check if enable ampdu by BA_starting_seqctrl
+				if(pattrib->ampdu_en == _TRUE)
+				{					
+					u16 tx_seq;
+
+					tx_seq = psta->BA_starting_seqctrl[pattrib->priority & 0x0f];
+		
+					//check BA_starting_seqctrl
+					if(SN_LESS(pattrib->seqnum, tx_seq))
+					{
+						//DBG_871X("tx ampdu seqnum(%d) < tx_seq(%d)\n", pattrib->seqnum, tx_seq);
+						pattrib->ampdu_en = _FALSE;//AGG BK
+		}
+					else if(SN_EQUAL(pattrib->seqnum, tx_seq))
+					{					
+						psta->BA_starting_seqctrl[pattrib->priority & 0x0f] = (tx_seq+1)&0xfff;
+					
+						pattrib->ampdu_en = _TRUE;//AGG EN
+					}
+					else
+					{
+						//DBG_871X("tx ampdu over run\n");
+						psta->BA_starting_seqctrl[pattrib->priority & 0x0f] = (pattrib->seqnum+1)&0xfff;
+						pattrib->ampdu_en = _TRUE;//AGG EN
+					}
+		
+				}
+				
 			}
 		}
+		
 	}
 	else
 	{
