@@ -22,6 +22,8 @@
 
 /*Created on  2011/ 6/15,  5:45*/
 
+#include <stdint.h>
+
 #ifdef CONFIG_BT_COEXISTENCE
 #define TSMCImgArrayLength 15706 //v84 TSMC COMMON 2012-04-13
 #else //#ifdef CONFIG_P2P

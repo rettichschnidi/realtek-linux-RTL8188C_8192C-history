@@ -76,7 +76,6 @@
 
 #endif
 
-
 #ifdef PLATFORM_LINUX
 	#include <linux/version.h>
 	#include <linux/types.h>
